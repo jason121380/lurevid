@@ -6,7 +6,7 @@ export type SeedanceSettings = {
 
 const BYTEPLUS_BASE_URL = "https://ark.ap-southeast.bytepluses.com/api/v3";
 
-export async function createSeedanceTask(prompt: string, settings: SeedanceSettings) {
+export async function createSeedanceTask(prompt: string, settings: SeedanceSettings, imageUrl?: string | null) {
   if (!process.env.ARK_API_KEY || process.env.ARK_API_KEY.startsWith("replace-with")) {
     throw new Error("請先在 .env 設定有效的 ARK_API_KEY");
   }
@@ -18,7 +18,10 @@ export async function createSeedanceTask(prompt: string, settings: SeedanceSetti
     },
     body: JSON.stringify({
       model: process.env.SEEDANCE_MODEL || "dreamina-seedance-2-0-fast-260128",
-      content: [{ type: "text", text: prompt }],
+      content: [
+        { type: "text", text: prompt },
+        ...(imageUrl ? [{ type: "image", url: imageUrl }] : [])
+      ],
       ratio: settings.ratio,
       resolution: settings.resolution,
       duration: settings.duration

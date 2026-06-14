@@ -11,6 +11,7 @@ enum ProjectStatus {
   DRAFT
   QUEUED
   STORYBOARDING
+  STORYBOARD_READY
   GENERATING
   MERGING
   COMPLETED
@@ -20,6 +21,8 @@ enum ProjectStatus {
 enum SceneStatus {
   DRAFT
   PROMPT_READY
+  IMAGE_GENERATING
+  IMAGE_READY
   QUEUED
   GENERATING
   SUCCEEDED
@@ -49,6 +52,9 @@ model Scene {
   sceneNumber     Int
   title           String
   visualGoal      String
+  imagePrompt     String?     @db.Text
+  imageUrl        String?
+  imageLocalPath  String?
   seedancePrompt  String      @db.Text
   status          SceneStatus @default(DRAFT)
   seedanceTaskId  String?

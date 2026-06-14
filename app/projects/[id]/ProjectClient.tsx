@@ -10,6 +10,8 @@ type Scene = {
   sceneNumber: number;
   title: string;
   visualGoal: string;
+  imagePrompt?: string;
+  imageUrl?: string;
   seedancePrompt: string;
   status: string;
   videoUrl?: string;
@@ -35,6 +37,7 @@ function statusClass(status: string) {
 export function ProjectClient({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null);
   const [error, setError] = useState("");
+  const [startingVideo, setStartingVideo] = useState(false);
 
   useEffect(() => {
     let stopped = false;
@@ -54,6 +57,24 @@ export function ProjectClient({ projectId }: { projectId: string }) {
       stopped = true;
     };
   }, [projectId]);
+
+  async function startVideo() {
+    setStartingVideo(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/video`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "無法開始生成影片");
+        return;
+      }
+      setProject(data);
+    } catch {
+      setError("影片生成 API 沒有回應");
+    } finally {
+      setStartingVideo(false);
+    }
+  }
 
   if (error) return <Shell><div className="p-6 text-[var(--red)]">{error}</div></Shell>;
   if (!project) return <Shell><div className="grid min-h-screen place-items-center"><Loader2 className="animate-spin text-orange" /></div></Shell>;
@@ -75,6 +96,11 @@ export function ProjectClient({ projectId }: { projectId: string }) {
               <p className="text-[11px] uppercase text-orange">Project</p>
               <h1 className="mt-1 text-xl">{project.idea}</h1>
               <p className="mt-2 text-sm text-[var(--gray-500)]">{project.message}</p>
+              {project.status === "STORYBOARD_READY" && (
+                <button className="btn btn-primary mt-4" disabled={startingVideo} onClick={startVideo}>
+                  {startingVideo ? "送出中" : "變成影片"}
+                </button>
+              )}
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--border)]">
                 <div className="h-full rounded-full bg-orange transition-all" style={{ width: `${Math.round(project.progress * 100)}%` }} />
               </div>
@@ -88,8 +114,16 @@ export function ProjectClient({ projectId }: { projectId: string }) {
                     <span className={`badge ${statusClass(scene.status)}`}>{scene.status}</span>
                   </div>
                   <h2 className="text-sm">{scene.title}</h2>
+                  <div className="mt-3 grid aspect-video place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
+                    {scene.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={scene.imageUrl} alt={scene.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs text-[var(--gray-500)]">分鏡圖生成中</span>
+                    )}
+                  </div>
                   <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">{scene.visualGoal}</p>
-                  <p className="mt-3 max-h-28 overflow-auto rounded-lg bg-[var(--warm-white)] p-2 text-[11px] leading-5">{scene.seedancePrompt}</p>
+                  <p className="mt-3 max-h-20 overflow-auto rounded-lg bg-[var(--warm-white)] p-2 text-[11px] leading-5">{scene.imagePrompt || scene.seedancePrompt}</p>
                 </article>
               ))}
             </div>
@@ -101,8 +135,13 @@ export function ProjectClient({ projectId }: { projectId: string }) {
               <h2 className="text-lg">輸出影片</h2>
             </div>
             <div className="grid aspect-video place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
-              {project.finalVideoUrl ? <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" /> : "影片生成中"}
+              {project.finalVideoUrl ? <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" /> : project.status === "STORYBOARD_READY" ? "分鏡圖已完成" : "處理中"}
             </div>
+            {project.status === "STORYBOARD_READY" && (
+              <button className="btn btn-primary mt-4 w-full" disabled={startingVideo} onClick={startVideo}>
+                {startingVideo ? "送出中" : "變成影片"}
+              </button>
+            )}
             {project.finalVideoUrl && (
               <a className="btn btn-primary mt-4 w-full" href={project.finalVideoUrl} target="_blank" rel="noreferrer">
                 <Download size={16} />
