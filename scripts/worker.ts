@@ -37,7 +37,7 @@ async function runAnalyze(projectId: string) {
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "ANALYZING", message: "正在取得影片內容並分析", progress: 0.1, error: null }
+    data: { status: "ANALYZING", message: "正在下載來源影片", progress: 0.06, error: null }
   });
 
   const platform = project.sourcePlatform || detectPlatform(project.sourceUrl);
@@ -50,15 +50,30 @@ async function runAnalyze(projectId: string) {
     await withDownloadedVideo(project.sourceUrl, async (videoPath, dir) => {
       if (!transcript) {
         try {
+          await prisma.project.update({
+            where: { id: projectId },
+            data: { message: "正在轉錄影片音訊", progress: 0.1 }
+          });
           transcript = await transcribeMediaFile(videoPath);
-          await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
+          await prisma.project.update({
+            where: { id: projectId },
+            data: { sourceTranscript: transcript, message: "逐字稿完成，準備分析畫面", progress: 0.13 }
+          });
         } catch (error) {
           transcriptError = error instanceof Error ? error.message : "未知錯誤";
         }
       }
 
       try {
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { message: "正在抽取影片畫面影格", progress: 0.15 }
+        });
         const frames = await extractVideoFrames(videoPath, dir);
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { message: `正在用 AI 分析畫面分鏡（${frames.length} 張影格）`, progress: 0.17 }
+        });
         visualAnalysis = await analyzeVideoFrames(frames, transcript, platform);
       } catch (error) {
         visualError = error instanceof Error ? error.message : "未知錯誤";
@@ -70,6 +85,10 @@ async function runAnalyze(projectId: string) {
 
   if (!transcript) {
     try {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { message: "正在改用音訊下載方式取得逐字稿", progress: 0.12 }
+      });
       transcript = await fetchTranscript(project.sourceUrl);
     } catch (error) {
       const reason = error instanceof Error ? error.message : "未知錯誤";
@@ -78,6 +97,10 @@ async function runAnalyze(projectId: string) {
     await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
   }
 
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { message: "正在整合逐字稿與畫面分析", progress: 0.19 }
+  });
   const analysis = await analyzeVideo(
     transcript,
     platform,

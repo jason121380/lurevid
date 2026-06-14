@@ -1,7 +1,7 @@
 "use client";
 
-import { Eye, EyeOff, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2, ChevronDown, Clock3, Eye, EyeOff, Save } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 
 type SettingField = {
@@ -14,6 +14,41 @@ type SettingField = {
   maskedValue: string;
 };
 
+type SettingGroup = {
+  title: string;
+  description: string;
+  keys: string[];
+  requiredKeys: string[];
+};
+
+type GroupStatus = {
+  state: "ready" | "pending" | "missing";
+  label: string;
+  detail: string;
+  missingLabels: string[];
+};
+
+const groups: SettingGroup[] = [
+  {
+    title: "OpenAI",
+    description: "分析、視覺理解、圖片與音訊轉錄會用這組設定。",
+    keys: ["OPENAI_API_KEY", "OPENAI_STORY_MODEL", "OPENAI_PROMPT_MODEL", "OPENAI_IMAGE_MODEL", "OPENAI_TRANSCRIBE_MODEL"],
+    requiredKeys: ["OPENAI_API_KEY", "OPENAI_STORY_MODEL", "OPENAI_PROMPT_MODEL", "OPENAI_IMAGE_MODEL", "OPENAI_TRANSCRIBE_MODEL"]
+  },
+  {
+    title: "Seedance",
+    description: "把分鏡變成影片片段時會用這組設定。",
+    keys: ["ARK_API_KEY", "SEEDANCE_MODEL"],
+    requiredKeys: ["ARK_API_KEY", "SEEDANCE_MODEL"]
+  },
+  {
+    title: "S3 物件儲存",
+    description: "儲存分鏡圖、影片片段與 final.mp4，並提供前台播放網址。",
+    keys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL", "S3_FORCE_PATH_STYLE"],
+    requiredKeys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL"]
+  }
+];
+
 export default function SettingsPage() {
   const [fields, setFields] = useState<SettingField[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -22,38 +57,43 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [savedAt, setSavedAt] = useState("");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  async function loadSettings() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/settings");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "讀取設定失敗");
+      setFields(data.fields);
+      setValues(
+        Object.fromEntries(
+          data.fields.map((field: SettingField) => [field.key, field.secret ? "" : field.value || field.defaultValue || ""])
+        )
+      );
+      setExpanded((current) => {
+        if (Object.keys(current).length) return current;
+        const next: Record<string, boolean> = {};
+        for (const group of groups) {
+          next[group.title] = group.requiredKeys.some((key) => {
+            const field = data.fields.find((item: SettingField) => item.key === key);
+            return !field || !field.configured && !(field.value || field.defaultValue);
+          });
+        }
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "讀取設定失敗");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch("/api/settings");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "讀取設定失敗");
-        setFields(data.fields);
-        setValues(
-          Object.fromEntries(
-            data.fields.map((field: SettingField) => [field.key, field.secret ? "" : field.value || field.defaultValue || ""])
-          )
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "讀取設定失敗");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    loadSettings();
   }, []);
-
-  const groups = useMemo(
-    () => [
-      { title: "OpenAI", keys: ["OPENAI_API_KEY", "OPENAI_STORY_MODEL", "OPENAI_PROMPT_MODEL", "OPENAI_IMAGE_MODEL", "OPENAI_TRANSCRIBE_MODEL"] },
-      { title: "Seedance", keys: ["ARK_API_KEY", "SEEDANCE_MODEL"] },
-      { title: "S3 物件儲存", keys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL", "S3_FORCE_PATH_STYLE"] }
-    ],
-    []
-  );
 
   async function save() {
     setSaving(true);
@@ -68,13 +108,8 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "儲存設定失敗");
       setMessage("設定已儲存，下一個 worker 任務會使用最新設定。");
-      const refreshed = await fetch("/api/settings").then((response) => response.json());
-      setFields(refreshed.fields);
-      setValues(
-        Object.fromEntries(
-          refreshed.fields.map((field: SettingField) => [field.key, field.secret ? "" : field.value || field.defaultValue || ""])
-        )
-      );
+      setSavedAt(new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" }));
+      await loadSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : "儲存設定失敗");
     } finally {
@@ -84,6 +119,55 @@ export default function SettingsPage() {
 
   function fieldByKey(key: string) {
     return fields.find((field) => field.key === key);
+  }
+
+  function hasUnsavedValue(field: SettingField) {
+    const value = values[field.key]?.trim() || "";
+    if (field.secret) return Boolean(value);
+    return value !== (field.value || field.defaultValue || "");
+  }
+
+  function isConfigured(key: string) {
+    const field = fieldByKey(key);
+    if (!field) return false;
+    const currentValue = values[key]?.trim() || "";
+    if (field.secret) return field.configured || Boolean(currentValue);
+    return Boolean(currentValue || field.value || field.defaultValue);
+  }
+
+  function groupStatus(group: SettingGroup): GroupStatus {
+    const groupFields = group.keys.map(fieldByKey).filter(Boolean) as SettingField[];
+    const dirty = groupFields.some(hasUnsavedValue);
+    const missingLabels = group.requiredKeys
+      .map((key) => fieldByKey(key))
+      .filter((field): field is SettingField => Boolean(field))
+      .filter((field) => !isConfigured(field.key))
+      .map((field) => field.label);
+
+    if (dirty) {
+      return {
+        state: "pending",
+        label: "有未儲存變更",
+        detail: "儲存後 worker 才會使用這些新設定。",
+        missingLabels
+      };
+    }
+
+    if (missingLabels.length) {
+      return {
+        state: "missing",
+        label: "尚未完成",
+        detail: `缺少 ${missingLabels.join("、")}`,
+        missingLabels
+      };
+    }
+
+    return {
+      state: "ready",
+      label: "已設定",
+      detail: "下一個任務會使用這組設定。",
+      missingLabels: []
+    };
   }
 
   return (
@@ -104,52 +188,118 @@ export default function SettingsPage() {
           {loading ? (
             <div className="card p-4 text-sm text-[var(--gray-500)]">載入設定中</div>
           ) : (
-            groups.map((group) => (
-              <section className="card p-4" key={group.title}>
-                <h2 className="mb-4 text-sm">{group.title}</h2>
-                <div className="grid gap-3">
-                  {group.keys.map((key) => {
-                    const field = fieldByKey(key);
-                    if (!field) return null;
-                    const inputType = field.secret && !revealed[key] ? "password" : "text";
-                    return (
-                      <label className="grid gap-2 text-sm md:grid-cols-[220px_minmax(0,1fr)] md:items-center" key={key}>
-                        <span className="text-[var(--gray-500)]">{field.label}</span>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
-                              placeholder={field.secret && field.configured ? field.maskedValue : field.defaultValue || field.key}
-                              type={inputType}
-                              value={values[key] || ""}
-                              onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))}
-                            />
-                            {field.secret && (
-                              <button
-                                className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--border-strong)] bg-white text-[var(--gray-500)]"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  setRevealed((current) => ({ ...current, [key]: !current[key] }));
-                                }}
-                                title={revealed[key] ? "隱藏" : "顯示"}
-                              >
-                                {revealed[key] ? <EyeOff size={16} /> : <Eye size={16} />}
-                              </button>
-                            )}
-                          </div>
-                          {field.secret && field.configured && !values[key] && (
-                            <p className="mt-1 text-xs text-[var(--gray-500)]">已設定：{field.maskedValue}。留空儲存會保留原值。</p>
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </section>
-            ))
+            <>
+              <div className="grid gap-3 md:grid-cols-3">
+                {groups.map((group) => (
+                  <StatusCard group={group} key={group.title} savedAt={savedAt} status={groupStatus(group)} />
+                ))}
+              </div>
+
+              {groups.map((group) => {
+                const status = groupStatus(group);
+
+                return (
+                  <section className="card overflow-hidden" key={group.title}>
+                    <button
+                      className="flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left"
+                      onClick={() => setExpanded((current) => ({ ...current, [group.title]: !current[group.title] }))}
+                      type="button"
+                    >
+                      <div>
+                        <h2 className="text-sm">{group.title}</h2>
+                        <p className="mt-1 text-xs leading-5 text-[var(--gray-500)]">{group.description}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={status} />
+                        <ChevronDown className={`text-[var(--gray-500)] transition-transform ${expanded[group.title] ? "rotate-180" : ""}`} size={18} />
+                      </div>
+                    </button>
+                    {expanded[group.title] && (
+                      <div className="grid gap-3 border-t border-[var(--border)] p-4">
+                        {group.keys.map((key) => {
+                          const field = fieldByKey(key);
+                          if (!field) return null;
+                          const inputType = field.secret && !revealed[key] ? "password" : "text";
+                          return (
+                            <label className="grid gap-2 text-sm md:grid-cols-[220px_minmax(0,1fr)] md:items-center" key={key}>
+                              <span className="text-[var(--gray-500)]">{field.label}</span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
+                                    placeholder={field.secret && field.configured ? field.maskedValue : field.defaultValue || field.key}
+                                    type={inputType}
+                                    value={values[key] || ""}
+                                    onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))}
+                                  />
+                                  {field.secret && (
+                                    <button
+                                      className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--border-strong)] bg-white text-[var(--gray-500)]"
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        setRevealed((current) => ({ ...current, [key]: !current[key] }));
+                                      }}
+                                      title={revealed[key] ? "隱藏" : "顯示"}
+                                      type="button"
+                                    >
+                                      {revealed[key] ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                  )}
+                                </div>
+                                {field.secret && field.configured && !values[key] && (
+                                  <p className="mt-1 text-xs text-[var(--gray-500)]">已設定：{field.maskedValue}。留空儲存會保留原值。</p>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </>
           )}
         </div>
       </div>
     </Shell>
+  );
+}
+
+function StatusBadge({ status }: { status: GroupStatus }) {
+  const className =
+    status.state === "ready"
+      ? "border-[var(--green)] bg-[var(--green-bg)] text-[var(--green)]"
+      : status.state === "pending"
+        ? "border-orange bg-orange-bg text-orange"
+        : "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]";
+
+  return <span className={`rounded-full border px-3 py-1 text-xs ${className}`}>{status.label}</span>;
+}
+
+function StatusIcon({ state }: { state: GroupStatus["state"] }) {
+  if (state === "ready") return <CheckCircle2 size={18} />;
+  if (state === "pending") return <Clock3 size={18} />;
+  return <AlertCircle size={18} />;
+}
+
+function StatusCard({ group, savedAt, status }: { group: SettingGroup; savedAt: string; status: GroupStatus }) {
+  const cardClass =
+    status.state === "ready"
+      ? "border-[var(--green)] bg-[var(--green-bg)] text-[var(--green)]"
+      : status.state === "pending"
+        ? "border-orange bg-orange-bg text-orange"
+        : "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]";
+
+  return (
+    <div className={`rounded-xl border p-4 ${cardClass}`}>
+      <div className="flex items-center gap-2">
+        <StatusIcon state={status.state} />
+        <h2 className="text-sm">{group.title}</h2>
+      </div>
+      <div className="mt-2 text-lg font-semibold">{status.label}</div>
+      <p className="mt-1 text-xs leading-5">{status.detail}</p>
+      {status.state === "ready" && savedAt && <p className="mt-2 text-xs">剛剛儲存：{savedAt}</p>}
+    </div>
   );
 }

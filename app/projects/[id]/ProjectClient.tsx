@@ -35,11 +35,53 @@ type Project = {
 };
 
 const BUSY = ["QUEUED", "ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING", "GENERATING", "MERGING"];
+type StepState = "done" | "active" | "waiting" | "failed";
+
+function stepStateClass(state: StepState) {
+  if (state === "done") return "border-[var(--green)] bg-[var(--green-bg)] text-[var(--green)]";
+  if (state === "active") return "border-orange bg-orange-bg text-orange";
+  if (state === "failed") return "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]";
+  return "border-[var(--border-strong)] bg-white text-[var(--gray-300)]";
+}
+
+function buildProcessSteps(project: Project): Array<{ title: string; description: string; state: StepState }> {
+  const failed = project.status === "FAILED";
+  const doneAfterAnalyze = !["DRAFT", "QUEUED", "ANALYZING", "FAILED"].includes(project.status) || Boolean(project.analysis);
+  const activeMessage = project.message || "";
+  const step = (
+    title: string,
+    description: string,
+    done: boolean,
+    active: boolean
+  ): { title: string; description: string; state: StepState } => {
+    const state: StepState = failed && active ? "failed" : done ? "done" : active ? "active" : "waiting";
+    return { title, description, state };
+  };
+
+  return [
+    step("建立專案", "儲存來源連結並排入 Redis queue", project.progress >= 0.03, project.status === "QUEUED"),
+    step("下載影片", "worker 用 yt-dlp 取得 IG/TikTok 影片", project.progress >= 0.1 || Boolean(project.sourceTranscript), project.status === "ANALYZING" && activeMessage.includes("下載")),
+    step("轉錄音訊", "把影片聲音轉成逐字稿", Boolean(project.sourceTranscript), project.status === "ANALYZING" && (activeMessage.includes("轉錄") || activeMessage.includes("逐字稿") || activeMessage.includes("音訊"))),
+    step("抽取影格", "用 ffmpeg 抽出代表性畫面", project.progress >= 0.17 || doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("抽取")),
+    step("視覺分析", "AI 分析畫面、字幕、構圖與分鏡節奏", project.progress >= 0.19 || doneAfterAnalyze, project.status === "ANALYZING" && (activeMessage.includes("畫面") || activeMessage.includes("影格") || activeMessage.includes("分鏡"))),
+    step("整合分析", "合併逐字稿與視覺分析產出洞察", doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("整合")),
+    step("拆解結構", "拆 hook、鋪陳、賣點與 CTA", ["STRUCTURE_READY", "ADAPTING", "ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STRUCTURING"),
+    step("改編腳本", "改寫成全新原創短影音腳本", ["ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "ADAPTING"),
+    step("產生分鏡", "拆 9 鏡並產生分鏡圖", ["STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STORYBOARDING"),
+    step("生成影片", "送 Seedance 產片段並合成 final.mp4", project.status === "COMPLETED", ["GENERATING", "MERGING"].includes(project.status))
+  ];
+}
 
 function statusClass(status: string) {
   if (status === "COMPLETED" || status === "SUCCEEDED") return "badge-active";
   if (status === "FAILED") return "badge-error";
   return "badge-warn";
+}
+
+function sourceEmbedUrl(url?: string) {
+  if (!url) return "";
+  if (/instagram\.com\/(?:reel|p)\//i.test(url)) return `${url.split("?")[0].replace(/\/+$/, "")}/embed`;
+  return url;
 }
 
 export function ProjectClient({ projectId }: { projectId: string }) {
@@ -127,7 +169,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           <span className={`badge ${statusClass(project.status)}`}>{project.status}</span>
         </div>
 
-        <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:p-6">
+        <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-4 p-6">
           <section className="space-y-4">
             <div className="card p-4">
               <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
@@ -162,14 +204,13 @@ export function ProjectClient({ projectId }: { projectId: string }) {
             </div>
 
             {project.analysis != null && project.analysis !== "" && (
-              <StepCard
+              <ResultCard
                 index="1"
-                title="分析"
+                title="影片分析"
                 value={analysis}
-                onChange={setAnalysis}
                 actionLabel="確認分析 → 拆解結構"
                 disabled={disabled}
-                onAction={() => post("/structure", { analysis })}
+                onAction={() => post("/structure", { analysis: project.analysis || analysis })}
               />
             )}
 
@@ -248,30 +289,103 @@ export function ProjectClient({ projectId }: { projectId: string }) {
             )}
           </section>
 
-          <aside className="card h-fit p-4 lg:sticky lg:top-6">
-            <div className="mb-3 flex items-center gap-2">
-              {project.status === "COMPLETED" ? <CheckCircle2 className="text-[var(--green)]" /> : project.status === "FAILED" ? <XCircle className="text-[var(--red)]" /> : <Loader2 className="animate-spin text-orange" />}
-              <h2 className="text-lg">輸出影片</h2>
-            </div>
-            <div className="grid aspect-[9/16] max-h-[420px] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
-              {project.finalVideoUrl ? (
-                <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
-              ) : project.status === "STORYBOARD_READY" ? (
-                "分鏡圖已完成，按「變成影片」"
-              ) : (
-                "處理中"
+          <aside className="sticky top-6 h-fit space-y-4">
+            <div className="card p-4">
+              <div className="mb-3 flex items-center gap-2">
+                {project.status === "COMPLETED" ? <CheckCircle2 className="text-[var(--green)]" /> : project.status === "FAILED" ? <XCircle className="text-[var(--red)]" /> : <Loader2 className="animate-spin text-orange" />}
+                <h2 className="text-lg">{project.finalVideoUrl ? "輸出影片" : "影片預覽"}</h2>
+              </div>
+              <div className="grid aspect-[9/16] max-h-[420px] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
+                {project.finalVideoUrl ? (
+                  <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
+                ) : project.sourceUrl ? (
+                  <iframe
+                    className="h-full w-full border-0 bg-white"
+                    src={sourceEmbedUrl(project.sourceUrl)}
+                    title="來源影片預覽"
+                    loading="lazy"
+                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  />
+                ) : (
+                  "尚未取得來源影片"
+                )}
+              </div>
+              {!project.finalVideoUrl && project.sourceUrl && (
+                <a className="btn btn-ghost mt-4 w-full" href={project.sourceUrl} target="_blank" rel="noreferrer">
+                  開啟原始影片
+                </a>
+              )}
+              {project.finalVideoUrl && (
+                <a className="btn btn-primary mt-4 w-full" href={project.finalVideoUrl} target="_blank" rel="noreferrer">
+                  <Download size={16} />
+                  下載完成影片
+                </a>
               )}
             </div>
-            {project.finalVideoUrl && (
-              <a className="btn btn-primary mt-4 w-full" href={project.finalVideoUrl} target="_blank" rel="noreferrer">
-                <Download size={16} />
-                下載完成影片
-              </a>
-            )}
+            <ProcessTimeline project={project} />
           </aside>
         </div>
       </div>
     </Shell>
+  );
+}
+
+function ProcessTimeline({ project }: { project: Project }) {
+  const steps = buildProcessSteps(project);
+
+  return (
+    <div className="card p-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="text-sm">背後處理流程</h2>
+        <span className="text-xs text-[var(--gray-500)]">{Math.round(project.progress * 100)}%</span>
+      </div>
+      <div className="space-y-2">
+        {steps.map((step, index) => (
+          <div className="flex gap-3 rounded-xl border border-[var(--border)] bg-white p-3" key={step.title}>
+            <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs ${stepStateClass(step.state)}`}>
+              {step.state === "done" ? <CheckCircle2 size={15} /> : step.state === "active" ? <Loader2 size={15} className="animate-spin" /> : step.state === "failed" ? <XCircle size={15} /> : index + 1}
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm">{step.title}</div>
+              <p className="mt-1 text-xs leading-5 text-[var(--gray-500)]">{step.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ResultCard({
+  index,
+  title,
+  value,
+  actionLabel,
+  onAction,
+  disabled
+}: {
+  index: string;
+  title: string;
+  value: string;
+  actionLabel: string;
+  onAction: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm">
+          {index} · {title}
+        </h2>
+        <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
+      </div>
+      <div className="max-h-[520px] overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-white p-4 text-sm leading-7 whitespace-pre-wrap">
+        {value}
+      </div>
+      <button className="btn btn-primary mt-3" disabled={disabled || !value.trim()} onClick={onAction}>
+        {actionLabel}
+      </button>
+    </div>
   );
 }
 

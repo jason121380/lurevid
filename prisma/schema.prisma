@@ -37,6 +37,7 @@ enum SceneStatus {
 
 model Project {
   id               String        @id @default(cuid())
+  title            String        @default("未命名專案")
   idea             String        @default("")
   sourceUrl        String?
   sourcePlatform   String?

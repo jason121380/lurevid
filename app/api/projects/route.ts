@@ -18,6 +18,18 @@ const createProjectSchema = z.object({
     .default({})
 });
 
+function projectTitle(sourceUrl: string) {
+  const platform = detectPlatform(sourceUrl);
+  const host = new URL(sourceUrl).hostname.replace(/^www\./, "");
+  const time = new Date().toLocaleString("zh-TW", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  return `${platform || host} 分析 ${time}`;
+}
+
 function toCreateProjectError(error: unknown) {
   if (error instanceof z.ZodError) return { message: "請貼上有效的 Instagram Reels 或 TikTok 連結", status: 400 };
 
@@ -49,6 +61,7 @@ export async function POST(request: Request) {
 
     const project = await prisma.project.create({
       data: {
+        title: projectTitle(body.sourceUrl),
         sourceUrl: body.sourceUrl,
         sourcePlatform: detectPlatform(body.sourceUrl),
         sourceTranscript: body.transcript?.trim() || null,
@@ -56,8 +69,8 @@ export async function POST(request: Request) {
         resolution: body.settings.resolution,
         duration: body.settings.duration,
         status: "ANALYZING",
-        message: "正在取得影片內容並分析",
-        progress: 0.05
+        message: "已建立專案，等待 worker 下載影片",
+        progress: 0.03
       },
       include: { scenes: { orderBy: { sceneNumber: "asc" } } }
     });
@@ -75,7 +88,16 @@ export async function GET() {
   const projects = await prisma.project.findMany({
     orderBy: { createdAt: "desc" },
     take: 20,
-    include: { scenes: { orderBy: { sceneNumber: "asc" } } }
+    select: {
+      id: true,
+      title: true,
+      sourceUrl: true,
+      sourcePlatform: true,
+      status: true,
+      progress: true,
+      updatedAt: true,
+      createdAt: true
+    }
   });
   return NextResponse.json({ projects });
 }
