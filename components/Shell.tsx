@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Menu, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Menu, Pencil, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -146,11 +146,11 @@ export function Shell({ children }: { children: ReactNode }) {
                           <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "AI 分析中"}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
-                          <button className="grid h-6 w-6 place-items-center rounded-md text-[var(--gray-500)] hover:bg-white hover:text-orange" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
-                            <Pencil size={12} />
+                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-400)] hover:text-[var(--gray-600)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
+                            <Pencil size={11} />
                           </button>
-                          <button className="grid h-6 w-6 place-items-center rounded-md text-[var(--gray-500)] hover:bg-white hover:text-[var(--red)]" disabled={savingId === project.id} onClick={() => deleteProject(project)} title="刪除專案">
-                            <Trash2 size={12} />
+                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-400)] hover:text-[var(--gray-600)]" disabled={savingId === project.id} onClick={() => deleteProject(project)} title="刪除專案">
+                            <X size={12} />
                           </button>
                         </div>
                       </div>
