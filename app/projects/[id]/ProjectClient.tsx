@@ -308,7 +308,8 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           <aside className="sticky top-6 h-fit space-y-4">
             <div className="card p-4">
               <div className="mb-3 flex items-center gap-2">
-                {project.status === "COMPLETED" ? <CheckCircle2 className="text-[var(--green)]" /> : project.status === "FAILED" ? <XCircle className="text-[var(--red)]" /> : <Loader2 className="animate-spin text-orange" />}
+                {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
+                {project.status === "FAILED" && <XCircle className="text-[var(--red)]" />}
                 <h2 className="text-lg">{project.finalVideoUrl ? "輸出影片" : "影片預覽"}</h2>
               </div>
               <div ref={previewRef} className="relative grid w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
