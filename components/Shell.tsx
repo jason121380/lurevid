@@ -162,7 +162,7 @@ export function Shell({ children }: { children: ReactNode }) {
                     ) : (
                       <div className="flex items-center gap-1">
                         <Link className="block min-w-0 flex-1 py-1" href={`/projects/${project.id}`} onClick={closeMobileMenu}>
-                          <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "AI 分析中"}</div>
+                          <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "未命名專案"}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
                           <button className="grid h-6 w-6 place-items-center text-[var(--gray-400)] hover:text-[var(--gray-600)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">

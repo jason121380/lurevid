@@ -8,12 +8,13 @@ import { Shell } from "@/components/Shell";
 
 export default function HomePage() {
   const router = useRouter();
+  const [projectTitle, setProjectTitle] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function start() {
-    if (!sourceUrl.trim()) return;
+    if (!projectTitle.trim() || !sourceUrl.trim()) return;
     setError("");
     setLoading(true);
     try {
@@ -21,6 +22,7 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: projectTitle.trim(),
           sourceUrl: sourceUrl.trim()
         })
       });
@@ -56,6 +58,12 @@ export default function HomePage() {
                 <h2 className="text-sm">貼上影片連結</h2>
               </div>
               <input
+                className="mb-3 w-full rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm outline-none focus:border-orange md:p-4"
+                placeholder="專案名稱"
+                value={projectTitle}
+                onChange={(event) => setProjectTitle(event.target.value)}
+              />
+              <input
                 className="w-full rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm outline-none focus:border-orange md:p-4"
                 placeholder="https://www.instagram.com/reel/...　或　https://www.tiktok.com/@.../video/..."
                 value={sourceUrl}
@@ -64,7 +72,7 @@ export default function HomePage() {
 
               <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div />
-                <button className="btn btn-primary w-full sm:w-auto" disabled={!sourceUrl.trim() || loading} onClick={start}>
+                <button className="btn btn-primary w-full sm:w-auto" disabled={!projectTitle.trim() || !sourceUrl.trim() || loading} onClick={start}>
                   <Wand2 size={16} />
                   {loading ? "建立中" : "開始分析"}
                 </button>

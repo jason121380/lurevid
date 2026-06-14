@@ -64,21 +64,6 @@ export async function analyzeVideo(transcript: string, platform: string, visualA
   );
 }
 
-export async function summarizeProjectTitle(analysis: string) {
-  const title = await generateText(
-    await textModel(),
-    "你是短影音專案命名助手。請根據分析內容產生一個精準、好辨識的繁體中文短標題，只輸出標題本身，不要引號、不要標點裝飾。",
-    `分析內容：\n${analysis}\n\n請輸出 8 到 16 個中文字以內的專案名稱，聚焦影片主題或核心洞察。`
-  );
-
-  return title
-    .replace(/^["「『]|["」』]$/g, "")
-    .replace(/[\n\r]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 40);
-}
-
 /** 第 2 步：拆解敘事結構。 */
 export async function analyzeStructure(transcript: string, analysis: string) {
   return generateText(

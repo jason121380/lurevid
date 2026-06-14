@@ -7,6 +7,7 @@ import { detectPlatform, isSupportedSourceUrl } from "@/lib/transcribe";
 export const runtime = "nodejs";
 
 const createProjectSchema = z.object({
+  title: z.string().trim().min(1, "請輸入專案名稱").max(80, "專案名稱太長"),
   sourceUrl: z.string().url(),
   transcript: z.string().optional(),
   settings: z
@@ -19,7 +20,13 @@ const createProjectSchema = z.object({
 });
 
 function toCreateProjectError(error: unknown) {
-  if (error instanceof z.ZodError) return { message: "請貼上有效的 Instagram Reels 或 TikTok 連結", status: 400 };
+  if (error instanceof z.ZodError) {
+    const first = error.issues[0];
+    return {
+      message: first?.path[0] === "title" ? first.message : "請貼上有效的 Instagram Reels 或 TikTok 連結",
+      status: 400
+    };
+  }
 
   const message = error instanceof Error ? error.message : "";
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
@@ -49,7 +56,7 @@ export async function POST(request: Request) {
 
     const project = await prisma.project.create({
       data: {
-        title: "AI 分析中",
+        title: body.title,
         sourceUrl: body.sourceUrl,
         sourcePlatform: detectPlatform(body.sourceUrl),
         sourceTranscript: body.transcript?.trim() || null,
