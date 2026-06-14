@@ -379,6 +379,57 @@ function ProcessTimeline({ project }: { project: Project }) {
   );
 }
 
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong className="font-semibold text-[var(--black)]" key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+
+    return part;
+  });
+}
+
+function MarkdownResult({ value }: { value: string }) {
+  const lines = value.split(/\r?\n/);
+
+  return (
+    <div className="max-h-[560px] overflow-y-auto px-1 py-1 text-sm leading-7">
+      {lines.map((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div className="h-3" key={index} />;
+        if (/^-{3,}$/.test(trimmed)) return <div className="my-4 h-px bg-[var(--border)]" key={index} />;
+
+        const heading = trimmed.match(/^#{1,4}\s*(.+)$/);
+        if (heading) {
+          return (
+            <h3 className="mt-4 text-base font-semibold text-[var(--black)] first:mt-0" key={index}>
+              {renderInlineMarkdown(heading[1])}
+            </h3>
+          );
+        }
+
+        const bullet = trimmed.match(/^-\s+(.+)$/);
+        if (bullet) {
+          return (
+            <div className="flex gap-2 text-[var(--black)]" key={index}>
+              <span className="mt-[0.72em] h-1.5 w-1.5 shrink-0 rounded-full bg-orange" />
+              <p>{renderInlineMarkdown(bullet[1])}</p>
+            </div>
+          );
+        }
+
+        return (
+          <p className="text-[var(--black)]" key={index}>
+            {renderInlineMarkdown(trimmed)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function ResultCard({
   index,
   title,
@@ -402,9 +453,7 @@ function ResultCard({
         </h2>
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
       </div>
-      <div className="max-h-[520px] overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-white p-4 text-sm leading-7 whitespace-pre-wrap">
-        {value}
-      </div>
+      <MarkdownResult value={value} />
       <button className="btn btn-primary mt-3" disabled={disabled || !value.trim()} onClick={onAction}>
         {actionLabel}
       </button>
