@@ -41,7 +41,7 @@ export default function HomePage() {
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
         <div className="flex min-h-[60px] flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-white px-6 py-3">
-          <h1 className="text-base">lurevid | 短影音分析改編</h1>
+          <h1 className="text-base">lurevid | 短影音分析創作平台</h1>
           <Link className="btn btn-ghost" href="/settings">
             <Settings size={16} />
             設定
