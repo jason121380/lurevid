@@ -51,6 +51,10 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   const [structure, setStructure] = useState("");
   const [script, setScript] = useState("");
   const [transcript, setTranscript] = useState("");
+  const [ratio, setRatio] = useState("9:16");
+  const [resolution, setResolution] = useState("720p");
+  const [duration, setDuration] = useState(5);
+  const settingsInit = useRef(false);
   const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({});
 
   useEffect(() => {
@@ -68,6 +72,12 @@ export function ProjectClient({ projectId }: { projectId: string }) {
       if (data.structure !== lastServer.current.structure) setStructure(data.structure || "");
       if (data.adaptedScript !== lastServer.current.adaptedScript) setScript(data.adaptedScript || "");
       lastServer.current = { analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
+      if (!settingsInit.current) {
+        if (data.ratio) setRatio(data.ratio);
+        if (data.resolution) setResolution(data.resolution);
+        if (data.duration) setDuration(data.duration);
+        settingsInit.current = true;
+      }
 
       setProject(data);
       if (!["COMPLETED", "FAILED"].includes(data.status)) setTimeout(load, 5000);
@@ -189,12 +199,29 @@ export function ProjectClient({ projectId }: { projectId: string }) {
 
             {project.scenes.length > 0 && (
               <div className="card p-4">
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-sm">4 · 分鏡圖</h2>
                   {project.status === "STORYBOARD_READY" && (
-                    <button className="btn btn-primary" disabled={disabled} onClick={() => post("/video")}>
-                      變成影片
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={ratio} onChange={(event) => setRatio(event.target.value)}>
+                        <option>9:16</option>
+                        <option>16:9</option>
+                        <option>1:1</option>
+                      </select>
+                      <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={resolution} onChange={(event) => setResolution(event.target.value)}>
+                        <option>720p</option>
+                        <option>1080p</option>
+                        <option>480p</option>
+                      </select>
+                      <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
+                        <option value={3}>每段 3 秒</option>
+                        <option value={4}>每段 4 秒</option>
+                        <option value={5}>每段 5 秒</option>
+                      </select>
+                      <button className="btn btn-primary" disabled={disabled} onClick={() => post("/video", { ratio, resolution, duration })}>
+                        變成影片
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="grid gap-3 xl:grid-cols-3">

@@ -9,11 +9,13 @@ export const runtime = "nodejs";
 const createProjectSchema = z.object({
   sourceUrl: z.string().url(),
   transcript: z.string().optional(),
-  settings: z.object({
-    ratio: z.string().default("16:9"),
-    resolution: z.string().default("720p"),
-    duration: z.number().int().min(2).max(15).default(5)
-  })
+  settings: z
+    .object({
+      ratio: z.string().default("9:16"),
+      resolution: z.string().default("720p"),
+      duration: z.number().int().min(2).max(15).default(5)
+    })
+    .default({})
 });
 
 export async function POST(request: Request) {
