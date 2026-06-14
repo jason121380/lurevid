@@ -63,15 +63,12 @@ export default function HomePage() {
               />
 
               <div className="mt-3 flex items-center justify-between gap-3">
-                {!sourceUrl.trim() && (
-                  <p className="text-xs text-[var(--gray-500)]">先貼上 Reels 或 TikTok 連結後才能開始。</p>
-                )}
+                <div />
                 <button className="btn btn-primary" disabled={!sourceUrl.trim() || loading} onClick={start}>
                   <Wand2 size={16} />
                   {loading ? "建立中" : "開始分析"}
                 </button>
               </div>
-              <p className="mt-2 text-xs text-[var(--gray-500)]">沒貼逐字稿時會自動分析影片音訊、畫面影格、字幕與分鏡節奏；影片比例、解析度、秒數會在「變成影片」那一步再選。</p>
               {error && (
                 <div className="mt-3 rounded-xl border border-[var(--red)] bg-red-50 p-3 text-sm leading-6 text-[var(--red)]" role="alert">
                   {error}
