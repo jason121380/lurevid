@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -37,6 +37,7 @@ body {
   background: var(--warm-white);
   color: var(--black);
   font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 400;
 }
 
 button,
@@ -55,7 +56,7 @@ textarea {
   justify-content: center;
   gap: 8px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 400;
   transition: 160ms ease;
 }
 
@@ -84,7 +85,7 @@ textarea {
   border-radius: 50px;
   padding: 3px 9px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .badge-active {
@@ -106,5 +107,4 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 16px;
   background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }

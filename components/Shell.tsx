@@ -6,22 +6,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen">
       <aside className="fixed inset-y-0 left-0 hidden w-[var(--sidebar-w)] border-r border-[var(--border)] bg-white lg:flex lg:flex-col">
         <div className="flex h-[60px] items-center gap-2 border-b border-[var(--border)] px-5">
-          <div className="grid h-8 w-8 place-items-center rounded-full bg-orange text-sm font-black text-white">S</div>
-          <div>
-            <div className="text-sm font-extrabold">Seedance</div>
-            <div className="text-[10px] font-semibold text-[var(--gray-500)]">Studio Pipeline</div>
-          </div>
+          <div className="text-sm text-[var(--black)]">lurevid</div>
         </div>
         <nav className="flex-1 space-y-1 p-3">
-          <Link className="flex items-center gap-3 rounded-xl bg-orange-bg px-3 py-3 text-sm font-bold text-orange" href="/">
+          <Link className="flex items-center gap-3 rounded-xl bg-orange-bg px-3 py-3 text-sm text-orange" href="/">
             <LayoutDashboard size={17} />
             工作台
           </Link>
-          <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[var(--gray-500)]">
+          <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[var(--gray-500)]">
             <Film size={17} />
             專案
           </div>
-          <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[var(--gray-500)]">
+          <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[var(--gray-500)]">
             <Settings size={17} />
             設定
           </div>
@@ -30,7 +26,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3 rounded-xl bg-[var(--warm-white)] p-3">
             <Sparkles size={18} className="text-orange" />
             <div>
-              <div className="text-xs font-bold">OpenAI + Seedance</div>
+              <div className="text-xs">OpenAI + Seedance</div>
               <div className="text-[11px] text-[var(--gray-500)]">9-shot video workflow</div>
             </div>
           </div>

@@ -72,8 +72,8 @@ export function ProjectClient({ projectId }: { projectId: string }) {
         <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:p-6">
           <section className="space-y-4">
             <div className="card p-4">
-              <p className="text-[11px] font-bold uppercase text-orange">Project</p>
-              <h1 className="mt-1 text-xl font-extrabold">{project.idea}</h1>
+              <p className="text-[11px] uppercase text-orange">Project</p>
+              <h1 className="mt-1 text-xl">{project.idea}</h1>
               <p className="mt-2 text-sm text-[var(--gray-500)]">{project.message}</p>
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--border)]">
                 <div className="h-full rounded-full bg-orange transition-all" style={{ width: `${Math.round(project.progress * 100)}%` }} />
@@ -84,10 +84,10 @@ export function ProjectClient({ projectId }: { projectId: string }) {
               {project.scenes.map((scene) => (
                 <article key={scene.id} className="card p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-black text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
+                    <span className="text-xs text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
                     <span className={`badge ${statusClass(scene.status)}`}>{scene.status}</span>
                   </div>
-                  <h2 className="text-sm font-extrabold">{scene.title}</h2>
+                  <h2 className="text-sm">{scene.title}</h2>
                   <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">{scene.visualGoal}</p>
                   <p className="mt-3 max-h-28 overflow-auto rounded-lg bg-[var(--warm-white)] p-2 text-[11px] leading-5">{scene.seedancePrompt}</p>
                 </article>
@@ -98,9 +98,9 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           <aside className="card h-fit p-4 lg:sticky lg:top-6">
             <div className="mb-3 flex items-center gap-2">
               {project.status === "COMPLETED" ? <CheckCircle2 className="text-[var(--green)]" /> : project.status === "FAILED" ? <XCircle className="text-[var(--red)]" /> : <Loader2 className="animate-spin text-orange" />}
-              <h2 className="text-lg font-extrabold">輸出影片</h2>
+              <h2 className="text-lg">輸出影片</h2>
             </div>
-            <div className="grid aspect-video place-items-center overflow-hidden rounded-xl bg-[#111] text-sm font-bold text-white">
+            <div className="grid aspect-video place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
               {project.finalVideoUrl ? <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" /> : "影片生成中"}
             </div>
             {project.finalVideoUrl && (
