@@ -26,35 +26,45 @@ export default function HomePage() {
     if (!idea.trim()) return;
     setError("");
     setLoading("storyboard");
-    const res = await fetch("/api/storyboard", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idea })
-    });
-    const data = await res.json();
-    setLoading("");
-    if (!res.ok) {
-      setError(data.error || "分鏡失敗");
-      return;
+    try {
+      const res = await fetch("/api/storyboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "分鏡失敗");
+        return;
+      }
+      setScenes(data.scenes);
+    } catch {
+      setError("分鏡 API 沒有回應，請確認本機伺服器正在執行");
+    } finally {
+      setLoading("");
     }
-    setScenes(data.scenes);
   }
 
   async function createProject() {
     setError("");
     setLoading("project");
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idea, scenes, settings: { ratio, resolution, duration } })
-    });
-    const data = await res.json();
-    setLoading("");
-    if (!res.ok) {
-      setError(data.error || "建立專案失敗");
-      return;
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea, scenes, settings: { ratio, resolution, duration } })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "建立專案失敗");
+        return;
+      }
+      router.push(`/projects/${data.id}`);
+    } catch {
+      setError("建立專案 API 沒有回應，請確認本機伺服器正在執行");
+    } finally {
+      setLoading("");
     }
-    router.push(`/projects/${data.id}`);
   }
 
   return (
@@ -100,6 +110,7 @@ export default function HomePage() {
               </button>
             </div>
             {error && <p className="mt-3 text-sm text-[var(--red)]">{error}</p>}
+            {loading === "storyboard" && <p className="mt-3 text-sm text-[var(--gray-500)]">正在呼叫 OpenAI 產生 9 格分鏡，請稍候。</p>}
           </div>
 
           <div className="grid gap-3 xl:grid-cols-3">

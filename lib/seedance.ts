@@ -7,7 +7,9 @@ export type SeedanceSettings = {
 const BYTEPLUS_BASE_URL = "https://ark.ap-southeast.bytepluses.com/api/v3";
 
 export async function createSeedanceTask(prompt: string, settings: SeedanceSettings) {
-  if (!process.env.ARK_API_KEY) throw new Error("缺少 ARK_API_KEY");
+  if (!process.env.ARK_API_KEY || process.env.ARK_API_KEY.startsWith("replace-with")) {
+    throw new Error("請先在 .env 設定有效的 ARK_API_KEY");
+  }
   const response = await fetch(`${BYTEPLUS_BASE_URL}/contents/generations/tasks`, {
     method: "POST",
     headers: {

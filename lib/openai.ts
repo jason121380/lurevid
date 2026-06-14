@@ -16,7 +16,9 @@ const storyboardSchema = z.object({
 });
 
 function client() {
-  if (!process.env.OPENAI_API_KEY) throw new Error("缺少 OPENAI_API_KEY");
+  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.startsWith("replace-with")) {
+    throw new Error("請先在 .env 設定有效的 OPENAI_API_KEY");
+  }
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
