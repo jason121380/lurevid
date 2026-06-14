@@ -10,7 +10,8 @@ import {
   analyzeStructure,
   analyzeVideo,
   generateStoryboardImage,
-  generateStoryboardWithTwoModels
+  generateStoryboardWithTwoModels,
+  summarizeProjectTitle
 } from "@/lib/openai";
 import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
 import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
@@ -106,10 +107,16 @@ async function runAnalyze(projectId: string) {
     platform,
     visualAnalysis || (visualError ? `視覺分析未完成：${visualError}` : "")
   );
+  let title = project.title || "AI 分析中";
+  try {
+    title = (await summarizeProjectTitle(analysis)) || title;
+  } catch (error) {
+    console.warn("專案標題產生失敗", error);
+  }
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { analysis, status: "ANALYSIS_READY", message: "分析完成，可調整後繼續", progress: 0.2 }
+    data: { title, analysis, status: "ANALYSIS_READY", message: "分析完成，可調整後繼續", progress: 0.2 }
   });
 }
 

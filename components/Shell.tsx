@@ -16,19 +16,6 @@ type ProjectListItem = {
   updatedAt: string;
 };
 
-function projectStatusClass(status: string) {
-  if (status === "COMPLETED") return "bg-[var(--green-bg)] text-[var(--green)]";
-  if (status === "FAILED") return "bg-[var(--red-bg)] text-[var(--red)]";
-  return "bg-orange-bg text-orange";
-}
-
-function projectStatusLabel(status: string) {
-  if (status === "COMPLETED") return "完成";
-  if (status === "FAILED") return "失敗";
-  if (["ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING", "GENERATING", "MERGING"].includes(status)) return "處理中";
-  return "進行中";
-}
-
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -138,12 +125,8 @@ export function Shell({ children }: { children: ReactNode }) {
                       </div>
                     ) : (
                       <div className="flex items-start gap-1">
-                        <Link className="block min-w-0 flex-1" href={`/projects/${project.id}`}>
-                          <div className={`truncate text-xs ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "未命名專案"}</div>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] ${projectStatusClass(project.status)}`}>{projectStatusLabel(project.status)}</span>
-                            <span className="truncate text-[10px] text-[var(--gray-500)]">{project.sourcePlatform || "影片"}</span>
-                          </div>
+                        <Link className="block min-w-0 flex-1 py-1" href={`/projects/${project.id}`}>
+                          <div className={`truncate text-sm ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "AI 分析中"}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
                           <button className="grid h-7 w-7 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-white hover:text-orange" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
