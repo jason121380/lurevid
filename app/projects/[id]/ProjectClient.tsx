@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Download, Loader2, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, Eye, Loader2, X, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
@@ -80,7 +80,9 @@ function statusClass(status: string) {
 
 function sourceEmbedUrl(url?: string) {
   if (!url) return "";
-  if (/instagram\.com\/(?:reel|p)\//i.test(url)) return `${url.split("?")[0].replace(/\/+$/, "")}/embed`;
+  if (/instagram\.com\/(?:reels?|p)\//i.test(url)) {
+    return `${url.split("?")[0].replace(/\/+$/, "").replace(/\/reels\//i, "/reel/")}/embed`;
+  }
   return url;
 }
 
@@ -103,27 +105,34 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   useEffect(() => {
     let stopped = false;
     async function load() {
-      const res = await fetch(`/api/projects/${projectId}`);
-      const data = await res.json();
-      if (stopped) return;
-      if (!res.ok) {
-        setError(data.error || "讀取失敗");
-        return;
-      }
-      // 只有當伺服器的值改變時才覆寫本地編輯，避免蓋掉使用者正在編輯的內容。
-      if (data.analysis !== lastServer.current.analysis) setAnalysis(data.analysis || "");
-      if (data.structure !== lastServer.current.structure) setStructure(data.structure || "");
-      if (data.adaptedScript !== lastServer.current.adaptedScript) setScript(data.adaptedScript || "");
-      lastServer.current = { analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
-      if (!settingsInit.current) {
-        if (data.ratio) setRatio(data.ratio);
-        if (data.resolution) setResolution(data.resolution);
-        if (data.duration) setDuration(data.duration);
-        settingsInit.current = true;
-      }
+      try {
+        const res = await fetch(`/api/projects/${projectId}`);
+        const data = await res.json();
+        if (stopped) return;
+        if (!res.ok) {
+          setError(data.error || "讀取失敗");
+          return;
+        }
+        setError("");
+        // 只有當伺服器的值改變時才覆寫本地編輯，避免蓋掉使用者正在編輯的內容。
+        if (data.analysis !== lastServer.current.analysis) setAnalysis(data.analysis || "");
+        if (data.structure !== lastServer.current.structure) setStructure(data.structure || "");
+        if (data.adaptedScript !== lastServer.current.adaptedScript) setScript(data.adaptedScript || "");
+        lastServer.current = { analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
+        if (!settingsInit.current) {
+          if (data.ratio) setRatio(data.ratio);
+          if (data.resolution) setResolution(data.resolution);
+          if (data.duration) setDuration(data.duration);
+          settingsInit.current = true;
+        }
 
-      setProject(data);
-      if (!["COMPLETED", "FAILED"].includes(data.status)) setTimeout(load, 5000);
+        setProject(data);
+        if (!["COMPLETED", "FAILED"].includes(data.status)) setTimeout(load, 5000);
+      } catch {
+        if (stopped) return;
+        setError("暫時讀不到專案資料，稍後會自動重試。");
+        setTimeout(load, 5000);
+      }
     }
     load();
     return () => {
@@ -187,12 +196,22 @@ export function ProjectClient({ projectId }: { projectId: string }) {
         <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-4 p-6">
           <section className="space-y-4">
             <div className="card p-4">
-              <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
-              {project.sourceUrl && (
-                <a className="mt-1 block break-all text-sm text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
-                  {project.sourceUrl}
-                </a>
-              )}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
+                  {project.sourceUrl && (
+                    <a className="mt-1 block break-all text-sm text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
+                      {project.sourceUrl}
+                    </a>
+                  )}
+                </div>
+                {project.sourceUrl && (
+                  <a className="btn btn-ghost shrink-0" href="#video-preview-modal" onClick={() => { window.location.hash = "video-preview-modal"; }}>
+                    <Eye size={16} />
+                    影片預覽
+                  </a>
+                )}
+              </div>
               <p className="mt-2 flex items-center gap-2 text-sm text-[var(--gray-500)]">
                 {busy && <Loader2 size={14} className="animate-spin text-orange" />}
                 {project.message}
@@ -333,6 +352,30 @@ export function ProjectClient({ projectId }: { projectId: string }) {
             </div>
           </aside>
         </div>
+        {project.sourceUrl && (
+          <div id="video-preview-modal" className="fixed inset-0 z-50 hidden place-items-center bg-black/45 p-4 target:grid" role="dialog" aria-modal="true">
+            <div className="w-full max-w-[520px] rounded-2xl bg-white p-4 shadow-xl">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-lg">影片預覽</h2>
+                <a className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange" href="#" title="關閉">
+                  <X size={18} />
+                </a>
+              </div>
+              <div className="relative grid w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
+                <iframe
+                  className="h-full w-full border-0 bg-white"
+                  src={sourceEmbedUrl(project.sourceUrl)}
+                  title="來源影片預覽"
+                  loading="lazy"
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                />
+              </div>
+              <a className="btn btn-ghost mt-4 w-full" href={project.sourceUrl} target="_blank" rel="noreferrer">
+                開啟原始影片
+              </a>
+            </div>
+          </div>
+        )}
       </div>
     </Shell>
   );
