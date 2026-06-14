@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LayoutDashboard, Menu, Pencil, Trash2, X } from "lucide-react";
+import { Check, Menu, Pencil, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -103,7 +103,7 @@ export function Shell({ children }: { children: ReactNode }) {
               href="/"
               title="新增專案"
             >
-              <LayoutDashboard size={17} />
+              <Plus size={17} />
               {!collapsed && "新增專案"}
             </Link>
           </div>
