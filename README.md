@@ -44,6 +44,16 @@ PUBLIC_BASE_URL="https://你的-zeabur-domain"
 STORAGE_DIR="./storage/generated"
 ```
 
+### 選填：Worker 並行設定
+
+Worker 會並行處理分鏡圖、Seedance 任務與影片下載，可用以下變數調整並行上限（預設值已適合大多數情境）：
+
+```env
+WORKER_CONCURRENCY="1"   # 同時處理的專案數
+IMAGE_CONCURRENCY="3"    # 同時產生的分鏡圖數
+SEEDANCE_CONCURRENCY="3" # 同時送出/輪詢/下載的 Seedance 片段數
+```
+
 ## Zeabur 部署
 
 1. 建立 PostgreSQL 服務。
