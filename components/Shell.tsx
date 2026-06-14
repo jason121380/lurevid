@@ -100,7 +100,7 @@ export function Shell({ children }: { children: ReactNode }) {
               href="/"
             >
               <LayoutDashboard size={17} />
-              工作台
+              新增專案
             </Link>
             <Link
               className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}

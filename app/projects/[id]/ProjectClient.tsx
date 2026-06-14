@@ -180,7 +180,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
         <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] bg-white px-6">
           <Link className="btn btn-ghost" href="/">
             <ArrowLeft size={16} />
-            返回工作台
+            返回新增專案
           </Link>
           <span className={`badge ${statusClass(project.status)}`}>{project.status}</span>
         </div>
