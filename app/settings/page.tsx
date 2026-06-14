@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, ChevronDown, Clock3, Eye, EyeOff, Save } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 
@@ -57,7 +57,6 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [savedAt, setSavedAt] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   async function loadSettings() {
@@ -108,7 +107,6 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "儲存設定失敗");
       setMessage("設定已儲存，下一個 worker 任務會使用最新設定。");
-      setSavedAt(new Date().toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" }));
       await loadSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : "儲存設定失敗");
@@ -189,12 +187,6 @@ export default function SettingsPage() {
             <div className="card p-4 text-sm text-[var(--gray-500)]">載入設定中</div>
           ) : (
             <>
-              <div className="grid gap-3 md:grid-cols-3">
-                {groups.map((group) => (
-                  <StatusCard group={group} key={group.title} savedAt={savedAt} status={groupStatus(group)} />
-                ))}
-              </div>
-
               {groups.map((group) => {
                 const status = groupStatus(group);
 
@@ -275,31 +267,4 @@ function StatusBadge({ status }: { status: GroupStatus }) {
         : "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]";
 
   return <span className={`rounded-full border px-3 py-1 text-xs ${className}`}>{status.label}</span>;
-}
-
-function StatusIcon({ state }: { state: GroupStatus["state"] }) {
-  if (state === "ready") return <CheckCircle2 size={18} />;
-  if (state === "pending") return <Clock3 size={18} />;
-  return <AlertCircle size={18} />;
-}
-
-function StatusCard({ group, savedAt, status }: { group: SettingGroup; savedAt: string; status: GroupStatus }) {
-  const cardClass =
-    status.state === "ready"
-      ? "border-[var(--green)] bg-[var(--green-bg)] text-[var(--green)]"
-      : status.state === "pending"
-        ? "border-orange bg-orange-bg text-orange"
-        : "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]";
-
-  return (
-    <div className={`rounded-xl border p-4 ${cardClass}`}>
-      <div className="flex items-center gap-2">
-        <StatusIcon state={status.state} />
-        <h2 className="text-sm">{group.title}</h2>
-      </div>
-      <div className="mt-2 text-lg font-semibold">{status.label}</div>
-      <p className="mt-1 text-xs leading-5">{status.detail}</p>
-      {status.state === "ready" && savedAt && <p className="mt-2 text-xs">剛剛儲存：{savedAt}</p>}
-    </div>
-  );
 }
