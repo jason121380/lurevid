@@ -98,6 +98,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   const [resolution, setResolution] = useState("720p");
   const [duration, setDuration] = useState(5);
   const [previewWidth, setPreviewWidth] = useState(0);
+  const [activeStep, setActiveStep] = useState(1);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const settingsInit = useRef(false);
   const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({});
@@ -181,6 +182,194 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   const busy = BUSY.includes(project.status) || submitting;
   const disabled = busy;
   const previewScale = previewWidth ? previewWidth / 540 : 1;
+  const statusPanel = (
+    <div className="card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
+          {project.sourceUrl && (
+            <a className="mt-1 block break-all text-sm text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
+              {project.sourceUrl}
+            </a>
+          )}
+        </div>
+        {project.sourceUrl && (
+          <a className="btn btn-ghost shrink-0" href="#video-preview-modal" onClick={() => { window.location.hash = "video-preview-modal"; }}>
+            <Eye size={16} />
+            影片預覽
+          </a>
+        )}
+      </div>
+      <p className="mt-2 flex items-center gap-2 text-sm text-[var(--gray-500)]">
+        {busy && <Loader2 size={14} className="animate-spin text-orange" />}
+        {project.message}
+      </p>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--border)]">
+        <div className="h-full rounded-full bg-orange transition-all" style={{ width: `${Math.round(project.progress * 100)}%` }} />
+      </div>
+      {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-sm text-[var(--red)]">{project.error}</p>}
+    </div>
+  );
+  const previewPanel = (
+    <div className="card p-4">
+      <div className="mb-3 flex items-center gap-2">
+        {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
+        {project.status === "FAILED" && <XCircle className="text-[var(--red)]" />}
+        <h2 className="text-lg">{project.finalVideoUrl ? "輸出影片" : "影片預覽"}</h2>
+      </div>
+      <div ref={previewRef} className="relative grid w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
+        {project.finalVideoUrl ? (
+          <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
+        ) : project.sourceUrl ? (
+          <iframe
+            className="absolute left-0 top-0 border-0 bg-white"
+            src={sourceEmbedUrl(project.sourceUrl)}
+            style={{
+              width: 540,
+              height: 960,
+              transform: `scale(${previewScale})`,
+              transformOrigin: "top left"
+            }}
+            title="來源影片預覽"
+            loading="lazy"
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          />
+        ) : (
+          "尚未取得來源影片"
+        )}
+      </div>
+      {!project.finalVideoUrl && project.sourceUrl && (
+        <a className="btn btn-ghost mt-4 w-full" href={project.sourceUrl} target="_blank" rel="noreferrer">
+          開啟原始影片
+        </a>
+      )}
+      {project.finalVideoUrl && (
+        <a className="btn btn-primary mt-4 w-full" href={project.finalVideoUrl} target="_blank" rel="noreferrer">
+          <Download size={16} />
+          下載完成影片
+        </a>
+      )}
+    </div>
+  );
+  const transcriptPanel = (
+    <div className="card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm">3 · 轉錄音訊</h2>
+        <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
+      </div>
+      {project.sourceTranscript ? (
+        <div className="max-h-[560px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-[var(--border)] bg-white p-4 text-sm leading-7">
+          {project.sourceTranscript}
+        </div>
+      ) : (
+        <EmptyPanel title="尚未取得逐字稿" description="worker 會在下載影片後自動轉錄音訊。" />
+      )}
+    </div>
+  );
+  const storyboardPanel = (
+    <div className="card p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm">9 · 產生分鏡</h2>
+        {project.status === "STORYBOARD_READY" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={ratio} onChange={(event) => setRatio(event.target.value)}>
+              <option>9:16</option>
+              <option>16:9</option>
+              <option>1:1</option>
+            </select>
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={resolution} onChange={(event) => setResolution(event.target.value)}>
+              <option>720p</option>
+              <option>1080p</option>
+              <option>480p</option>
+            </select>
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
+              <option value={3}>每段 3 秒</option>
+              <option value={4}>每段 4 秒</option>
+              <option value={5}>每段 5 秒</option>
+            </select>
+            <button className="btn btn-primary" disabled={disabled} onClick={() => post("/video", { ratio, resolution, duration })}>
+              變成影片
+            </button>
+          </div>
+        )}
+      </div>
+      {project.scenes.length > 0 ? (
+        <div className="grid gap-3 xl:grid-cols-3">
+          {project.scenes.map((scene) => (
+            <article key={scene.id} className="card p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
+                <span className={`badge ${statusClass(scene.status)}`}>{scene.status}</span>
+              </div>
+              <h3 className="text-sm">{scene.title}</h3>
+              <div className="mt-3 grid aspect-video place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
+                {scene.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={scene.imageUrl} alt={scene.title} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs text-[var(--gray-500)]">分鏡圖生成中</span>
+                )}
+              </div>
+              <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">{scene.visualGoal}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyPanel title="尚未產生分鏡" description="完成改編腳本後，可以在這裡產生並確認分鏡圖。" />
+      )}
+    </div>
+  );
+  const selectedPanel = (() => {
+    if (activeStep === 1) return statusPanel;
+    if (activeStep === 2) return previewPanel;
+    if (activeStep === 3) return transcriptPanel;
+    if ([4, 5, 6].includes(activeStep)) {
+      return project.analysis ? (
+        <ResultCard
+          index="6"
+          title="整合分析"
+          value={analysis}
+          actionLabel="確認分析 → 拆解結構"
+          disabled={disabled}
+          onAction={() => post("/structure", { analysis: project.analysis || analysis })}
+        />
+      ) : (
+        <div className="card p-4"><EmptyPanel title="尚未完成分析" description="系統會先抽取影格、理解畫面，再整合逐字稿與視覺洞察。" /></div>
+      );
+    }
+    if (activeStep === 7) {
+      return project.structure ? (
+        <StepCard
+          index="7"
+          title="拆解結構"
+          value={structure}
+          onChange={setStructure}
+          actionLabel="確認結構 → 改編腳本"
+          disabled={disabled}
+          onAction={() => post("/adapt", { structure })}
+        />
+      ) : (
+        <div className="card p-4"><EmptyPanel title="尚未拆解結構" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
+      );
+    }
+    if (activeStep === 8) {
+      return project.adaptedScript ? (
+        <StepCard
+          index="8"
+          title="改編腳本"
+          value={script}
+          onChange={setScript}
+          actionLabel="確認腳本 → 產生分鏡圖"
+          disabled={disabled}
+          onAction={() => post("/storyboard", { adaptedScript: script })}
+        />
+      ) : (
+        <div className="card p-4"><EmptyPanel title="尚未改編腳本" description="完成結構拆解後，會改寫成新的短影音腳本。" /></div>
+      );
+    }
+    if (activeStep === 9) return storyboardPanel;
+    return previewPanel;
+  })();
 
   return (
     <Shell>
@@ -193,164 +382,14 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           <span className={`badge ${statusClass(project.status)}`}>{project.status}</span>
         </div>
 
-        <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-4 p-6">
-          <section className="space-y-4">
-            <div className="card p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
-                  {project.sourceUrl && (
-                    <a className="mt-1 block break-all text-sm text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
-                      {project.sourceUrl}
-                    </a>
-                  )}
-                </div>
-                {project.sourceUrl && (
-                  <a className="btn btn-ghost shrink-0" href="#video-preview-modal" onClick={() => { window.location.hash = "video-preview-modal"; }}>
-                    <Eye size={16} />
-                    影片預覽
-                  </a>
-                )}
-              </div>
-              <p className="mt-2 flex items-center gap-2 text-sm text-[var(--gray-500)]">
-                {busy && <Loader2 size={14} className="animate-spin text-orange" />}
-                {project.message}
-              </p>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--border)]">
-                <div className="h-full rounded-full bg-orange transition-all" style={{ width: `${Math.round(project.progress * 100)}%` }} />
-              </div>
-              {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-sm text-[var(--red)]">{project.error}</p>}
-
-            </div>
-
-            {project.analysis != null && project.analysis !== "" && (
-              <ResultCard
-                index="1"
-                title="影片分析"
-                value={analysis}
-                actionLabel="確認分析 → 拆解結構"
-                disabled={disabled}
-                onAction={() => post("/structure", { analysis: project.analysis || analysis })}
-              />
-            )}
-
-            {project.structure != null && project.structure !== "" && (
-              <StepCard
-                index="2"
-                title="分析結構"
-                value={structure}
-                onChange={setStructure}
-                actionLabel="確認結構 → 改編腳本"
-                disabled={disabled}
-                onAction={() => post("/adapt", { structure })}
-              />
-            )}
-
-            {project.adaptedScript != null && project.adaptedScript !== "" && (
-              <StepCard
-                index="3"
-                title="改編腳本"
-                value={script}
-                onChange={setScript}
-                actionLabel="確認腳本 → 產生分鏡圖"
-                disabled={disabled}
-                onAction={() => post("/storyboard", { adaptedScript: script })}
-              />
-            )}
-
-            {project.scenes.length > 0 && (
-              <div className="card p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm">4 · 分鏡圖</h2>
-                  {project.status === "STORYBOARD_READY" && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={ratio} onChange={(event) => setRatio(event.target.value)}>
-                        <option>9:16</option>
-                        <option>16:9</option>
-                        <option>1:1</option>
-                      </select>
-                      <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={resolution} onChange={(event) => setResolution(event.target.value)}>
-                        <option>720p</option>
-                        <option>1080p</option>
-                        <option>480p</option>
-                      </select>
-                      <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
-                        <option value={3}>每段 3 秒</option>
-                        <option value={4}>每段 4 秒</option>
-                        <option value={5}>每段 5 秒</option>
-                      </select>
-                      <button className="btn btn-primary" disabled={disabled} onClick={() => post("/video", { ratio, resolution, duration })}>
-                        變成影片
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="grid gap-3 xl:grid-cols-3">
-                  {project.scenes.map((scene) => (
-                    <article key={scene.id} className="card p-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-xs text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
-                        <span className={`badge ${statusClass(scene.status)}`}>{scene.status}</span>
-                      </div>
-                      <h3 className="text-sm">{scene.title}</h3>
-                      <div className="mt-3 grid aspect-video place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
-                        {scene.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={scene.imageUrl} alt={scene.title} className="h-full w-full object-cover" />
-                        ) : (
-                          <span className="text-xs text-[var(--gray-500)]">分鏡圖生成中</span>
-                        )}
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">{scene.visualGoal}</p>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-
-          <aside className="sticky top-6 h-fit space-y-4">
-            <ProcessTimeline project={project} />
-            <div className="card p-4">
-              <div className="mb-3 flex items-center gap-2">
-                {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
-                {project.status === "FAILED" && <XCircle className="text-[var(--red)]" />}
-                <h2 className="text-lg">{project.finalVideoUrl ? "輸出影片" : "影片預覽"}</h2>
-              </div>
-              <div ref={previewRef} className="relative grid w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
-                {project.finalVideoUrl ? (
-                  <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
-                ) : project.sourceUrl ? (
-                  <iframe
-                    className="absolute left-0 top-0 border-0 bg-white"
-                    src={sourceEmbedUrl(project.sourceUrl)}
-                    style={{
-                      width: 540,
-                      height: 960,
-                      transform: `scale(${previewScale})`,
-                      transformOrigin: "top left"
-                    }}
-                    title="來源影片預覽"
-                    loading="lazy"
-                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                  />
-                ) : (
-                  "尚未取得來源影片"
-                )}
-              </div>
-              {!project.finalVideoUrl && project.sourceUrl && (
-                <a className="btn btn-ghost mt-4 w-full" href={project.sourceUrl} target="_blank" rel="noreferrer">
-                  開啟原始影片
-                </a>
-              )}
-              {project.finalVideoUrl && (
-                <a className="btn btn-primary mt-4 w-full" href={project.finalVideoUrl} target="_blank" rel="noreferrer">
-                  <Download size={16} />
-                  下載完成影片
-                </a>
-              )}
-            </div>
+        <div className="grid grid-cols-[300px_minmax(0,1fr)] gap-4 p-6">
+          <aside className="sticky top-6 h-fit">
+            <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} />
           </aside>
+
+          <section className="min-w-0">
+            {selectedPanel}
+          </section>
         </div>
         {project.sourceUrl && (
           <div id="video-preview-modal" className="fixed inset-0 z-50 hidden place-items-center bg-black/45 p-4 target:grid" role="dialog" aria-modal="true">
@@ -381,38 +420,66 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   );
 }
 
-function ProcessTimeline({ project }: { project: Project }) {
+function ProcessTimeline({
+  project,
+  activeStep,
+  onSelectStep
+}: {
+  project: Project;
+  activeStep: number;
+  onSelectStep: (step: number) => void;
+}) {
   const steps = buildProcessSteps(project);
 
   return (
-    <div className="card p-4">
+    <div className="card p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm">工作清單</h2>
         <span className="text-xs text-[var(--gray-500)]">{Math.round(project.progress * 100)}%</span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {steps.map((step, index) => (
-          <div className="flex gap-3 rounded-xl border border-[var(--border)] bg-white p-3" key={step.title}>
-            <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs ${stepStateClass(step.state)}`}>
-              {step.state === "active" ? <Loader2 size={15} className="animate-spin" /> : step.state === "failed" ? <XCircle size={15} /> : index + 1}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm">{step.title}</div>
-              <p className="mt-1 text-xs leading-5 text-[var(--gray-500)]">{step.description}</p>
-            </div>
+          <div
+            className={`flex items-center gap-1 rounded-lg border px-2.5 py-2 transition ${
+              activeStep === index + 1
+                ? "border-orange bg-orange-bg"
+                : "border-[var(--border)] bg-white hover:border-orange/40 hover:bg-orange-bg/40"
+            }`}
+            key={step.title}
+          >
+            <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(index + 1)} type="button">
+              <div className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] ${stepStateClass(step.state)}`}>
+                {step.state === "active" ? <Loader2 size={13} className="animate-spin" /> : step.state === "failed" ? <XCircle size={13} /> : index + 1}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-medium">{step.title}</div>
+                <p className="mt-0.5 truncate text-[11px] leading-4 text-[var(--gray-500)]">{step.description}</p>
+              </div>
+            </button>
             {step.title === "下載影片" && project.sourceUrl && (
               <a
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-white hover:text-orange"
                 href={project.sourceUrl}
                 target="_blank"
                 rel="noreferrer"
                 title="開啟原始影片"
               >
-                <Download size={15} />
+                <Download size={14} />
               </a>
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function EmptyPanel({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-[var(--border-strong)] bg-white p-6 text-center">
+      <div>
+        <h3 className="text-sm font-medium">{title}</h3>
+        <p className="mt-2 max-w-md text-sm leading-6 text-[var(--gray-500)]">{description}</p>
       </div>
     </div>
   );
