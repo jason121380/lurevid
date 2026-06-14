@@ -64,8 +64,8 @@ function buildProcessSteps(project: Project): Array<{ title: string; description
     step("轉錄音訊", "把影片聲音轉成逐字稿", Boolean(project.sourceTranscript), project.status === "ANALYZING" && (activeMessage.includes("轉錄") || activeMessage.includes("逐字稿") || activeMessage.includes("音訊"))),
     step("抽取影格", "用 ffmpeg 抽出代表性畫面", project.progress >= 0.17 || doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("抽取")),
     step("視覺分析", "AI 分析畫面、字幕、構圖與分鏡節奏", project.progress >= 0.19 || doneAfterAnalyze, project.status === "ANALYZING" && (activeMessage.includes("畫面") || activeMessage.includes("影格") || activeMessage.includes("分鏡"))),
-    step("整合分析", "合併逐字稿與視覺分析產出洞察", doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("整合")),
-    step("拆解結構", "拆 hook、鋪陳、賣點與 CTA", ["STRUCTURE_READY", "ADAPTING", "ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STRUCTURING"),
+    step("影片分析", "合併逐字稿與視覺分析產出洞察", doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("整合")),
+    step("結構分析", "拆 hook、鋪陳、賣點與 CTA", ["STRUCTURE_READY", "ADAPTING", "ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STRUCTURING"),
     step("改編腳本", "改寫成全新原創短影音腳本", ["ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "ADAPTING"),
     step("產生分鏡", "拆 9 鏡並產生分鏡圖", ["STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STORYBOARDING"),
     step("生成影片", "送 Seedance 產片段並合成 final.mp4", project.status === "COMPLETED", ["GENERATING", "MERGING"].includes(project.status))
@@ -327,9 +327,9 @@ export function ProjectClient({ projectId }: { projectId: string }) {
       return project.analysis ? (
         <ResultCard
           index="6"
-          title="整合分析"
+          title="影片分析"
           value={analysis}
-          actionLabel="確認分析 → 拆解結構"
+          actionLabel="確認分析 → 結構分析"
           disabled={disabled}
           onAction={() => post("/structure", { analysis: project.analysis || analysis })}
         />
@@ -341,7 +341,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
       return project.structure ? (
         <StepCard
           index="7"
-          title="拆解結構"
+          title="結構分析"
           value={structure}
           onChange={setStructure}
           actionLabel="確認結構 → 改編腳本"
@@ -349,7 +349,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           onAction={() => post("/adapt", { structure })}
         />
       ) : (
-        <div className="card p-4"><EmptyPanel title="尚未拆解結構" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
+        <div className="card p-4"><EmptyPanel title="尚未結構分析" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
       );
     }
     if (activeStep === 8) {
