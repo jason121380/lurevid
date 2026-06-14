@@ -183,8 +183,8 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   const disabled = busy;
   const previewScale = previewWidth ? previewWidth / 540 : 1;
   const statusPanel = (
-    <div className="card p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="card p-3 md:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
           {project.sourceUrl && (
@@ -194,7 +194,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           )}
         </div>
         {project.sourceUrl && (
-          <a className="btn btn-ghost shrink-0" href="#video-preview-modal" onClick={() => { window.location.hash = "video-preview-modal"; }}>
+          <a className="btn btn-ghost w-full shrink-0 sm:w-auto" href="#video-preview-modal" onClick={() => { window.location.hash = "video-preview-modal"; }}>
             <Eye size={16} />
             影片預覽
           </a>
@@ -211,7 +211,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
     </div>
   );
   const previewPanel = (
-    <div className="card p-4">
+    <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center gap-2">
         {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
         {project.status === "FAILED" && <XCircle className="text-[var(--red)]" />}
@@ -252,13 +252,13 @@ export function ProjectClient({ projectId }: { projectId: string }) {
     </div>
   );
   const transcriptPanel = (
-    <div className="card p-4">
+    <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm">3 · 轉錄音訊</h2>
         <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
       </div>
       {project.sourceTranscript ? (
-        <div className="max-h-[560px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-[var(--border)] bg-white p-4 text-sm leading-7">
+        <div className="max-h-[560px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-[var(--border)] bg-white p-3 text-sm leading-7 md:p-4">
           {project.sourceTranscript}
         </div>
       ) : (
@@ -267,34 +267,34 @@ export function ProjectClient({ projectId }: { projectId: string }) {
     </div>
   );
   const storyboardPanel = (
-    <div className="card p-4">
+    <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm">9 · 產生分鏡</h2>
         {project.status === "STORYBOARD_READY" && (
-          <div className="flex flex-wrap items-center gap-2">
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={ratio} onChange={(event) => setRatio(event.target.value)}>
+          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={ratio} onChange={(event) => setRatio(event.target.value)}>
               <option>9:16</option>
               <option>16:9</option>
               <option>1:1</option>
             </select>
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={resolution} onChange={(event) => setResolution(event.target.value)}>
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={resolution} onChange={(event) => setResolution(event.target.value)}>
               <option>720p</option>
               <option>1080p</option>
               <option>480p</option>
             </select>
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
               <option value={3}>每段 3 秒</option>
               <option value={4}>每段 4 秒</option>
               <option value={5}>每段 5 秒</option>
             </select>
-            <button className="btn btn-primary" disabled={disabled} onClick={() => post("/video", { ratio, resolution, duration })}>
+            <button className="btn btn-primary w-full sm:w-auto" disabled={disabled} onClick={() => post("/video", { ratio, resolution, duration })}>
               變成影片
             </button>
           </div>
         )}
       </div>
       {project.scenes.length > 0 ? (
-        <div className="grid gap-3 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {project.scenes.map((scene) => (
             <article key={scene.id} className="card p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -374,16 +374,16 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   return (
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] bg-white px-6">
-          <Link className="btn btn-ghost" href="/">
+        <div className="flex min-h-[60px] flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-white px-3 py-3 md:px-6">
+          <Link className="btn btn-ghost min-w-0" href="/">
             <ArrowLeft size={16} />
-            返回新增專案
+            <span className="truncate">返回新增專案</span>
           </Link>
           <span className={`badge ${statusClass(project.status)}`}>{project.status}</span>
         </div>
 
-        <div className="grid grid-cols-[300px_minmax(0,1fr)] gap-4 p-6">
-          <aside className="sticky top-6 h-fit">
+        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[300px_minmax(0,1fr)] md:gap-4 md:p-6">
+          <aside className="h-fit md:sticky md:top-6">
             <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} />
           </aside>
 
@@ -393,7 +393,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
         </div>
         {project.sourceUrl && (
           <div id="video-preview-modal" className="fixed inset-0 z-50 hidden overflow-y-auto bg-black/45 px-4 py-8 target:grid target:items-start" role="dialog" aria-modal="true">
-            <div className="mx-auto w-full max-w-[380px] rounded-2xl bg-white p-4 shadow-xl">
+            <div className="mx-auto w-full max-w-[380px] rounded-2xl bg-white p-3 shadow-xl md:p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-lg">影片預覽</h2>
                 <a className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange" href="#" title="關閉">
@@ -432,15 +432,15 @@ function ProcessTimeline({
   const steps = buildProcessSteps(project);
 
   return (
-    <div className="card p-3">
+    <div className="card p-2.5 md:p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm">工作清單</h2>
         <span className="text-xs text-[var(--gray-500)]">{Math.round(project.progress * 100)}%</span>
       </div>
-      <div className="space-y-1.5">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-1.5 md:overflow-visible md:pb-0">
         {steps.map((step, index) => (
           <div
-            className={`flex items-center gap-1 rounded-lg border px-2.5 py-2 transition ${
+            className={`flex min-w-[178px] items-center gap-1 rounded-lg border px-2.5 py-2 transition md:min-w-0 ${
               activeStep === index + 1
                 ? "border-orange bg-orange-bg"
                 : "border-[var(--border)] bg-white hover:border-orange/40 hover:bg-orange-bg/40"
@@ -476,7 +476,7 @@ function ProcessTimeline({
 
 function EmptyPanel({ title, description }: { title: string; description: string }) {
   return (
-    <div className="grid min-h-[260px] place-items-center rounded-xl border border-dashed border-[var(--border-strong)] bg-white p-6 text-center">
+    <div className="grid min-h-[220px] place-items-center rounded-xl border border-dashed border-[var(--border-strong)] bg-white p-4 text-center md:min-h-[260px] md:p-6">
       <div>
         <h3 className="text-sm font-medium">{title}</h3>
         <p className="mt-2 max-w-md text-sm leading-6 text-[var(--gray-500)]">{description}</p>
@@ -501,7 +501,7 @@ function MarkdownResult({ value }: { value: string }) {
   const lines = value.split(/\r?\n/);
 
   return (
-    <div className="max-h-[560px] overflow-y-auto px-1 py-1 text-sm leading-7">
+    <div className="max-h-[60vh] overflow-y-auto px-1 py-1 text-sm leading-7 md:max-h-[560px]">
       {lines.map((line, index) => {
         const trimmed = line.trim();
         if (!trimmed) return <div className="h-3" key={index} />;
@@ -552,15 +552,15 @@ function ResultCard({
   disabled: boolean;
 }) {
   return (
-    <div className="card p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="card p-3 md:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm">
           {index} · {title}
         </h2>
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
       </div>
       <MarkdownResult value={value} />
-      <button className="btn btn-primary mt-3" disabled={disabled || !value.trim()} onClick={onAction}>
+      <button className="btn btn-primary mt-3 w-full sm:w-auto" disabled={disabled || !value.trim()} onClick={onAction}>
         {actionLabel}
       </button>
     </div>
@@ -585,19 +585,19 @@ function StepCard({
   disabled: boolean;
 }) {
   return (
-    <div className="card p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="card p-3 md:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm">
           {index} · {title}
         </h2>
         <span className="text-[11px] text-[var(--gray-500)]">可編輯後再繼續</span>
       </div>
       <textarea
-        className="min-h-[180px] w-full resize-y rounded-xl border border-[var(--border-strong)] bg-white p-4 text-sm leading-7 outline-none focus:border-orange"
+        className="min-h-[220px] w-full resize-y rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm leading-7 outline-none focus:border-orange md:min-h-[180px] md:p-4"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      <button className="btn btn-primary mt-3" disabled={disabled || !value.trim()} onClick={onAction}>
+      <button className="btn btn-primary mt-3 w-full sm:w-auto" disabled={disabled || !value.trim()} onClick={onAction}>
         {actionLabel}
       </button>
     </div>

@@ -40,31 +40,31 @@ export default function HomePage() {
   return (
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="flex min-h-[60px] flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-white px-6 py-3">
-          <h1 className="text-base">lurevid | 短影音分析創作平台</h1>
+        <div className="flex min-h-[60px] flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:px-6">
+          <h1 className="min-w-0 text-sm md:text-base">lurevid | 短影音分析創作平台</h1>
           <Link className="btn btn-ghost" href="/settings">
             <Settings size={16} />
             設定
           </Link>
         </div>
 
-        <div className="p-4 lg:p-6">
+        <div className="p-3 md:p-4 lg:p-6">
           <section className="space-y-4">
-            <div className="card p-4">
+            <div className="card p-3 md:p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Link2 size={18} className="text-orange" />
                 <h2 className="text-sm">貼上參考影片連結</h2>
               </div>
               <input
-                className="w-full rounded-xl border border-[var(--border-strong)] bg-white p-4 text-sm outline-none focus:border-orange"
+                className="w-full rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm outline-none focus:border-orange md:p-4"
                 placeholder="https://www.instagram.com/reel/...　或　https://www.tiktok.com/@.../video/..."
                 value={sourceUrl}
                 onChange={(event) => setSourceUrl(event.target.value)}
               />
 
-              <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div />
-                <button className="btn btn-primary" disabled={!sourceUrl.trim() || loading} onClick={start}>
+                <button className="btn btn-primary w-full sm:w-auto" disabled={!sourceUrl.trim() || loading} onClick={start}>
                   <Wand2 size={16} />
                   {loading ? "建立中" : "開始分析"}
                 </button>

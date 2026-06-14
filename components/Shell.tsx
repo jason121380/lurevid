@@ -24,6 +24,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const [draftTitle, setDraftTitle] = useState("");
   const [savingId, setSavingId] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] || "";
 
   async function loadProjects() {
@@ -51,6 +52,10 @@ export function Shell({ children }: { children: ReactNode }) {
   function beginEdit(project: ProjectListItem) {
     setEditingId(project.id);
     setDraftTitle(project.title || "未命名專案");
+  }
+
+  function closeMobileMenu() {
+    setMobileOpen(false);
   }
 
   async function saveTitle(projectId: string) {
@@ -89,26 +94,40 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <aside className={`fixed inset-y-0 left-0 flex flex-col border-r border-[var(--border)] bg-white transition-[width] duration-200 ${collapsed ? "w-16" : "w-[var(--sidebar-w)]"}`}>
-        <div className={`flex h-[60px] items-center border-b border-[var(--border)] ${collapsed ? "justify-center px-2" : "justify-between px-5"}`}>
+      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--border)] bg-white px-3 md:hidden">
+        <button className="grid h-10 w-10 place-items-center rounded-xl text-[var(--gray-500)]" onClick={() => setMobileOpen(true)} title="開啟選單">
+          <Menu size={19} />
+        </button>
+        <div className="min-w-0 truncate px-2 text-sm text-[var(--black)]">lurevid</div>
+        <Link className="grid h-10 w-10 place-items-center rounded-xl text-orange" href="/" title="新增專案">
+          <Plus size={18} />
+        </Link>
+      </div>
+      {mobileOpen && <button className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={closeMobileMenu} aria-label="關閉選單" />}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,300px)] flex-col border-r border-[var(--border)] bg-white transition-transform duration-200 md:z-40 md:translate-x-0 md:transition-[width] ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "md:w-16" : "md:w-[var(--sidebar-w)]"}`}>
+        <div className={`flex h-[60px] items-center border-b border-[var(--border)] ${collapsed ? "md:justify-center md:px-2" : "justify-between px-5"}`}>
           {!collapsed && <div className="text-sm text-[var(--black)]">lurevid</div>}
-          <button className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange" onClick={toggleSidebar} title={collapsed ? "展開選單" : "收合選單"}>
+          <button className="hidden h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange md:grid" onClick={toggleSidebar} title={collapsed ? "展開選單" : "收合選單"}>
             <Menu size={18} />
           </button>
+          <button className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] md:hidden" onClick={closeMobileMenu} title="關閉選單">
+            <X size={18} />
+          </button>
         </div>
-        <nav className={`flex min-h-0 flex-1 flex-col ${collapsed ? "p-2" : "p-3"}`}>
+        <nav className={`flex min-h-0 flex-1 flex-col p-3 ${collapsed ? "md:p-2" : "md:p-3"}`}>
           <div className="space-y-1">
             <Link
-              className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "justify-center px-0" : "gap-3 px-3"} ${pathname === "/" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+              className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
               href="/"
+              onClick={closeMobileMenu}
               title="新增專案"
             >
               <Plus size={17} />
-              {!collapsed && "新增專案"}
+              <span className={collapsed ? "md:hidden" : ""}>新增專案</span>
             </Link>
           </div>
 
-          {!collapsed && <div className="mt-4 min-h-0 flex-1 border-t border-[var(--border)] pt-3">
+          <div className={`mt-4 min-h-0 flex-1 border-t border-[var(--border)] pt-3 ${collapsed ? "md:hidden" : ""}`}>
             <div className="mb-2 flex items-center justify-between px-2">
               <div className="text-[11px] uppercase tracking-wide text-[var(--gray-500)]">專案</div>
               <span className="text-[11px] text-[var(--gray-300)]">{projects.length}</span>
@@ -142,7 +161,7 @@ export function Shell({ children }: { children: ReactNode }) {
                       </div>
                     ) : (
                       <div className="flex items-center gap-1">
-                        <Link className="block min-w-0 flex-1 py-1" href={`/projects/${project.id}`}>
+                        <Link className="block min-w-0 flex-1 py-1" href={`/projects/${project.id}`} onClick={closeMobileMenu}>
                           <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "AI 分析中"}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
@@ -159,10 +178,10 @@ export function Shell({ children }: { children: ReactNode }) {
                 );
               })}
             </div>
-          </div>}
+          </div>
         </nav>
       </aside>
-      <main className={`transition-[margin] duration-200 ${collapsed ? "ml-16" : "ml-[var(--sidebar-w)]"}`}>{children}</main>
+      <main className={`pt-14 transition-[margin] duration-200 md:pt-0 ${collapsed ? "md:ml-16" : "md:ml-[var(--sidebar-w)]"}`}>{children}</main>
     </div>
   );
 }
