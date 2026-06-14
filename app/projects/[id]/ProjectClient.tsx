@@ -365,7 +365,7 @@ function ProcessTimeline({ project }: { project: Project }) {
         {steps.map((step, index) => (
           <div className="flex gap-3 rounded-xl border border-[var(--border)] bg-white p-3" key={step.title}>
             <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs ${stepStateClass(step.state)}`}>
-              {step.state === "done" ? <CheckCircle2 size={15} /> : step.state === "active" ? <Loader2 size={15} className="animate-spin" /> : step.state === "failed" ? <XCircle size={15} /> : index + 1}
+              {step.state === "active" ? <Loader2 size={15} className="animate-spin" /> : step.state === "failed" ? <XCircle size={15} /> : index + 1}
             </div>
             <div className="min-w-0">
               <div className="text-sm">{step.title}</div>
