@@ -92,7 +92,6 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   const [analysis, setAnalysis] = useState("");
   const [structure, setStructure] = useState("");
   const [script, setScript] = useState("");
-  const [transcript, setTranscript] = useState("");
   const [ratio, setRatio] = useState("9:16");
   const [resolution, setResolution] = useState("720p");
   const [duration, setDuration] = useState(5);
@@ -203,20 +202,6 @@ export function ProjectClient({ projectId }: { projectId: string }) {
               </div>
               {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-sm text-[var(--red)]">{project.error}</p>}
 
-              {project.status === "FAILED" && (
-                <div className="mt-3 space-y-2 rounded-xl bg-[var(--warm-white)] p-3">
-                  <p className="text-xs text-[var(--gray-500)]">抓不到影片時，可手動貼上逐字稿重新分析：</p>
-                  <textarea
-                    className="min-h-[100px] w-full resize-y rounded-lg border border-[var(--border-strong)] bg-white p-3 text-sm outline-none focus:border-orange"
-                    placeholder="貼上影片字幕／逐字稿"
-                    value={transcript}
-                    onChange={(event) => setTranscript(event.target.value)}
-                  />
-                  <button className="btn btn-primary" disabled={submitting} onClick={() => post("/analyze", { transcript })}>
-                    用這份逐字稿重新分析
-                  </button>
-                </div>
-              )}
             </div>
 
             {project.analysis != null && project.analysis !== "" && (

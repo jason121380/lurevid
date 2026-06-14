@@ -9,8 +9,6 @@ import { Shell } from "@/components/Shell";
 export default function HomePage() {
   const router = useRouter();
   const [sourceUrl, setSourceUrl] = useState("");
-  const [transcript, setTranscript] = useState("");
-  const [showTranscript, setShowTranscript] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,8 +21,7 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceUrl: sourceUrl.trim(),
-          transcript: transcript.trim() || undefined
+          sourceUrl: sourceUrl.trim()
         })
       });
       const data = await res.json();
@@ -64,21 +61,6 @@ export default function HomePage() {
                 value={sourceUrl}
                 onChange={(event) => setSourceUrl(event.target.value)}
               />
-
-              <button
-                className="mt-3 text-xs text-orange"
-                onClick={() => setShowTranscript((value) => !value)}
-              >
-                {showTranscript ? "收起手動逐字稿" : "手動貼逐字稿（選填備援）"}
-              </button>
-              {showTranscript && (
-                <textarea
-                  className="mt-2 min-h-[120px] w-full resize-y rounded-xl border border-[var(--border-strong)] bg-white p-4 text-sm leading-7 outline-none focus:border-orange"
-                  placeholder="可選填。沒貼時系統會自動下載影片、抽影格分析畫面，並把音訊轉成逐字稿；若 IG/TikTok 擋住抓取，再改貼字幕／逐字稿。"
-                  value={transcript}
-                  onChange={(event) => setTranscript(event.target.value)}
-                />
-              )}
 
               <div className="mt-3 flex items-center justify-between gap-3">
                 {!sourceUrl.trim() && (
