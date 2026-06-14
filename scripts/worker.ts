@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { join } from "node:path";
 import { Worker } from "bullmq";
 import { prisma } from "@/lib/prisma";
