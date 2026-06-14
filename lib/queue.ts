@@ -1,7 +1,9 @@
-import { Queue } from "bullmq";
+import { Queue, type JobsOptions } from "bullmq";
 import IORedis from "ioredis";
 
 export const PROJECT_QUEUE_NAME = "seedance-projects";
+
+export type ProjectAction = "analyze" | "structure" | "adapt" | "storyboard" | "video";
 
 export function createRedisConnection() {
   const redisUrl = process.env.REDIS_URL;
@@ -15,4 +17,13 @@ export function createProjectQueue() {
   return new Queue(PROJECT_QUEUE_NAME, {
     connection: createRedisConnection()
   });
+}
+
+export async function enqueueProjectJob(projectId: string, action: ProjectAction, opts?: JobsOptions) {
+  const queue = createProjectQueue();
+  try {
+    await queue.add(`${action}-${projectId}`, { projectId, action }, opts ?? { attempts: 1 });
+  } finally {
+    await queue.close();
+  }
 }

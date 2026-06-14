@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createProjectQueue } from "@/lib/queue";
+import { enqueueProjectJob } from "@/lib/queue";
 
 export const runtime = "nodejs";
 
@@ -24,9 +24,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     data: { status: "QUEUED", message: "已排入影片生成佇列", progress: 0.5 }
   });
 
-  const queue = createProjectQueue();
-  await queue.add("generate-video", { projectId: id, action: "video" }, { attempts: 2, backoff: { type: "exponential", delay: 5000 } });
-  await queue.close();
+  await enqueueProjectJob(id, "video", { attempts: 2, backoff: { type: "exponential", delay: 5000 } });
 
   const next = await prisma.project.findUnique({
     where: { id },
