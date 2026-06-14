@@ -392,15 +392,15 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           </section>
         </div>
         {project.sourceUrl && (
-          <div id="video-preview-modal" className="fixed inset-0 z-50 hidden place-items-center bg-black/45 p-4 target:grid" role="dialog" aria-modal="true">
-            <div className="w-full max-w-[520px] rounded-2xl bg-white p-4 shadow-xl">
+          <div id="video-preview-modal" className="fixed inset-0 z-50 hidden overflow-y-auto bg-black/45 px-4 py-8 target:grid target:items-start" role="dialog" aria-modal="true">
+            <div className="mx-auto w-full max-w-[380px] rounded-2xl bg-white p-4 shadow-xl">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-lg">影片預覽</h2>
                 <a className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange" href="#" title="關閉">
                   <X size={18} />
                 </a>
               </div>
-              <div className="relative grid w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
+              <div className="relative grid max-h-[72vh] w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
                 <iframe
                   className="h-full w-full border-0 bg-white"
                   src={sourceEmbedUrl(project.sourceUrl)}
