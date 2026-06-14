@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LayoutDashboard, Pencil, Settings, Trash2, X } from "lucide-react";
+import { Check, LayoutDashboard, Pencil, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -101,13 +101,6 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               <LayoutDashboard size={17} />
               新增專案
-            </Link>
-            <Link
-              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
-              href="/settings"
-            >
-              <Settings size={17} />
-              設定
             </Link>
           </div>
 

@@ -1,22 +1,10 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Link2, Loader2, Wand2 } from "lucide-react";
+import { Link2, Settings, Wand2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Shell } from "@/components/Shell";
-
-type SettingField = {
-  key: string;
-  configured: boolean;
-  value: string;
-  defaultValue: string;
-};
-
-const apiGroups = [
-  { title: "OpenAI", keys: ["OPENAI_API_KEY", "OPENAI_STORY_MODEL", "OPENAI_PROMPT_MODEL", "OPENAI_IMAGE_MODEL", "OPENAI_TRANSCRIBE_MODEL"] },
-  { title: "Seedance", keys: ["ARK_API_KEY", "SEEDANCE_MODEL"] },
-  { title: "S3", keys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL"] }
-];
 
 export default function HomePage() {
   const router = useRouter();
@@ -24,24 +12,7 @@ export default function HomePage() {
   const [transcript, setTranscript] = useState("");
   const [showTranscript, setShowTranscript] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState<SettingField[]>([]);
-  const [settingsLoading, setSettingsLoading] = useState(true);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    async function loadSettings() {
-      setSettingsLoading(true);
-      try {
-        const res = await fetch("/api/settings");
-        const data = await res.json();
-        if (res.ok) setSettings(data.fields);
-      } finally {
-        setSettingsLoading(false);
-      }
-    }
-
-    loadSettings();
-  }, []);
 
   async function start() {
     if (!sourceUrl.trim()) return;
@@ -74,7 +45,10 @@ export default function HomePage() {
       <div className="min-h-screen bg-[var(--warm-white)]">
         <div className="flex min-h-[60px] flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-white px-6 py-3">
           <h1 className="text-base">lurevid | 短影音分析改編</h1>
-          <ApiStatus fields={settings} loading={settingsLoading} />
+          <Link className="btn btn-ghost" href="/settings">
+            <Settings size={16} />
+            設定
+          </Link>
         </div>
 
         <div className="p-4 lg:p-6">
@@ -126,40 +100,5 @@ export default function HomePage() {
         </div>
       </div>
     </Shell>
-  );
-}
-
-function ApiStatus({ fields, loading }: { fields: SettingField[]; loading: boolean }) {
-  const configured = (key: string) => {
-    const field = fields.find((item) => item.key === key);
-    if (!field) return false;
-    return Boolean(field.configured || field.value || field.defaultValue);
-  };
-
-  const statuses = apiGroups.map((group) => ({
-    title: group.title,
-    ready: group.keys.every(configured)
-  }));
-  const readyCount = statuses.filter((status) => status.ready).length;
-
-  if (loading) {
-    return (
-      <span className="badge badge-warn inline-flex items-center gap-1">
-        <Loader2 size={12} className="animate-spin" />
-        API 狀態讀取中
-      </span>
-    );
-  }
-
-  return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <span className={readyCount === statuses.length ? "badge badge-active" : "badge badge-warn"}>API 狀態 {readyCount}/{statuses.length}</span>
-      {statuses.map((status) => (
-        <span className={`badge inline-flex items-center gap-1 ${status.ready ? "badge-active" : "badge-error"}`} key={status.title}>
-          {status.ready ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-          {status.title}
-        </span>
-      ))}
-    </div>
   );
 }
