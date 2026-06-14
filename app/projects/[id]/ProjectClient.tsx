@@ -291,6 +291,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           </section>
 
           <aside className="sticky top-6 h-fit space-y-4">
+            <ProcessTimeline project={project} />
             <div className="card p-4">
               <div className="mb-3 flex items-center gap-2">
                 {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
@@ -330,7 +331,6 @@ export function ProjectClient({ projectId }: { projectId: string }) {
                 </a>
               )}
             </div>
-            <ProcessTimeline project={project} />
           </aside>
         </div>
       </div>
@@ -344,7 +344,7 @@ function ProcessTimeline({ project }: { project: Project }) {
   return (
     <div className="card p-4">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="text-sm">背後處理流程</h2>
+        <h2 className="text-sm">工作清單</h2>
         <span className="text-xs text-[var(--gray-500)]">{Math.round(project.progress * 100)}%</span>
       </div>
       <div className="space-y-2">
