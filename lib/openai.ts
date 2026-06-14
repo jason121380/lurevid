@@ -21,12 +21,16 @@ function isMissingApiKey(value: string) {
   return !value || value === "sk-..." || value.startsWith("replace-with");
 }
 
+function openaiTimeoutMs() {
+  return Number(process.env.OPENAI_TIMEOUT_MS || 120000);
+}
+
 async function client() {
   const settings = await getAppSettings();
   if (isMissingApiKey(settings.OPENAI_API_KEY)) {
     throw new Error("請先在設定頁填入有效的 OPENAI_API_KEY");
   }
-  return new OpenAI({ apiKey: settings.OPENAI_API_KEY });
+  return new OpenAI({ apiKey: settings.OPENAI_API_KEY, timeout: openaiTimeoutMs(), maxRetries: 1 });
 }
 
 export async function openaiClient() {

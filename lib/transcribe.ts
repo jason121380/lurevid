@@ -55,7 +55,7 @@ export async function fetchTranscript(url: string): Promise<string> {
     const audio = files.find((file) => TRANSCRIBABLE_EXTENSIONS.has(file.split(".").pop()?.toLowerCase() || ""));
     if (!audio) throw new Error("yt-dlp 沒有輸出可轉錄的音訊檔");
 
-    return transcribeMediaFile(join(dir, audio));
+    return await transcribeMediaFile(join(dir, audio));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

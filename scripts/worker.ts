@@ -168,7 +168,7 @@ async function generateStoryboard(projectId: string) {
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "STORYBOARDING", message: "正在產生分鏡與 9 張分鏡圖", progress: 0.45 }
+    data: { status: "STORYBOARDING", message: "正在產生分鏡與 9 張分鏡圖", progress: 0.45, error: null }
   });
 
   const storyboard = await generateStoryboardWithTwoModels(project.adaptedScript || project.idea);
@@ -217,7 +217,7 @@ async function generateStoryboard(projectId: string) {
     await prisma.project.update({
       where: { id: projectId },
       data: {
-        progress: 0.08 + (imagesDone / createdScenes.length) * 0.42,
+        progress: 0.45 + (imagesDone / createdScenes.length) * 0.05,
         message: `正在產生分鏡圖：${imagesDone}/${createdScenes.length}`
       }
     });
@@ -239,7 +239,7 @@ async function generateVideo(projectId: string) {
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "GENERATING", message: "正在把分鏡圖送入 Seedance", progress: 0.52 }
+    data: { status: "GENERATING", message: "正在把分鏡圖送入 Seedance", progress: 0.52, error: null }
   });
 
   await mapWithConcurrency(project.scenes, SEEDANCE_CONCURRENCY, async (scene) => {
