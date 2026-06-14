@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "lurevid | AI 影像大師",
-  description: "輸入想法，自動分鏡、生成並合成 Seedance 影片。"
+  title: "lurevid | 短影音分析改編",
+  description: "貼上 IG Reels / TikTok 連結，自動分析、改編、分鏡並生成影片。"
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

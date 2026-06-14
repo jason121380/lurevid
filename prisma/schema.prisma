@@ -10,6 +10,12 @@ datasource db {
 enum ProjectStatus {
   DRAFT
   QUEUED
+  ANALYZING
+  ANALYSIS_READY
+  STRUCTURING
+  STRUCTURE_READY
+  ADAPTING
+  ADAPT_READY
   STORYBOARDING
   STORYBOARD_READY
   GENERATING
@@ -30,19 +36,25 @@ enum SceneStatus {
 }
 
 model Project {
-  id            String        @id @default(cuid())
-  idea          String
-  status        ProjectStatus @default(DRAFT)
-  message       String        @default("等待開始")
-  progress      Float         @default(0)
-  ratio         String        @default("16:9")
-  resolution    String        @default("720p")
-  duration      Int           @default(5)
-  finalVideoUrl String?
-  error         String?
-  scenes        Scene[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id               String        @id @default(cuid())
+  idea             String        @default("")
+  sourceUrl        String?
+  sourcePlatform   String?
+  sourceTranscript String?       @db.Text
+  analysis         String?       @db.Text
+  structure        String?       @db.Text
+  adaptedScript    String?       @db.Text
+  status           ProjectStatus @default(DRAFT)
+  message          String        @default("等待開始")
+  progress         Float         @default(0)
+  ratio            String        @default("16:9")
+  resolution       String        @default("720p")
+  duration         Int           @default(5)
+  finalVideoUrl    String?
+  error            String?
+  scenes           Scene[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 }
 
 model Scene {

@@ -5,7 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/async";
 import { PROJECT_QUEUE_NAME, createRedisConnection } from "@/lib/queue";
 import { readFile } from "node:fs/promises";
-import { generateStoryboardImage, generateStoryboardWithTwoModels } from "@/lib/openai";
+import {
+  adaptScript,
+  analyzeStructure,
+  analyzeVideo,
+  generateStoryboardImage,
+  generateStoryboardWithTwoModels
+} from "@/lib/openai";
+import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
 import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
 import { downloadVideo, mergeVideos, storageRoot } from "@/lib/video";
 import { uploadObject } from "@/lib/storage";
@@ -21,16 +28,88 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const IMAGE_CONCURRENCY = Number(process.env.IMAGE_CONCURRENCY || 3);
 const SEEDANCE_CONCURRENCY = Number(process.env.SEEDANCE_CONCURRENCY || 3);
 
+async function runAnalyze(projectId: string) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new Error(`找不到專案：${projectId}`);
+  if (!project.sourceUrl) throw new Error("缺少來源影片連結");
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { status: "ANALYZING", message: "正在取得影片內容並分析", progress: 0.1, error: null }
+  });
+
+  let transcript = project.sourceTranscript?.trim() || "";
+  if (!transcript) {
+    try {
+      transcript = await fetchTranscript(project.sourceUrl);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "未知錯誤";
+      throw new Error(`無法自動抓取影片逐字稿（${reason}）。請改用手動貼上逐字稿後重試。`);
+    }
+    await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
+  }
+
+  const platform = project.sourcePlatform || detectPlatform(project.sourceUrl);
+  const analysis = await analyzeVideo(transcript, platform);
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { analysis, status: "ANALYSIS_READY", message: "分析完成，可調整後繼續", progress: 0.2 }
+  });
+}
+
+async function runStructure(projectId: string) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new Error(`找不到專案：${projectId}`);
+  if (!project.analysis) throw new Error("尚未完成分析");
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { status: "STRUCTURING", message: "正在拆解影片結構", progress: 0.25 }
+  });
+
+  const structure = await analyzeStructure(project.sourceTranscript || "", project.analysis);
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { structure, status: "STRUCTURE_READY", message: "結構拆解完成，可調整後繼續", progress: 0.32 }
+  });
+}
+
+async function runAdapt(projectId: string) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new Error(`找不到專案：${projectId}`);
+  if (!project.analysis || !project.structure) throw new Error("尚未完成結構拆解");
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { status: "ADAPTING", message: "正在改編成新腳本", progress: 0.36 }
+  });
+
+  const adaptedScript = await adaptScript(project.analysis, project.structure);
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: {
+      adaptedScript,
+      idea: adaptedScript,
+      status: "ADAPT_READY",
+      message: "改編完成，可調整後產生分鏡圖",
+      progress: 0.4
+    }
+  });
+}
+
 async function generateStoryboard(projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new Error(`找不到專案：${projectId}`);
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "STORYBOARDING", message: "正在產生分鏡與 9 張分鏡圖", progress: 0.05 }
+    data: { status: "STORYBOARDING", message: "正在產生分鏡與 9 張分鏡圖", progress: 0.45 }
   });
 
-  const storyboard = await generateStoryboardWithTwoModels(project.idea);
+  const storyboard = await generateStoryboardWithTwoModels(project.adaptedScript || project.idea);
   await prisma.scene.deleteMany({ where: { projectId } });
 
   const createdScenes = await Promise.all(
@@ -198,7 +277,10 @@ const worker = new Worker(
     const projectId = String(job.data.projectId);
     const action = String(job.data.action || "video");
     try {
-      if (action === "storyboard") await generateStoryboard(projectId);
+      if (action === "analyze") await runAnalyze(projectId);
+      else if (action === "structure") await runStructure(projectId);
+      else if (action === "adapt") await runAdapt(projectId);
+      else if (action === "storyboard") await generateStoryboard(projectId);
       else await generateVideo(projectId);
     } catch (error) {
       await prisma.project.update({

@@ -23,6 +23,51 @@ function client() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
+export function openaiClient() {
+  return client();
+}
+
+async function generateText(model: string, system: string, user: string) {
+  const openai = client();
+  const response = await openai.responses.create({
+    model,
+    input: [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ]
+  });
+  return response.output_text.trim();
+}
+
+const textModel = () => process.env.OPENAI_STORY_MODEL || "gpt-5.4-mini";
+
+/** 第 1 步：分析這支短影音。 */
+export async function analyzeVideo(transcript: string, platform: string) {
+  return generateText(
+    textModel(),
+    "你是短影音內容策略分析師。根據逐字稿分析這支短影音，用繁體中文、條列重點，精簡有洞察。",
+    `平台：${platform}\n逐字稿：\n${transcript}\n\n請分析：主題、目標受眾、核心賣點、語氣與風格，以及它為什麼會吸引人。`
+  );
+}
+
+/** 第 2 步：拆解敘事結構。 */
+export async function analyzeStructure(transcript: string, analysis: string) {
+  return generateText(
+    textModel(),
+    "你是爆款短影音結構拆解專家。用繁體中文條列影片的敘事結構與節奏。",
+    `先前分析：\n${analysis}\n\n逐字稿：\n${transcript}\n\n請拆解：開頭 hook、鋪陳、賣點呈現、CTA／結尾，每段大約時間佔比與使用的手法。`
+  );
+}
+
+/** 第 3 步：改編成全新原創腳本構想（接給分鏡使用）。 */
+export async function adaptScript(analysis: string, structure: string) {
+  return generateText(
+    process.env.OPENAI_PROMPT_MODEL || textModel(),
+    "你是短影音編劇。根據結構分析，改編出一支全新、原創、不抄襲的短影音腳本構想，用繁體中文。",
+    `分析：\n${analysis}\n\n結構：\n${structure}\n\n請輸出一份可直接拿去做分鏡的腳本構想：一段完整描述，包含主題、調性、畫面走向與節奏。`
+  );
+}
+
 function parseJsonText(text: string) {
   const trimmed = text.trim();
   const json = trimmed.startsWith("```") ? trimmed.replace(/^```json\s*/i, "").replace(/```$/i, "") : trimmed;

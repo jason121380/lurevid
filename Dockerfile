@@ -16,8 +16,10 @@ FROM node:24-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/* \
+  && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp \
+  && chmod a+rx /usr/local/bin/yt-dlp
 COPY --from=builder /app ./
 EXPOSE 3000
 # Web 服務用此預設指令；Worker 服務在 Zeabur 把 Start Command 覆寫為：npm run worker

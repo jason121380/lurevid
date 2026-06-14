@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { createProjectQueue } from "@/lib/queue";
+import { enqueueProjectJob } from "@/lib/queue";
+import { detectPlatform, isSupportedSourceUrl } from "@/lib/transcribe";
 
 export const runtime = "nodejs";
 
 const createProjectSchema = z.object({
-  idea: z.string().min(1),
+  sourceUrl: z.string().url(),
+  transcript: z.string().optional(),
   settings: z.object({
     ratio: z.string().default("16:9"),
     resolution: z.string().default("720p"),
@@ -17,22 +19,26 @@ const createProjectSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = createProjectSchema.parse(await request.json());
+    if (!isSupportedSourceUrl(body.sourceUrl)) {
+      return NextResponse.json({ error: "目前僅支援 Instagram Reels 與 TikTok 連結" }, { status: 400 });
+    }
+
     const project = await prisma.project.create({
       data: {
-        idea: body.idea,
+        sourceUrl: body.sourceUrl,
+        sourcePlatform: detectPlatform(body.sourceUrl),
+        sourceTranscript: body.transcript?.trim() || null,
         ratio: body.settings.ratio,
         resolution: body.settings.resolution,
         duration: body.settings.duration,
-        status: "STORYBOARDING",
-        message: "正在產生 9 張分鏡圖",
-        progress: 0.02
+        status: "ANALYZING",
+        message: "正在取得影片內容並分析",
+        progress: 0.05
       },
       include: { scenes: { orderBy: { sceneNumber: "asc" } } }
     });
 
-    const queue = createProjectQueue();
-    await queue.add("generate-storyboard", { projectId: project.id, action: "storyboard" }, { attempts: 1 });
-    await queue.close();
+    await enqueueProjectJob(project.id, "analyze");
 
     return NextResponse.json(project, { status: 202 });
   } catch (error) {
