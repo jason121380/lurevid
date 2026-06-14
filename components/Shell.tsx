@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LayoutDashboard, Pencil, Trash2, X } from "lucide-react";
+import { Check, LayoutDashboard, Menu, Pencil, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -23,6 +23,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const [editingId, setEditingId] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
   const [savingId, setSavingId] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] || "";
 
   async function loadProjects() {
@@ -34,6 +35,18 @@ export function Shell({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadProjects();
   }, [pathname]);
+
+  useEffect(() => {
+    setCollapsed(window.localStorage.getItem("lurevid-sidebar-collapsed") === "true");
+  }, []);
+
+  function toggleSidebar() {
+    setCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("lurevid-sidebar-collapsed", String(next));
+      return next;
+    });
+  }
 
   function beginEdit(project: ProjectListItem) {
     setEditingId(project.id);
@@ -76,22 +89,26 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <aside className="fixed inset-y-0 left-0 flex w-[var(--sidebar-w)] flex-col border-r border-[var(--border)] bg-white">
-        <div className="flex h-[60px] items-center gap-2 border-b border-[var(--border)] px-5">
-          <div className="text-sm text-[var(--black)]">lurevid</div>
+      <aside className={`fixed inset-y-0 left-0 flex flex-col border-r border-[var(--border)] bg-white transition-[width] duration-200 ${collapsed ? "w-16" : "w-[var(--sidebar-w)]"}`}>
+        <div className={`flex h-[60px] items-center border-b border-[var(--border)] ${collapsed ? "justify-center px-2" : "justify-between px-5"}`}>
+          {!collapsed && <div className="text-sm text-[var(--black)]">lurevid</div>}
+          <button className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange" onClick={toggleSidebar} title={collapsed ? "展開選單" : "收合選單"}>
+            <Menu size={18} />
+          </button>
         </div>
-        <nav className="flex min-h-0 flex-1 flex-col p-3">
+        <nav className={`flex min-h-0 flex-1 flex-col ${collapsed ? "p-2" : "p-3"}`}>
           <div className="space-y-1">
             <Link
-              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+              className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "justify-center px-0" : "gap-3 px-3"} ${pathname === "/" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
               href="/"
+              title="新增專案"
             >
               <LayoutDashboard size={17} />
-              新增專案
+              {!collapsed && "新增專案"}
             </Link>
           </div>
 
-          <div className="mt-4 min-h-0 flex-1 border-t border-[var(--border)] pt-3">
+          {!collapsed && <div className="mt-4 min-h-0 flex-1 border-t border-[var(--border)] pt-3">
             <div className="mb-2 flex items-center justify-between px-2">
               <div className="text-[11px] uppercase tracking-wide text-[var(--gray-500)]">專案</div>
               <span className="text-[11px] text-[var(--gray-300)]">{projects.length}</span>
@@ -142,10 +159,10 @@ export function Shell({ children }: { children: ReactNode }) {
                 );
               })}
             </div>
-          </div>
+          </div>}
         </nav>
       </aside>
-      <main className="ml-[var(--sidebar-w)]">{children}</main>
+      <main className={`transition-[margin] duration-200 ${collapsed ? "ml-16" : "ml-[var(--sidebar-w)]"}`}>{children}</main>
     </div>
   );
 }
