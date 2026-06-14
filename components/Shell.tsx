@@ -1,4 +1,4 @@
-import { Film, LayoutDashboard, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -13,14 +13,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <LayoutDashboard size={17} />
             工作台
           </Link>
-          <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[var(--gray-500)]">
-            <Film size={17} />
-            專案
-          </div>
-          <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[var(--gray-500)]">
-            <Settings size={17} />
-            設定
-          </div>
         </nav>
         <div className="border-t border-[var(--border)] p-4">
           <div className="flex items-center gap-3 rounded-xl bg-[var(--warm-white)] p-3">

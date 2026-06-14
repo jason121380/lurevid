@@ -4,7 +4,7 @@ import { enqueueProjectJob } from "@/lib/queue";
 
 export const runtime = "nodejs";
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const project = await prisma.project.findUnique({
     where: { id },
@@ -19,9 +19,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "需要 9 張分鏡圖才能變成影片" }, { status: 400 });
   }
 
+  const body = await request.json().catch(() => ({}));
+  const ratio = typeof body.ratio === "string" ? body.ratio : project.ratio;
+  const resolution = typeof body.resolution === "string" ? body.resolution : project.resolution;
+  const duration = Number.isInteger(body.duration) ? body.duration : project.duration;
+
   await prisma.project.update({
     where: { id },
-    data: { status: "QUEUED", message: "已排入影片生成佇列", progress: 0.5 }
+    data: { ratio, resolution, duration, status: "QUEUED", message: "已排入影片生成佇列", progress: 0.5 }
   });
 
   await enqueueProjectJob(id, "video", { attempts: 2, backoff: { type: "exponential", delay: 5000 } });

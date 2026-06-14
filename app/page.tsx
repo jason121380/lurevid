@@ -10,9 +10,6 @@ export default function HomePage() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [transcript, setTranscript] = useState("");
   const [showTranscript, setShowTranscript] = useState(false);
-  const [ratio, setRatio] = useState("9:16");
-  const [resolution, setResolution] = useState("720p");
-  const [duration, setDuration] = useState(5);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,8 +23,7 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourceUrl: sourceUrl.trim(),
-          transcript: transcript.trim() || undefined,
-          settings: { ratio, resolution, duration }
+          transcript: transcript.trim() || undefined
         })
       });
       const data = await res.json();
@@ -80,27 +76,13 @@ export default function HomePage() {
                 />
               )}
 
-              <div className="mt-3 grid gap-2 md:grid-cols-[110px_120px_130px_auto]">
-                <select className="rounded-full border border-[var(--border-strong)] px-3 text-sm" value={ratio} onChange={(event) => setRatio(event.target.value)}>
-                  <option>9:16</option>
-                  <option>16:9</option>
-                  <option>1:1</option>
-                </select>
-                <select className="rounded-full border border-[var(--border-strong)] px-3 text-sm" value={resolution} onChange={(event) => setResolution(event.target.value)}>
-                  <option>720p</option>
-                  <option>1080p</option>
-                  <option>480p</option>
-                </select>
-                <select className="rounded-full border border-[var(--border-strong)] px-3 text-sm" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
-                  <option value={3}>每段 3 秒</option>
-                  <option value={4}>每段 4 秒</option>
-                  <option value={5}>每段 5 秒</option>
-                </select>
+              <div className="mt-3 flex justify-end">
                 <button className="btn btn-primary" disabled={!sourceUrl.trim() || loading} onClick={start}>
                   <Wand2 size={16} />
                   {loading ? "建立中" : "開始分析"}
                 </button>
               </div>
+              <p className="mt-2 text-xs text-[var(--gray-500)]">影片比例、解析度、秒數會在「變成影片」那一步再選。</p>
               {error && <p className="mt-3 text-sm text-[var(--red)]">{error}</p>}
             </div>
 

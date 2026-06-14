@@ -47,7 +47,7 @@ model Project {
   status           ProjectStatus @default(DRAFT)
   message          String        @default("等待開始")
   progress         Float         @default(0)
-  ratio            String        @default("16:9")
+  ratio            String        @default("9:16")
   resolution       String        @default("720p")
   duration         Int           @default(5)
   finalVideoUrl    String?
