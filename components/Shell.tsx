@@ -113,18 +113,18 @@ export function Shell({ children }: { children: ReactNode }) {
               <div className="text-[11px] uppercase tracking-wide text-[var(--gray-500)]">專案</div>
               <span className="text-[11px] text-[var(--gray-300)]">{projects.length}</span>
             </div>
-            <div className="max-h-[calc(100vh-170px)] space-y-1 overflow-y-auto pr-1">
+            <div className="max-h-[calc(100vh-170px)] space-y-0.5 overflow-y-auto pr-1">
               {projects.length === 0 && <div className="rounded-xl bg-[var(--warm-white)] px-3 py-3 text-xs leading-5 text-[var(--gray-500)]">開始分析後，專案會自動存到這裡。</div>}
               {projects.map((project) => {
                 const active = activeProjectId === project.id;
                 const editing = editingId === project.id;
 
                 return (
-                  <div className={`rounded-xl p-2 ${active ? "bg-orange-bg" : "hover:bg-[var(--warm-white)]"}`} key={project.id}>
+                  <div className={`rounded-lg px-2 py-1 ${active ? "bg-orange-bg" : "hover:bg-[var(--warm-white)]"}`} key={project.id}>
                     {editing ? (
                       <div className="flex items-start gap-1">
                         <input
-                          className="min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-white px-2 py-1 text-xs outline-none focus:border-orange"
+                          className="min-w-0 flex-1 rounded-md border border-[var(--border-strong)] bg-white px-2 py-1 text-xs outline-none focus:border-orange"
                           value={draftTitle}
                           onChange={(event) => setDraftTitle(event.target.value)}
                           onKeyDown={(event) => {
@@ -133,24 +133,24 @@ export function Shell({ children }: { children: ReactNode }) {
                           }}
                           autoFocus
                         />
-                        <button className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-orange text-white" disabled={savingId === project.id} onClick={() => saveTitle(project.id)} title="儲存名稱">
-                          <Check size={14} />
+                        <button className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-orange text-white" disabled={savingId === project.id} onClick={() => saveTitle(project.id)} title="儲存名稱">
+                          <Check size={13} />
                         </button>
-                        <button className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-[var(--border-strong)] bg-white text-[var(--gray-500)]" onClick={() => setEditingId("")} title="取消">
-                          <X size={14} />
+                        <button className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-[var(--border-strong)] bg-white text-[var(--gray-500)]" onClick={() => setEditingId("")} title="取消">
+                          <X size={13} />
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-start gap-1">
+                      <div className="flex items-center gap-1">
                         <Link className="block min-w-0 flex-1 py-1" href={`/projects/${project.id}`}>
-                          <div className={`truncate text-sm ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "AI 分析中"}</div>
+                          <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "AI 分析中"}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
-                          <button className="grid h-7 w-7 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-white hover:text-orange" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
-                            <Pencil size={13} />
+                          <button className="grid h-6 w-6 place-items-center rounded-md text-[var(--gray-500)] hover:bg-white hover:text-orange" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
+                            <Pencil size={12} />
                           </button>
-                          <button className="grid h-7 w-7 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-white hover:text-[var(--red)]" disabled={savingId === project.id} onClick={() => deleteProject(project)} title="刪除專案">
-                            <Trash2 size={13} />
+                          <button className="grid h-6 w-6 place-items-center rounded-md text-[var(--gray-500)] hover:bg-white hover:text-[var(--red)]" disabled={savingId === project.id} onClick={() => deleteProject(project)} title="刪除專案">
+                            <Trash2 size={12} />
                           </button>
                         </div>
                       </div>
