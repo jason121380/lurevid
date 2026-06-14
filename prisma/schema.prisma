@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  DRAFT
+  QUEUED
+  STORYBOARDING
+  GENERATING
+  MERGING
+  COMPLETED
+  FAILED
+}
+
+enum SceneStatus {
+  DRAFT
+  PROMPT_READY
+  QUEUED
+  GENERATING
+  SUCCEEDED
+  FAILED
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  idea          String
+  status        ProjectStatus @default(DRAFT)
+  message       String        @default("等待開始")
+  progress      Float         @default(0)
+  ratio         String        @default("16:9")
+  resolution    String        @default("720p")
+  duration      Int           @default(5)
+  finalVideoUrl String?
+  error         String?
+  scenes        Scene[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Scene {
+  id              String      @id @default(cuid())
+  projectId       String
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneNumber     Int
+  title           String
+  visualGoal      String
+  seedancePrompt  String      @db.Text
+  status          SceneStatus @default(DRAFT)
+  seedanceTaskId  String?
+  videoUrl        String?
+  localPath       String?
+  error           String?
+  raw             Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([projectId, sceneNumber])
+}

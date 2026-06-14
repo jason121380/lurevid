@@ -1,0 +1,110 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --orange: #ff6b2c;
+  --orange-dark: #e55a1c;
+  --orange-bg: #fff5f0;
+  --orange-border: #ffe8d9;
+  --black: #1a1a1a;
+  --gray-500: #666666;
+  --gray-300: #aaaaaa;
+  --warm-white: #fafafa;
+  --white: #ffffff;
+  --border: #f0f0f0;
+  --border-strong: #e0e0e0;
+  --green: #2e7d32;
+  --green-bg: #e8f5e9;
+  --red: #c62828;
+  --red-bg: #ffebee;
+  --sidebar-w: 220px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--warm-white);
+  color: var(--black);
+  font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.btn {
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: 160ms ease;
+}
+
+.btn-primary {
+  background: var(--orange);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--orange-dark);
+}
+
+.btn-ghost {
+  border: 1px solid var(--border-strong);
+  background: white;
+  color: var(--black);
+}
+
+.btn-ghost:hover {
+  border-color: var(--orange-border);
+  background: var(--orange-bg);
+  color: var(--orange);
+}
+
+.badge {
+  border-radius: 50px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge-active {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.badge-warn {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.badge-error {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
