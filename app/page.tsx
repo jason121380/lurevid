@@ -53,7 +53,7 @@ export default function HomePage() {
             <div className="card p-3 md:p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Link2 size={18} className="text-orange" />
-                <h2 className="text-sm">貼上參考影片連結</h2>
+                <h2 className="text-sm">貼上影片連結</h2>
               </div>
               <input
                 className="w-full rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm outline-none focus:border-orange md:p-4"
