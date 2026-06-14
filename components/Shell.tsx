@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LayoutDashboard, Pencil, Settings, Sparkles, Trash2, X } from "lucide-react";
+import { Check, LayoutDashboard, Pencil, Settings, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -116,7 +116,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <div className="text-[11px] uppercase tracking-wide text-[var(--gray-500)]">專案</div>
               <span className="text-[11px] text-[var(--gray-300)]">{projects.length}</span>
             </div>
-            <div className="max-h-[calc(100vh-250px)] space-y-1 overflow-y-auto pr-1">
+            <div className="max-h-[calc(100vh-170px)] space-y-1 overflow-y-auto pr-1">
               {projects.length === 0 && <div className="rounded-xl bg-[var(--warm-white)] px-3 py-3 text-xs leading-5 text-[var(--gray-500)]">開始分析後，專案會自動存到這裡。</div>}
               {projects.map((project) => {
                 const active = activeProjectId === project.id;
@@ -168,15 +168,6 @@ export function Shell({ children }: { children: ReactNode }) {
             </div>
           </div>
         </nav>
-        <div className="border-t border-[var(--border)] p-4">
-          <div className="flex items-center gap-3 rounded-xl bg-[var(--warm-white)] p-3">
-            <Sparkles size={18} className="text-orange" />
-            <div>
-              <div className="text-xs">OpenAI + Seedance</div>
-              <div className="text-[11px] text-[var(--gray-500)]">9-shot video workflow</div>
-            </div>
-          </div>
-        </div>
       </aside>
       <main className="ml-[var(--sidebar-w)]">{children}</main>
     </div>
