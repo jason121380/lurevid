@@ -96,6 +96,8 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   const [ratio, setRatio] = useState("9:16");
   const [resolution, setResolution] = useState("720p");
   const [duration, setDuration] = useState(5);
+  const [previewWidth, setPreviewWidth] = useState(0);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const settingsInit = useRef(false);
   const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({});
 
@@ -130,6 +132,19 @@ export function ProjectClient({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
 
+  useEffect(() => {
+    const element = previewRef.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      setPreviewWidth(entry.contentRect.width);
+    });
+    observer.observe(element);
+    setPreviewWidth(element.getBoundingClientRect().width);
+
+    return () => observer.disconnect();
+  }, [project?.id]);
+
   async function post(path: string, payload?: Record<string, unknown>) {
     setSubmitting(true);
     setError("");
@@ -157,6 +172,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
 
   const busy = BUSY.includes(project.status) || submitting;
   const disabled = busy;
+  const previewScale = previewWidth ? previewWidth / 540 : 1;
 
   return (
     <Shell>
@@ -295,13 +311,19 @@ export function ProjectClient({ projectId }: { projectId: string }) {
                 {project.status === "COMPLETED" ? <CheckCircle2 className="text-[var(--green)]" /> : project.status === "FAILED" ? <XCircle className="text-[var(--red)]" /> : <Loader2 className="animate-spin text-orange" />}
                 <h2 className="text-lg">{project.finalVideoUrl ? "輸出影片" : "影片預覽"}</h2>
               </div>
-              <div className="grid aspect-[9/16] max-h-[420px] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
+              <div ref={previewRef} className="relative grid w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
                 {project.finalVideoUrl ? (
                   <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
                 ) : project.sourceUrl ? (
                   <iframe
-                    className="h-full w-full border-0 bg-white"
+                    className="absolute left-0 top-0 border-0 bg-white"
                     src={sourceEmbedUrl(project.sourceUrl)}
+                    style={{
+                      width: 540,
+                      height: 960,
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: "top left"
+                    }}
                     title="來源影片預覽"
                     loading="lazy"
                     allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
