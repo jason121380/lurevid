@@ -490,7 +490,7 @@ function renderInlineMarkdown(text: string) {
 
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong className="font-semibold text-[var(--black)]" key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+      return <strong className="font-bold text-[var(--black)]" key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
     }
 
     return part;
@@ -510,7 +510,7 @@ function MarkdownResult({ value }: { value: string }) {
         const heading = trimmed.match(/^#{1,4}\s*(.+)$/);
         if (heading) {
           return (
-            <h3 className="mt-4 text-base font-semibold text-[var(--black)] first:mt-0" key={index}>
+            <h3 className="mt-4 text-base font-bold text-[var(--black)] first:mt-0" key={index}>
               {renderInlineMarkdown(heading[1])}
             </h3>
           );
