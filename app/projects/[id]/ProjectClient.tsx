@@ -258,9 +258,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
         <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
       </div>
       {project.sourceTranscript ? (
-        <div className="max-h-[560px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-[var(--border)] bg-white p-3 text-sm leading-7 md:p-4">
-          {project.sourceTranscript}
-        </div>
+        <TranscriptResult value={project.sourceTranscript} />
       ) : (
         <EmptyPanel title="尚未取得逐字稿" description="worker 會在下載影片後自動轉錄音訊。" />
       )}
@@ -532,6 +530,32 @@ function MarkdownResult({ value }: { value: string }) {
           </p>
         );
       })}
+    </div>
+  );
+}
+
+function TranscriptResult({ value }: { value: string }) {
+  const rows = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const match = line.match(/^\[([^\]]+)\]\s*(.+)$/);
+      return match ? { time: match[1], text: match[2] } : { time: "", text: line };
+    });
+
+  return (
+    <div className="max-h-[560px] overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-2 text-sm md:p-3">
+      <div className="space-y-1">
+        {rows.map((row, index) => (
+          <div className="grid gap-2 rounded-lg px-2 py-2 sm:grid-cols-[112px_minmax(0,1fr)]" key={`${row.time}-${index}`}>
+            <div className="text-xs leading-6 text-[var(--gray-500)]">
+              {row.time || "全文"}
+            </div>
+            <p className="leading-6 text-[var(--black)]">{row.text}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
