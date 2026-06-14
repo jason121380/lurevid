@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Link2, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Link2, Loader2, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
@@ -77,7 +77,7 @@ export default function HomePage() {
           <ApiStatus fields={settings} loading={settingsLoading} />
         </div>
 
-        <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-6">
+        <div className="p-4 lg:p-6">
           <section className="space-y-4">
             <div className="card p-4">
               <div className="mb-3 flex items-center gap-2">
@@ -122,35 +122,7 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-
-            <div className="card grid min-h-[280px] place-items-center p-8 text-center">
-              <div>
-                <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-orange-bg text-orange">
-                  <Sparkles size={22} />
-                </div>
-                <h3>六步流程</h3>
-                <p className="mt-1 text-sm text-[var(--gray-500)]">
-                  分析影片內容與畫面 → 分析結構 → 改編 → 分鏡確認 → 變成影片 → 合成。前三步都可以看到結果並修改後再繼續。
-                </p>
-              </div>
-            </div>
           </section>
-
-          <aside className="card h-fit p-4 lg:sticky lg:top-6">
-            <p className="text-[11px] uppercase text-orange">Workflow</p>
-            <h2 className="mt-1 text-lg">參考爆款、做出自己的</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--gray-500)]">
-              貼一支 IG Reel 或 TikTok，系統會拆解它的逐字稿、畫面分鏡與剪輯節奏，改編成你的腳本，再產生分鏡與影片。
-            </p>
-            <ol className="mt-4 space-y-2 rounded-xl bg-[var(--warm-white)] p-3 text-sm">
-              <li>1. 分析影片</li>
-              <li>2. 拆解結構</li>
-              <li>3. 改編腳本</li>
-              <li>4. 確認分鏡圖</li>
-              <li>5. 變成影片</li>
-              <li>6. 合成完整影片</li>
-            </ol>
-          </aside>
         </div>
       </div>
     </Shell>
