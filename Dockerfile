@@ -1,3 +1,5 @@
+# 單一 image 同時供 Web（npm run start）與 Worker（npm run worker）兩個服務使用。
+# Worker 需要 tsx、lib/ 原始碼、tsconfig 與 ffmpeg，因此 runner 帶上完整相依與原始碼。
 FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -16,11 +18,7 @@ ENV NODE_ENV=production
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
   && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/scripts ./scripts
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app ./
 EXPOSE 3000
-CMD ["node", "server.js"]
+# Web 服務用此預設指令；Worker 服務在 Zeabur 把 Start Command 覆寫為：npm run worker
+CMD ["npm", "run", "start"]

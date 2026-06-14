@@ -4,17 +4,17 @@ import { Worker } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/async";
 import { PROJECT_QUEUE_NAME, createRedisConnection } from "@/lib/queue";
+import { readFile } from "node:fs/promises";
 import { generateStoryboardImage, generateStoryboardWithTwoModels } from "@/lib/openai";
 import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
-import {
-  downloadImage,
-  downloadVideo,
-  mergeVideos,
-  publicImageUrl,
-  publicVideoUrl,
-  storageRoot,
-  writeBase64Image
-} from "@/lib/video";
+import { downloadVideo, mergeVideos, storageRoot } from "@/lib/video";
+import { uploadObject } from "@/lib/storage";
+
+async function fetchToBuffer(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`下載檔案失敗：${url}`);
+  return Buffer.from(await response.arrayBuffer());
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -52,17 +52,22 @@ async function generateStoryboard(projectId: string) {
   let imagesDone = 0;
   await mapWithConcurrency(createdScenes, IMAGE_CONCURRENCY, async (scene) => {
     const image = await generateStoryboardImage(scene.imagePrompt || scene.seedancePrompt, project.ratio);
-    const imagePath = join(storageRoot(), projectId, `${String(scene.sceneNumber).padStart(2, "0")}.png`);
 
-    if (image.b64_json) await writeBase64Image(image.b64_json, imagePath);
-    else if (image.url) await downloadImage(image.url, imagePath);
+    let buffer: Buffer;
+    if (image.b64_json) buffer = Buffer.from(image.b64_json, "base64");
+    else if (image.url) buffer = await fetchToBuffer(image.url);
     else throw new Error(`第 ${scene.sceneNumber} 格沒有分鏡圖`);
+
+    const imageUrl = await uploadObject(
+      `projects/${projectId}/${String(scene.sceneNumber).padStart(2, "0")}.png`,
+      buffer,
+      "image/png"
+    );
 
     await prisma.scene.update({
       where: { id: scene.id },
       data: {
-        imageLocalPath: imagePath,
-        imageUrl: publicImageUrl(projectId, scene.id),
+        imageUrl,
         status: "IMAGE_READY"
       }
     });
@@ -174,10 +179,16 @@ async function generateVideo(projectId: string) {
     return path;
   });
 
-  await mergeVideos(projectId, clipPaths);
+  const finalPath = await mergeVideos(projectId, clipPaths);
+  const finalVideoUrl = await uploadObject(
+    `projects/${projectId}/final.mp4`,
+    await readFile(finalPath),
+    "video/mp4"
+  );
+
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "COMPLETED", message: "影片完成", progress: 1, finalVideoUrl: publicVideoUrl(projectId) }
+    data: { status: "COMPLETED", message: "影片完成", progress: 1, finalVideoUrl }
   });
 }
 

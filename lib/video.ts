@@ -16,18 +16,6 @@ export async function downloadVideo(url: string, path: string) {
   await pipeline(Readable.fromWeb(response.body as any), createWriteStream(path));
 }
 
-export async function writeBase64Image(base64: string, path: string) {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, Buffer.from(base64, "base64"));
-}
-
-export async function downloadImage(url: string, path: string) {
-  await mkdir(dirname(path), { recursive: true });
-  const response = await fetch(url);
-  if (!response.ok || !response.body) throw new Error(`下載分鏡圖失敗：${url}`);
-  await pipeline(Readable.fromWeb(response.body as any), createWriteStream(path));
-}
-
 function run(command: string, args: string[]) {
   return new Promise<void>((resolvePromise, reject) => {
     const child = spawn(command, args);
@@ -50,14 +38,4 @@ export async function mergeVideos(projectId: string, clipPaths: string[]) {
   await writeFile(listPath, clipPaths.map((path) => `file '${path.replaceAll("'", "'\\''")}'`).join("\n"));
   await run("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", finalPath]);
   return finalPath;
-}
-
-export function publicVideoUrl(projectId: string) {
-  const baseUrl = process.env.PUBLIC_BASE_URL || "http://localhost:3000";
-  return `${baseUrl}/api/projects/${projectId}/video`;
-}
-
-export function publicImageUrl(projectId: string, sceneId: string) {
-  const baseUrl = process.env.PUBLIC_BASE_URL || "http://localhost:3000";
-  return `${baseUrl}/api/projects/${projectId}/images/${sceneId}`;
 }
