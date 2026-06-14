@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import { getAppSettings } from "@/lib/settings";
 import type { StoryboardBeat, StoryboardScene } from "@/lib/types";
 
 const storyboardSchema = z.object({
@@ -16,19 +17,24 @@ const storyboardSchema = z.object({
     .length(9)
 });
 
-function client() {
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.startsWith("replace-with")) {
-    throw new Error("請先在 .env 設定有效的 OPENAI_API_KEY");
-  }
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function isMissingApiKey(value: string) {
+  return !value || value === "sk-..." || value.startsWith("replace-with");
 }
 
-export function openaiClient() {
+async function client() {
+  const settings = await getAppSettings();
+  if (isMissingApiKey(settings.OPENAI_API_KEY)) {
+    throw new Error("請先在設定頁填入有效的 OPENAI_API_KEY");
+  }
+  return new OpenAI({ apiKey: settings.OPENAI_API_KEY });
+}
+
+export async function openaiClient() {
   return client();
 }
 
 async function generateText(model: string, system: string, user: string) {
-  const openai = client();
+  const openai = await client();
   const response = await openai.responses.create({
     model,
     input: [
@@ -39,21 +45,21 @@ async function generateText(model: string, system: string, user: string) {
   return response.output_text.trim();
 }
 
-const textModel = () => process.env.OPENAI_STORY_MODEL || "gpt-5.4-mini";
+const textModel = async () => (await getAppSettings()).OPENAI_STORY_MODEL || "gpt-5.4-mini";
 
 /** 第 1 步：分析這支短影音。 */
-export async function analyzeVideo(transcript: string, platform: string) {
+export async function analyzeVideo(transcript: string, platform: string, visualAnalysis?: string) {
   return generateText(
-    textModel(),
-    "你是短影音內容策略分析師。根據逐字稿分析這支短影音，用繁體中文、條列重點，精簡有洞察。",
-    `平台：${platform}\n逐字稿：\n${transcript}\n\n請分析：主題、目標受眾、核心賣點、語氣與風格，以及它為什麼會吸引人。`
+    await textModel(),
+    "你是短影音內容策略分析師。根據逐字稿與視覺分鏡分析這支短影音，用繁體中文、條列重點，精簡有洞察。",
+    `平台：${platform}\n逐字稿：\n${transcript}\n\n視覺分鏡分析：\n${visualAnalysis || "未取得"}\n\n請整合分析：主題、目標受眾、核心賣點、語氣與風格、畫面與字幕如何輔助說服、分鏡/剪輯節奏，以及它為什麼會吸引人。`
   );
 }
 
 /** 第 2 步：拆解敘事結構。 */
 export async function analyzeStructure(transcript: string, analysis: string) {
   return generateText(
-    textModel(),
+    await textModel(),
     "你是爆款短影音結構拆解專家。用繁體中文條列影片的敘事結構與節奏。",
     `先前分析：\n${analysis}\n\n逐字稿：\n${transcript}\n\n請拆解：開頭 hook、鋪陳、賣點呈現、CTA／結尾，每段大約時間佔比與使用的手法。`
   );
@@ -62,7 +68,7 @@ export async function analyzeStructure(transcript: string, analysis: string) {
 /** 第 3 步：改編成全新原創腳本構想（接給分鏡使用）。 */
 export async function adaptScript(analysis: string, structure: string) {
   return generateText(
-    process.env.OPENAI_PROMPT_MODEL || textModel(),
+    (await getAppSettings()).OPENAI_PROMPT_MODEL || (await textModel()),
     "你是短影音編劇。根據結構分析，改編出一支全新、原創、不抄襲的短影音腳本構想，用繁體中文。",
     `分析：\n${analysis}\n\n結構：\n${structure}\n\n請輸出一份可直接拿去做分鏡的腳本構想：一段完整描述，包含主題、調性、畫面走向與節奏。`
   );
@@ -75,8 +81,8 @@ function parseJsonText(text: string) {
 }
 
 export async function createStoryboardBeats(idea: string): Promise<StoryboardBeat[]> {
-  const openai = client();
-  const model = process.env.OPENAI_STORY_MODEL || "gpt-5.4-mini";
+  const openai = await client();
+  const model = (await getAppSettings()).OPENAI_STORY_MODEL || "gpt-5.4-mini";
   const response = await openai.responses.create({
     model,
     input: [
@@ -141,8 +147,8 @@ export async function expandSeedancePrompts(
   idea: string,
   beats: StoryboardBeat[]
 ): Promise<StoryboardScene[]> {
-  const openai = client();
-  const model = process.env.OPENAI_PROMPT_MODEL || "gpt-5.4-mini";
+  const openai = await client();
+  const model = (await getAppSettings()).OPENAI_PROMPT_MODEL || "gpt-5.4-mini";
   const response = await openai.responses.create({
     model,
     input: [
@@ -207,8 +213,8 @@ export async function generateStoryboardWithTwoModels(idea: string) {
 }
 
 export async function generateStoryboardImage(prompt: string, ratio: string) {
-  const openai = client();
-  const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1-mini";
+  const openai = await client();
+  const model = (await getAppSettings()).OPENAI_IMAGE_MODEL || "gpt-image-2";
   const size = ratio === "9:16" ? "1024x1536" : ratio === "1:1" ? "1024x1024" : "1536x1024";
   const response = await openai.images.generate({
     model,

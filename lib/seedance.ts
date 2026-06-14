@@ -1,3 +1,5 @@
+import { getAppSettings } from "@/lib/settings";
+
 export type SeedanceSettings = {
   ratio: string;
   resolution: string;
@@ -7,17 +9,18 @@ export type SeedanceSettings = {
 const BYTEPLUS_BASE_URL = "https://ark.ap-southeast.bytepluses.com/api/v3";
 
 export async function createSeedanceTask(prompt: string, settings: SeedanceSettings, imageUrl?: string | null) {
-  if (!process.env.ARK_API_KEY || process.env.ARK_API_KEY.startsWith("replace-with")) {
-    throw new Error("請先在 .env 設定有效的 ARK_API_KEY");
+  const appSettings = await getAppSettings();
+  if (!appSettings.ARK_API_KEY || appSettings.ARK_API_KEY.startsWith("replace-with")) {
+    throw new Error("請先在設定頁填入有效的 ARK_API_KEY");
   }
   const response = await fetch(`${BYTEPLUS_BASE_URL}/contents/generations/tasks`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.ARK_API_KEY}`,
+      Authorization: `Bearer ${appSettings.ARK_API_KEY}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: process.env.SEEDANCE_MODEL || "dreamina-seedance-2-0-fast-260128",
+      model: appSettings.SEEDANCE_MODEL || "dreamina-seedance-2-0-fast-260128",
       content: [
         { type: "text", text: prompt },
         ...(imageUrl ? [{ type: "image", url: imageUrl }] : [])
@@ -34,10 +37,11 @@ export async function createSeedanceTask(prompt: string, settings: SeedanceSetti
 }
 
 export async function getSeedanceTask(taskId: string) {
-  if (!process.env.ARK_API_KEY) throw new Error("缺少 ARK_API_KEY");
+  const appSettings = await getAppSettings();
+  if (!appSettings.ARK_API_KEY) throw new Error("缺少 ARK_API_KEY");
   const response = await fetch(`${BYTEPLUS_BASE_URL}/contents/generations/tasks/${encodeURIComponent(taskId)}`, {
     headers: {
-      Authorization: `Bearer ${process.env.ARK_API_KEY}`
+      Authorization: `Bearer ${appSettings.ARK_API_KEY}`
     }
   });
 

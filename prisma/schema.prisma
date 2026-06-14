@@ -79,3 +79,9 @@ model Scene {
 
   @@unique([projectId, sceneNumber])
 }
+
+model AppSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}

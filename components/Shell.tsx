@@ -1,4 +1,4 @@
-import { LayoutDashboard, Sparkles } from "lucide-react";
+import { LayoutDashboard, Settings, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -12,6 +12,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <Link className="flex items-center gap-3 rounded-xl bg-orange-bg px-3 py-3 text-sm text-orange" href="/">
             <LayoutDashboard size={17} />
             工作台
+          </Link>
+          <Link className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange" href="/settings">
+            <Settings size={17} />
+            設定
           </Link>
         </nav>
         <div className="border-t border-[var(--border)] p-4">

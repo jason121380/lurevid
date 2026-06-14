@@ -14,8 +14,10 @@ import {
 } from "@/lib/openai";
 import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
 import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
+import { analyzeVideoFrames, extractVideoFrames, withDownloadedVideo } from "@/lib/visual";
 import { downloadVideo, mergeVideos, storageRoot } from "@/lib/video";
 import { uploadObject } from "@/lib/storage";
+import { transcribeMediaFile } from "@/lib/transcribe";
 
 async function fetchToBuffer(url: string) {
   const response = await fetch(url);
@@ -38,19 +40,49 @@ async function runAnalyze(projectId: string) {
     data: { status: "ANALYZING", message: "正在取得影片內容並分析", progress: 0.1, error: null }
   });
 
+  const platform = project.sourcePlatform || detectPlatform(project.sourceUrl);
   let transcript = project.sourceTranscript?.trim() || "";
+  let visualAnalysis = "";
+  let transcriptError = "";
+  let visualError = "";
+
+  try {
+    await withDownloadedVideo(project.sourceUrl, async (videoPath, dir) => {
+      if (!transcript) {
+        try {
+          transcript = await transcribeMediaFile(videoPath);
+          await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
+        } catch (error) {
+          transcriptError = error instanceof Error ? error.message : "未知錯誤";
+        }
+      }
+
+      try {
+        const frames = await extractVideoFrames(videoPath, dir);
+        visualAnalysis = await analyzeVideoFrames(frames, transcript, platform);
+      } catch (error) {
+        visualError = error instanceof Error ? error.message : "未知錯誤";
+      }
+    });
+  } catch (error) {
+    visualError = error instanceof Error ? error.message : "未知錯誤";
+  }
+
   if (!transcript) {
     try {
       transcript = await fetchTranscript(project.sourceUrl);
     } catch (error) {
       const reason = error instanceof Error ? error.message : "未知錯誤";
-      throw new Error(`無法自動抓取影片逐字稿（${reason}）。請改用手動貼上逐字稿後重試。`);
+      throw new Error(`無法自動抓取影片逐字稿（${transcriptError || reason}）。請改用手動貼上逐字稿後重試。`);
     }
     await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
   }
 
-  const platform = project.sourcePlatform || detectPlatform(project.sourceUrl);
-  const analysis = await analyzeVideo(transcript, platform);
+  const analysis = await analyzeVideo(
+    transcript,
+    platform,
+    visualAnalysis || (visualError ? `視覺分析未完成：${visualError}` : "")
+  );
 
   await prisma.project.update({
     where: { id: projectId },

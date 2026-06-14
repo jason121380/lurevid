@@ -18,6 +18,28 @@ const createProjectSchema = z.object({
     .default({})
 });
 
+function toCreateProjectError(error: unknown) {
+  if (error instanceof z.ZodError) return { message: "請貼上有效的 Instagram Reels 或 TikTok 連結", status: 400 };
+
+  const message = error instanceof Error ? error.message : "";
+  const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+  if (message.includes("Can't reach database server") || message.includes("localhost:5432")) {
+    return {
+      message: "本機 PostgreSQL 尚未啟動，請先啟動資料庫並確認 DATABASE_URL 可連線。",
+      status: 503
+    };
+  }
+
+  if (code === "ECONNREFUSED" || message.includes("ECONNREFUSED") || message.includes("Redis")) {
+    return {
+      message: "Redis 尚未連線，請先設定 REDIS_URL 並啟動 worker queue 後再開始分析。",
+      status: 503
+    };
+  }
+
+  return { message: message || "建立專案失敗", status: 500 };
+}
+
 export async function POST(request: Request) {
   try {
     const body = createProjectSchema.parse(await request.json());
@@ -44,7 +66,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(project, { status: 202 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "建立專案失敗" }, { status: 500 });
+    const { message, status } = toCreateProjectError(error);
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

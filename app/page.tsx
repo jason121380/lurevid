@@ -65,25 +65,32 @@ export default function HomePage() {
                 className="mt-3 text-xs text-orange"
                 onClick={() => setShowTranscript((value) => !value)}
               >
-                {showTranscript ? "收起手動逐字稿" : "抓不到影片？手動貼逐字稿（選填）"}
+                {showTranscript ? "收起手動逐字稿" : "手動貼逐字稿（選填備援）"}
               </button>
               {showTranscript && (
                 <textarea
                   className="mt-2 min-h-[120px] w-full resize-y rounded-xl border border-[var(--border-strong)] bg-white p-4 text-sm leading-7 outline-none focus:border-orange"
-                  placeholder="把影片字幕／逐字稿貼在這裡，系統會直接拿來分析（IG/TikTok 從機房 IP 常被擋，這是最穩的備援）"
+                  placeholder="可選填。沒貼時系統會自動下載影片、抽影格分析畫面，並把音訊轉成逐字稿；若 IG/TikTok 擋住抓取，再改貼字幕／逐字稿。"
                   value={transcript}
                   onChange={(event) => setTranscript(event.target.value)}
                 />
               )}
 
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex items-center justify-between gap-3">
+                {!sourceUrl.trim() && (
+                  <p className="text-xs text-[var(--gray-500)]">先貼上 Reels 或 TikTok 連結後才能開始。</p>
+                )}
                 <button className="btn btn-primary" disabled={!sourceUrl.trim() || loading} onClick={start}>
                   <Wand2 size={16} />
                   {loading ? "建立中" : "開始分析"}
                 </button>
               </div>
-              <p className="mt-2 text-xs text-[var(--gray-500)]">影片比例、解析度、秒數會在「變成影片」那一步再選。</p>
-              {error && <p className="mt-3 text-sm text-[var(--red)]">{error}</p>}
+              <p className="mt-2 text-xs text-[var(--gray-500)]">沒貼逐字稿時會自動分析影片音訊、畫面影格、字幕與分鏡節奏；影片比例、解析度、秒數會在「變成影片」那一步再選。</p>
+              {error && (
+                <div className="mt-3 rounded-xl border border-[var(--red)] bg-red-50 p-3 text-sm leading-6 text-[var(--red)]" role="alert">
+                  {error}
+                </div>
+              )}
             </div>
 
             <div className="card grid min-h-[280px] place-items-center p-8 text-center">
@@ -93,7 +100,7 @@ export default function HomePage() {
                 </div>
                 <h3>六步流程</h3>
                 <p className="mt-1 text-sm text-[var(--gray-500)]">
-                  分析 → 分析結構 → 改編 → 分鏡確認 → 變成影片 → 合成。前三步都可以看到結果並修改後再繼續。
+                  分析影片內容與畫面 → 分析結構 → 改編 → 分鏡確認 → 變成影片 → 合成。前三步都可以看到結果並修改後再繼續。
                 </p>
               </div>
             </div>
@@ -103,7 +110,7 @@ export default function HomePage() {
             <p className="text-[11px] uppercase text-orange">Workflow</p>
             <h2 className="mt-1 text-lg">參考爆款、做出自己的</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--gray-500)]">
-              貼一支 IG Reel 或 TikTok，系統會拆解它為什麼紅，改編成你的腳本，再產生分鏡與影片。
+              貼一支 IG Reel 或 TikTok，系統會拆解它的逐字稿、畫面分鏡與剪輯節奏，改編成你的腳本，再產生分鏡與影片。
             </p>
             <ol className="mt-4 space-y-2 rounded-xl bg-[var(--warm-white)] p-3 text-sm">
               <li>1. 分析影片</li>

@@ -9,6 +9,9 @@ export function createRedisConnection() {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) throw new Error("缺少 REDIS_URL");
   return new IORedis(redisUrl, {
+    connectTimeout: 1000,
+    enableOfflineQueue: false,
+    retryStrategy: () => null,
     maxRetriesPerRequest: null
   }) as any;
 }
