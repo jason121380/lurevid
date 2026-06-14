@@ -368,10 +368,21 @@ function ProcessTimeline({ project }: { project: Project }) {
             <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs ${stepStateClass(step.state)}`}>
               {step.state === "active" ? <Loader2 size={15} className="animate-spin" /> : step.state === "failed" ? <XCircle size={15} /> : index + 1}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="text-sm">{step.title}</div>
               <p className="mt-1 text-xs leading-5 text-[var(--gray-500)]">{step.description}</p>
             </div>
+            {step.title === "下載影片" && project.sourceUrl && (
+              <a
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"
+                href={project.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="開啟原始影片"
+              >
+                <Download size={15} />
+              </a>
+            )}
           </div>
         ))}
       </div>
