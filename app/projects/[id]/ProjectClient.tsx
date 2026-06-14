@@ -211,44 +211,46 @@ export function ProjectClient({ projectId }: { projectId: string }) {
     </div>
   );
   const previewPanel = (
-    <div className="card p-3 md:p-4">
-      <div className="mb-3 flex items-center gap-2">
-        {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
-        {project.status === "FAILED" && <XCircle className="text-[var(--red)]" />}
-        <h2 className="text-lg">{project.finalVideoUrl ? "輸出影片" : "影片預覽"}</h2>
-      </div>
-      <div ref={previewRef} className="relative grid w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
-        {project.finalVideoUrl ? (
-          <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
-        ) : project.sourceUrl ? (
-          <iframe
-            className="absolute left-0 top-0 border-0 bg-white"
-            src={sourceEmbedUrl(project.sourceUrl)}
-            style={{
-              width: 540,
-              height: 960,
-              transform: `scale(${previewScale})`,
-              transformOrigin: "top left"
-            }}
-            title="來源影片預覽"
-            loading="lazy"
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-          />
-        ) : (
-          "尚未取得來源影片"
+    <div className="w-full max-w-[360px]">
+      <div className="card overflow-hidden">
+        <div className="flex items-center gap-2 p-3 md:p-4">
+          {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
+          {project.status === "FAILED" && <XCircle className="text-[var(--red)]" />}
+          <h2 className="text-lg">{project.finalVideoUrl ? "輸出影片" : "影片預覽"}</h2>
+        </div>
+        <div ref={previewRef} className="relative -mx-px grid w-[calc(100%+2px)] aspect-[9/16] place-items-center overflow-hidden bg-[#111] text-sm text-white">
+          {project.finalVideoUrl ? (
+            <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
+          ) : project.sourceUrl ? (
+            <iframe
+              className="absolute left-0 top-0 border-0 bg-white"
+              src={sourceEmbedUrl(project.sourceUrl)}
+              style={{
+                width: 540,
+                height: 960,
+                transform: `scale(${previewScale})`,
+                transformOrigin: "top left"
+              }}
+              title="來源影片預覽"
+              loading="lazy"
+              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            />
+          ) : (
+            "尚未取得來源影片"
+          )}
+        </div>
+        {!project.finalVideoUrl && project.sourceUrl && (
+          <a className="btn btn-ghost m-3 w-[calc(100%-1.5rem)] md:m-4 md:w-[calc(100%-2rem)]" href={project.sourceUrl} target="_blank" rel="noreferrer">
+            開啟原始影片
+          </a>
+        )}
+        {project.finalVideoUrl && (
+          <a className="btn btn-primary m-3 w-[calc(100%-1.5rem)] md:m-4 md:w-[calc(100%-2rem)]" href={project.finalVideoUrl} target="_blank" rel="noreferrer">
+            <Download size={16} />
+            下載完成影片
+          </a>
         )}
       </div>
-      {!project.finalVideoUrl && project.sourceUrl && (
-        <a className="btn btn-ghost mt-4 w-full" href={project.sourceUrl} target="_blank" rel="noreferrer">
-          開啟原始影片
-        </a>
-      )}
-      {project.finalVideoUrl && (
-        <a className="btn btn-primary mt-4 w-full" href={project.finalVideoUrl} target="_blank" rel="noreferrer">
-          <Download size={16} />
-          下載完成影片
-        </a>
-      )}
     </div>
   );
   const transcriptPanel = (
