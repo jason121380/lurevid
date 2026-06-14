@@ -25,12 +25,16 @@ function openaiTimeoutMs() {
   return Number(process.env.OPENAI_TIMEOUT_MS || 120000);
 }
 
-async function client() {
+function openaiImageTimeoutMs() {
+  return Number(process.env.OPENAI_IMAGE_TIMEOUT_MS || 300000);
+}
+
+async function client(timeout = openaiTimeoutMs(), maxRetries = 1) {
   const settings = await getAppSettings();
   if (isMissingApiKey(settings.OPENAI_API_KEY)) {
     throw new Error("請先在設定頁填入有效的 OPENAI_API_KEY");
   }
-  return new OpenAI({ apiKey: settings.OPENAI_API_KEY, timeout: openaiTimeoutMs(), maxRetries: 1 });
+  return new OpenAI({ apiKey: settings.OPENAI_API_KEY, timeout, maxRetries });
 }
 
 export async function openaiClient() {
@@ -232,7 +236,7 @@ export async function generateStoryboardWithTwoModels(idea: string) {
 }
 
 export async function generateStoryboardImage(prompt: string, ratio: string) {
-  const openai = await client();
+  const openai = await client(openaiImageTimeoutMs(), 2);
   const model = (await getAppSettings()).OPENAI_IMAGE_MODEL || "gpt-image-2";
   const size = ratio === "9:16" ? "1024x1536" : ratio === "1:1" ? "1024x1024" : "1536x1024";
   const response = await openai.images.generate({
