@@ -2,20 +2,24 @@ import "dotenv/config";
 import { join } from "node:path";
 import { Worker } from "bullmq";
 import { prisma } from "@/lib/prisma";
+import { mapWithConcurrency } from "@/lib/async";
 import { PROJECT_QUEUE_NAME, createRedisConnection } from "@/lib/queue";
+import { readFile } from "node:fs/promises";
 import { generateStoryboardImage, generateStoryboardWithTwoModels } from "@/lib/openai";
 import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
-import {
-  downloadImage,
-  downloadVideo,
-  mergeVideos,
-  publicImageUrl,
-  publicVideoUrl,
-  storageRoot,
-  writeBase64Image
-} from "@/lib/video";
+import { downloadVideo, mergeVideos, storageRoot } from "@/lib/video";
+import { uploadObject } from "@/lib/storage";
+
+async function fetchToBuffer(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`下載檔案失敗：${url}`);
+  return Buffer.from(await response.arrayBuffer());
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const IMAGE_CONCURRENCY = Number(process.env.IMAGE_CONCURRENCY || 3);
+const SEEDANCE_CONCURRENCY = Number(process.env.SEEDANCE_CONCURRENCY || 3);
 
 async function generateStoryboard(projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -29,47 +33,54 @@ async function generateStoryboard(projectId: string) {
   const storyboard = await generateStoryboardWithTwoModels(project.idea);
   await prisma.scene.deleteMany({ where: { projectId } });
 
-  const createdScenes = [];
-  for (const scene of storyboard) {
-    const created = await prisma.scene.create({
-      data: {
-        projectId,
-        sceneNumber: scene.sceneNumber,
-        title: scene.title,
-        visualGoal: scene.visualGoal,
-        imagePrompt: scene.imagePrompt,
-        seedancePrompt: scene.seedancePrompt,
-        status: "IMAGE_GENERATING"
-      }
-    });
-    createdScenes.push(created);
-  }
+  const createdScenes = await Promise.all(
+    storyboard.map((scene) =>
+      prisma.scene.create({
+        data: {
+          projectId,
+          sceneNumber: scene.sceneNumber,
+          title: scene.title,
+          visualGoal: scene.visualGoal,
+          imagePrompt: scene.imagePrompt,
+          seedancePrompt: scene.seedancePrompt,
+          status: "IMAGE_GENERATING"
+        }
+      })
+    )
+  );
 
-  for (const scene of createdScenes) {
+  let imagesDone = 0;
+  await mapWithConcurrency(createdScenes, IMAGE_CONCURRENCY, async (scene) => {
     const image = await generateStoryboardImage(scene.imagePrompt || scene.seedancePrompt, project.ratio);
-    const imagePath = join(storageRoot(), projectId, `${String(scene.sceneNumber).padStart(2, "0")}.png`);
 
-    if (image.b64_json) await writeBase64Image(image.b64_json, imagePath);
-    else if (image.url) await downloadImage(image.url, imagePath);
+    let buffer: Buffer;
+    if (image.b64_json) buffer = Buffer.from(image.b64_json, "base64");
+    else if (image.url) buffer = await fetchToBuffer(image.url);
     else throw new Error(`第 ${scene.sceneNumber} 格沒有分鏡圖`);
+
+    const imageUrl = await uploadObject(
+      `projects/${projectId}/${String(scene.sceneNumber).padStart(2, "0")}.png`,
+      buffer,
+      "image/png"
+    );
 
     await prisma.scene.update({
       where: { id: scene.id },
       data: {
-        imageLocalPath: imagePath,
-        imageUrl: publicImageUrl(projectId, scene.id),
+        imageUrl,
         status: "IMAGE_READY"
       }
     });
 
+    imagesDone += 1;
     await prisma.project.update({
       where: { id: projectId },
       data: {
-        progress: 0.08 + (scene.sceneNumber / createdScenes.length) * 0.42,
-        message: `正在產生分鏡圖：${scene.sceneNumber}/${createdScenes.length}`
+        progress: 0.08 + (imagesDone / createdScenes.length) * 0.42,
+        message: `正在產生分鏡圖：${imagesDone}/${createdScenes.length}`
       }
     });
-  }
+  });
 
   await prisma.project.update({
     where: { id: projectId },
@@ -90,7 +101,7 @@ async function generateVideo(projectId: string) {
     data: { status: "GENERATING", message: "正在把分鏡圖送入 Seedance", progress: 0.52 }
   });
 
-  for (const scene of project.scenes) {
+  await mapWithConcurrency(project.scenes, SEEDANCE_CONCURRENCY, async (scene) => {
     if (!scene.imageUrl) throw new Error(`第 ${scene.sceneNumber} 格缺少分鏡圖`);
     await prisma.scene.update({ where: { id: scene.id }, data: { status: "QUEUED" } });
     const task = await createSeedanceTask(
@@ -110,7 +121,7 @@ async function generateVideo(projectId: string) {
         raw: task
       }
     });
-  }
+  });
 
   while (true) {
     const current = await prisma.project.findUniqueOrThrow({
@@ -118,15 +129,13 @@ async function generateVideo(projectId: string) {
       include: { scenes: { orderBy: { sceneNumber: "asc" } } }
     });
 
-    let done = 0;
-    for (const scene of current.scenes) {
-      if (scene.status === "SUCCEEDED") {
-        done += 1;
-        continue;
-      }
-      if (!scene.seedanceTaskId) continue;
+    let done = current.scenes.filter((scene) => scene.status === "SUCCEEDED").length;
+    const pending = current.scenes.filter(
+      (scene) => scene.status !== "SUCCEEDED" && scene.seedanceTaskId
+    );
 
-      const task = await getSeedanceTask(scene.seedanceTaskId);
+    await mapWithConcurrency(pending, SEEDANCE_CONCURRENCY, async (scene) => {
+      const task = await getSeedanceTask(scene.seedanceTaskId!);
       const upstreamStatus = String(task.status || "").toLowerCase();
       const videoUrl = extractSeedanceVideoUrl(task);
 
@@ -145,7 +154,7 @@ async function generateVideo(projectId: string) {
       } else {
         await prisma.scene.update({ where: { id: scene.id }, data: { raw: task } });
       }
-    }
+    });
 
     await prisma.project.update({
       where: { id: projectId },
@@ -162,19 +171,24 @@ async function generateVideo(projectId: string) {
     include: { scenes: { orderBy: { sceneNumber: "asc" } } }
   });
 
-  const clipPaths: string[] = [];
-  for (const scene of finished.scenes) {
+  const clipPaths = await mapWithConcurrency(finished.scenes, SEEDANCE_CONCURRENCY, async (scene) => {
     if (!scene.videoUrl) throw new Error(`第 ${scene.sceneNumber} 格沒有 videoUrl`);
     const path = join(storageRoot(), projectId, `${String(scene.sceneNumber).padStart(2, "0")}.mp4`);
     await downloadVideo(scene.videoUrl, path);
-    clipPaths.push(path);
     await prisma.scene.update({ where: { id: scene.id }, data: { localPath: path } });
-  }
+    return path;
+  });
 
-  await mergeVideos(projectId, clipPaths);
+  const finalPath = await mergeVideos(projectId, clipPaths);
+  const finalVideoUrl = await uploadObject(
+    `projects/${projectId}/final.mp4`,
+    await readFile(finalPath),
+    "video/mp4"
+  );
+
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "COMPLETED", message: "影片完成", progress: 1, finalVideoUrl: publicVideoUrl(projectId) }
+    data: { status: "COMPLETED", message: "影片完成", progress: 1, finalVideoUrl }
   });
 }
 
