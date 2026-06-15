@@ -20,15 +20,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message || "註冊資料格式錯誤" }, { status: 400 });
   }
 
-  const existing = await prisma.user.findUnique({ where: { email: body.email } });
-  if (existing) {
-    return NextResponse.json({ error: "這個 Email 已經註冊過了" }, { status: 409 });
+  try {
+    const existing = await prisma.user.findUnique({ where: { email: body.email } });
+    if (existing) {
+      return NextResponse.json({ error: "這個 Email 已經註冊過了" }, { status: 409 });
+    }
+
+    const passwordHash = await bcrypt.hash(body.password, 12);
+    await prisma.user.create({
+      data: { email: body.email, name: body.name || null, passwordHash }
+    });
+
+    return NextResponse.json({ ok: true }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+    // P2021: 資料表不存在；P1001/P1000: 連不到資料庫。
+    if (code === "P2021" || message.includes("does not exist") || message.includes("relation")) {
+      return NextResponse.json(
+        { error: "資料庫尚未初始化，請先執行 npm run db:push 建立資料表。" },
+        { status: 503 }
+      );
+    }
+    if (code === "P1001" || code === "P1000" || message.includes("Can't reach database server")) {
+      return NextResponse.json({ error: "目前連不到資料庫，請稍後再試。" }, { status: 503 });
+    }
+    return NextResponse.json({ error: "註冊失敗，請稍後再試。" }, { status: 500 });
   }
-
-  const passwordHash = await bcrypt.hash(body.password, 12);
-  await prisma.user.create({
-    data: { email: body.email, name: body.name || null, passwordHash }
-  });
-
-  return NextResponse.json({ ok: true }, { status: 201 });
 }
