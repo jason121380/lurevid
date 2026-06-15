@@ -18,6 +18,10 @@ export function emailIsAdmin(email?: string | null) {
  * Credentials provider（需要 Prisma/bcrypt）只放在 lib/auth.ts。
  */
 export const authConfig = {
+  // 非 Vercel 主機（如 Zeabur）必須信任 host，否則 Auth.js 會丟 Configuration 錯誤。
+  trustHost: true,
+  // Auth.js v5 預設讀 AUTH_SECRET；同時接受 NEXTAUTH_SECRET，避免少設一個就壞。
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [],
