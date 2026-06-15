@@ -19,6 +19,7 @@ import { downloadVideo, mergeVideos, storageRoot } from "@/lib/video";
 import { uploadObject } from "@/lib/storage";
 import { transcribeMediaFile } from "@/lib/transcribe";
 import { safeFetch } from "@/lib/safe-fetch";
+import { markStepDone, markStepFailed, markStepRunning, type StepKey } from "@/lib/steps";
 
 async function fetchToBuffer(url: string) {
   const response = await safeFetch(url);
@@ -38,121 +39,170 @@ const SEEDANCE_CONCURRENCY = Number(process.env.SEEDANCE_CONCURRENCY || 3);
 const SEEDANCE_POLL_INTERVAL_MS = Number(process.env.SEEDANCE_POLL_INTERVAL_MS || 8000);
 const SEEDANCE_POLL_TIMEOUT_MS = Number(process.env.SEEDANCE_POLL_TIMEOUT_MS || 20 * 60 * 1000);
 
-async function runAnalyze(projectId: string) {
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new Error(`找不到專案：${projectId}`);
-  if (!project.sourceUrl) throw new Error("缺少來源影片連結");
+const analysisIdleStatus = (analysis: string | null) => (analysis ? "ANALYSIS_READY" : "DRAFT");
 
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { status: "ANALYZING", message: "正在下載來源影片", progress: 0.06, error: null }
+async function uploadSourceVideo(projectId: string, videoPath: string, current?: string | null) {
+  if (current && /^https?:\/\//i.test(current)) return;
+  const sourceVideoUrl = await uploadObject(`projects/${projectId}/source.mp4`, await readFile(videoPath), "video/mp4");
+  await prisma.project.update({ where: { id: projectId }, data: { sourceVideoUrl, message: "來源影片已下載，可下載 MP4" } });
+}
+
+async function extractAndUploadFrames(projectId: string, videoPath: string, dir: string) {
+  const frames = await extractVideoFrames(videoPath, dir);
+  const sourceFrameUrls = await Promise.all(
+    frames.map((frame, index) =>
+      uploadObject(`projects/${projectId}/frames/${String(index + 1).padStart(2, "0")}.jpg`, frameDataUrlToBuffer(frame), "image/jpeg")
+    )
+  );
+  await prisma.project.update({ where: { id: projectId }, data: { sourceFrameUrls } });
+}
+
+/** 第 4 步「影片分析」= 視覺分析（用已存影格）＋ 整合逐字稿。不需重新下載。 */
+async function computeAnalysis(projectId: string) {
+  const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+  const platform = project.sourcePlatform || detectPlatform(project.sourceUrl || "");
+  const transcript = project.sourceTranscript?.trim() || "";
+  if (!transcript) throw new Error("尚未取得逐字稿，請先完成轉錄或手動貼逐字稿");
+
+  let visualAnalysis = project.visualAnalysis || "";
+  const frameUrls = Array.isArray(project.sourceFrameUrls) ? (project.sourceFrameUrls as string[]) : [];
+  const httpFrames = frameUrls.filter((url) => typeof url === "string" && /^https?:\/\//i.test(url));
+  if (httpFrames.length) {
+    try {
+      visualAnalysis = await analyzeVideoFrames(httpFrames, transcript, platform);
+      await prisma.project.update({ where: { id: projectId }, data: { visualAnalysis } });
+    } catch {
+      /* 視覺分析失敗就退回純文字分析 */
+    }
+  }
+  const analysis = await analyzeVideo(transcript, platform, visualAnalysis || "未取得視覺分析");
+  await prisma.project.update({ where: { id: projectId }, data: { analysis } });
+}
+
+/** 共用：把單一分析子步驟包成「running → done/failed」，並把整體 status 在跑時設 ANALYZING、結束回到 idle。 */
+async function runStepJob(projectId: string, key: StepKey, runningMessage: string, fn: () => Promise<void>) {
+  await markStepRunning(projectId, key, 0.15);
+  await prisma.project.update({ where: { id: projectId }, data: { status: "ANALYZING", message: runningMessage, error: null } });
+  try {
+    await fn();
+    await markStepDone(projectId, key);
+    const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId }, select: { analysis: true } });
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { status: analysisIdleStatus(project.analysis), message: "已完成該步驟", progress: project.analysis ? 0.2 : 0.12 }
+    });
+  } catch (error) {
+    await markStepFailed(projectId, key, error instanceof Error ? error.message : "未知錯誤");
+    throw error;
+  }
+}
+
+async function runSource(projectId: string) {
+  await runStepJob(projectId, "source", "正在下載來源影片", async () => {
+    const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+    if (!project.sourceUrl) throw new Error("缺少來源影片連結");
+    await withDownloadedVideo(project.sourceUrl, async (videoPath) => {
+      await uploadSourceVideo(projectId, videoPath, null);
+    });
   });
+}
 
-  const platform = project.sourcePlatform || detectPlatform(project.sourceUrl);
+async function runTranscribe(projectId: string) {
+  await runStepJob(projectId, "transcribe", "正在轉錄音訊", async () => {
+    const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+    if (!project.sourceUrl) throw new Error("缺少來源影片連結");
+    let transcript = "";
+    try {
+      await withDownloadedVideo(project.sourceUrl, async (videoPath) => {
+        transcript = await transcribeMediaFile(videoPath);
+      });
+    } catch {
+      transcript = await fetchTranscript(project.sourceUrl);
+    }
+    if (!transcript) throw new Error("轉錄結果為空");
+    await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
+  });
+}
+
+async function runFrames(projectId: string) {
+  await runStepJob(projectId, "frames", "正在抽取影片影格", async () => {
+    const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+    if (!project.sourceUrl) throw new Error("缺少來源影片連結");
+    await withDownloadedVideo(project.sourceUrl, async (videoPath, dir) => {
+      await uploadSourceVideo(projectId, videoPath, project.sourceVideoUrl);
+      await extractAndUploadFrames(projectId, videoPath, dir);
+    });
+  });
+}
+
+async function runAnalyze(projectId: string) {
+  await runStepJob(projectId, "analyze", "正在做影片分析（含視覺）", async () => {
+    await computeAnalysis(projectId);
+  });
+}
+
+/** 第一次建立專案：下載一次，依序做 source → transcribe → frames → analyze，逐步更新各步驟狀態。 */
+async function runFull(projectId: string) {
+  const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+  if (!project.sourceUrl) throw new Error("缺少來源影片連結");
+  await prisma.project.update({ where: { id: projectId }, data: { status: "ANALYZING", message: "正在下載來源影片", progress: 0.05, error: null } });
+
   let transcript = project.sourceTranscript?.trim() || "";
-  let visualAnalysis = "";
   let transcriptError = "";
-  let visualError = "";
 
   try {
     await withDownloadedVideo(project.sourceUrl, async (videoPath, dir) => {
-      // 沒有來源網址、或舊網址是本機 fallback 路徑（非 http，跨服務撈不到）時，重新上傳到物件儲存。
-      const needsSourceUpload = !project.sourceVideoUrl || !/^https?:\/\//i.test(project.sourceVideoUrl);
-      if (needsSourceUpload) {
-        const sourceVideoUrl = await uploadObject(
-          `projects/${projectId}/source.mp4`,
-          await readFile(videoPath),
-          "video/mp4"
-        );
-        await prisma.project.update({
-          where: { id: projectId },
-          data: { sourceVideoUrl, message: "來源影片已下載，可下載 MP4", progress: 0.08 }
-        });
-      }
+      await markStepRunning(projectId, "source", 0.5);
+      await uploadSourceVideo(projectId, videoPath, project.sourceVideoUrl);
+      await markStepDone(projectId, "source");
 
       if (!transcript) {
         try {
-          await prisma.project.update({
-            where: { id: projectId },
-            data: { message: "正在轉錄影片音訊", progress: 0.1 }
-          });
+          await markStepRunning(projectId, "transcribe", 0.4);
+          await prisma.project.update({ where: { id: projectId }, data: { message: "正在轉錄音訊", progress: 0.1 } });
           transcript = await transcribeMediaFile(videoPath);
-          await prisma.project.update({
-            where: { id: projectId },
-            data: { sourceTranscript: transcript, message: "逐字稿完成，準備分析畫面", progress: 0.13 }
-          });
+          await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
+          await markStepDone(projectId, "transcribe");
         } catch (error) {
           transcriptError = error instanceof Error ? error.message : "未知錯誤";
+          await markStepFailed(projectId, "transcribe", transcriptError);
         }
+      } else {
+        await markStepDone(projectId, "transcribe");
       }
 
       try {
-        await prisma.project.update({
-          where: { id: projectId },
-          data: { message: "正在抽取影片畫面影格", progress: 0.15 }
-        });
-        const frames = await extractVideoFrames(videoPath, dir);
-        const sourceFrameUrls = await Promise.all(
-          frames.map((frame, index) =>
-            uploadObject(
-              `projects/${projectId}/frames/${String(index + 1).padStart(2, "0")}.jpg`,
-              frameDataUrlToBuffer(frame),
-              "image/jpeg"
-            )
-          )
-        );
-        await prisma.project.update({
-          where: { id: projectId },
-          data: {
-            sourceFrameUrls,
-            message: `正在用 AI 分析畫面分鏡（${frames.length} 張影格）`,
-            progress: 0.17
-          }
-        });
-        visualAnalysis = await analyzeVideoFrames(frames, transcript, platform);
-        await prisma.project.update({
-          where: { id: projectId },
-          data: { visualAnalysis, message: "視覺分析完成，準備整合逐字稿", progress: 0.18 }
-        });
+        await markStepRunning(projectId, "frames", 0.4);
+        await prisma.project.update({ where: { id: projectId }, data: { message: "正在抽取影片影格", progress: 0.15 } });
+        await extractAndUploadFrames(projectId, videoPath, dir);
+        await markStepDone(projectId, "frames");
       } catch (error) {
-        visualError = error instanceof Error ? error.message : "未知錯誤";
+        await markStepFailed(projectId, "frames", error instanceof Error ? error.message : "未知錯誤");
       }
     });
-  } catch (error) {
-    visualError = error instanceof Error ? error.message : "未知錯誤";
+  } catch {
+    /* 下載整體失敗，下面再用音訊備援嘗試逐字稿 */
   }
 
   if (!transcript) {
     try {
-      await prisma.project.update({
-        where: { id: projectId },
-        data: { message: "正在改用音訊下載方式取得逐字稿", progress: 0.12 }
-      });
+      await markStepRunning(projectId, "transcribe", 0.5);
+      await prisma.project.update({ where: { id: projectId }, data: { message: "正在改用音訊下載取得逐字稿", progress: 0.12 } });
       transcript = await fetchTranscript(project.sourceUrl);
+      await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
+      await markStepDone(projectId, "transcribe");
     } catch (error) {
-      const reason = error instanceof Error ? error.message : "未知錯誤";
-      throw new Error(`無法下載或轉錄這支影片（${transcriptError || reason}）。請確認影片為公開連結，或稍後在第 2 步重新下載。`);
+      const reason = transcriptError || (error instanceof Error ? error.message : "未知錯誤");
+      await markStepFailed(projectId, "transcribe", reason);
+      throw new Error(`無法下載或轉錄這支影片（${reason}）。請確認影片為公開連結，或在第 2 步手動貼逐字稿。`);
     }
-    await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
   }
 
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { message: "正在整合逐字稿與畫面分析", progress: 0.19 }
-  });
-  const visualContext = visualAnalysis || (visualError ? `視覺分析未完成：${visualError}` : "");
-  if (!visualAnalysis && visualContext) {
-    await prisma.project.update({ where: { id: projectId }, data: { visualAnalysis: visualContext } });
-  }
-  const analysis = await analyzeVideo(
-    transcript,
-    platform,
-    visualContext
-  );
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { analysis, status: "ANALYSIS_READY", message: "分析完成，可調整後繼續", progress: 0.2 }
-  });
+  await markStepRunning(projectId, "analyze", 0.4);
+  await prisma.project.update({ where: { id: projectId }, data: { message: "正在整合分析", progress: 0.18 } });
+  await computeAnalysis(projectId);
+  await markStepDone(projectId, "analyze");
+  await prisma.project.update({ where: { id: projectId }, data: { status: "ANALYSIS_READY", message: "分析完成，可調整後繼續", progress: 0.2 } });
 }
 
 async function runStructure(projectId: string) {
@@ -406,7 +456,11 @@ const worker = new Worker(
     const projectId = String(job.data.projectId);
     const action = String(job.data.action || "video");
     try {
-      if (action === "analyze") await runAnalyze(projectId);
+      if (action === "full") await runFull(projectId);
+      else if (action === "source") await runSource(projectId);
+      else if (action === "transcribe") await runTranscribe(projectId);
+      else if (action === "frames") await runFrames(projectId);
+      else if (action === "analyze") await runAnalyze(projectId);
       else if (action === "structure") await runStructure(projectId);
       else if (action === "adapt") await runAdapt(projectId);
       else if (action === "storyboard") await generateStoryboard(projectId);

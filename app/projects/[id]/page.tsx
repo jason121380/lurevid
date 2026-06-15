@@ -37,6 +37,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         status: project.status,
         message: project.message,
         progress: project.progress,
+        steps: (project.steps as Record<string, { status?: string; progress?: number; message?: string }>) || {},
         ratio: project.ratio,
         resolution: project.resolution,
         duration: project.duration,

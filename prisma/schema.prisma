@@ -58,6 +58,7 @@ model Project {
   sourcePlatform   String?
   sourceVideoUrl   String?
   sourceFrameUrls  Json?
+  steps            Json          @default("{}")
   sourceTranscript String?       @db.Text
   visualAnalysis   String?       @db.Text
   analysis         String?       @db.Text

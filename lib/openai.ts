@@ -97,11 +97,11 @@ export async function createStoryboardBeats(idea: string): Promise<StoryboardBea
       {
         role: "system",
         content:
-          "你是商業影片導演。請把使用者想法拆成正好 9 個連續鏡頭。輸出只能是 JSON，不要 markdown。"
+          "你是商業影片導演。請把使用者想法拆成正好 9 個連續鏡頭。title 與 visualGoal 一律用繁體中文。輸出只能是 JSON，不要 markdown。"
       },
       {
         role: "user",
-        content: `想法：${idea}\n\n請輸出 {"scenes":[{"sceneNumber":1,"title":"","visualGoal":""}]}，正好 9 筆。`
+        content: `想法：${idea}\n\n請輸出 {"scenes":[{"sceneNumber":1,"title":"繁體中文標題","visualGoal":"繁體中文畫面說明"}]}，正好 9 筆，title 與 visualGoal 必須是繁體中文。`
       }
     ],
     text: {
@@ -171,7 +171,7 @@ export async function expandSeedancePrompts(
           idea,
           rules: [
             "正好 9 個 scenes",
-            "保留 sceneNumber/title/visualGoal",
+            "保留 sceneNumber/title/visualGoal，且 title 與 visualGoal 維持繁體中文不變",
             "imagePrompt 用英文，產生單張分鏡圖，包含構圖、主體、場景、光線、風格、連續性",
             "seedancePrompt 用英文，基於該分鏡圖延展成影片，包含動作、鏡頭運動、光線、節奏、避免文字"
           ],
