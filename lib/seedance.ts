@@ -32,11 +32,16 @@ function seedanceError(data: unknown, fallback: string) {
   return fallback;
 }
 
-export async function createSeedanceTask(prompt: string, settings: SeedanceSettings, imageUrl?: string | null): Promise<SeedanceTask> {
+export async function createSeedanceTask(
+  prompt: string,
+  settings: SeedanceSettings,
+  imageUrls?: string | string[] | null
+): Promise<SeedanceTask> {
   const appSettings = await getAppSettings();
   if (!appSettings.ARK_API_KEY || appSettings.ARK_API_KEY.startsWith("replace-with")) {
     throw new Error("請先在設定頁填入有效的 ARK_API_KEY");
   }
+  const images = (Array.isArray(imageUrls) ? imageUrls : imageUrls ? [imageUrls] : []).filter(Boolean);
   const response = await fetch(`${BYTEPLUS_BASE_URL}/contents/generations/tasks`, {
     method: "POST",
     headers: {
@@ -47,7 +52,7 @@ export async function createSeedanceTask(prompt: string, settings: SeedanceSetti
       model: appSettings.SEEDANCE_MODEL || "dreamina-seedance-2-0-fast-260128",
       content: [
         { type: "text", text: prompt },
-        ...(imageUrl ? [{ type: "image", url: imageUrl }] : [])
+        ...images.map((url) => ({ type: "image", url }))
       ],
       ratio: settings.ratio,
       resolution: settings.resolution,

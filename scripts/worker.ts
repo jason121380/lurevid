@@ -15,7 +15,7 @@ import {
 import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
 import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
 import { analyzeVideoFrames, extractVideoFrames, withDownloadedVideo } from "@/lib/visual";
-import { downloadVideo, mergeVideos, storageRoot } from "@/lib/video";
+import { downloadVideo, storageRoot } from "@/lib/video";
 import { uploadFileObject, uploadObject } from "@/lib/storage";
 import { transcribeMediaFile } from "@/lib/transcribe";
 import { safeFetch } from "@/lib/safe-fetch";
@@ -37,7 +37,6 @@ function frameDataUrlToBuffer(dataUrl: string) {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const IMAGE_CONCURRENCY = Number(process.env.IMAGE_CONCURRENCY || 3);
-const SEEDANCE_CONCURRENCY = Number(process.env.SEEDANCE_CONCURRENCY || 3);
 const SEEDANCE_POLL_INTERVAL_MS = Number(process.env.SEEDANCE_POLL_INTERVAL_MS || 8000);
 const SEEDANCE_POLL_TIMEOUT_MS = Number(process.env.SEEDANCE_POLL_TIMEOUT_MS || 20 * 60 * 1000);
 const REDIS_URL = process.env.REDIS_URL;
@@ -47,6 +46,23 @@ const analysisIdleStatus = (analysis: string | null) => (analysis ? "ANALYSIS_RE
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
+}
+
+function combinedSeedancePrompt(scenes: Array<{ sceneNumber: number; title: string; visualGoal: string; seedancePrompt: string }>) {
+  const sequence = scenes
+    .map(
+      (scene) =>
+        `${scene.sceneNumber}. ${scene.title}\nVisual goal: ${scene.visualGoal}\nMotion prompt: ${scene.seedancePrompt}`
+    )
+    .join("\n\n");
+
+  return [
+    "Create one continuous short-form vertical video using the 9 reference images in order as a storyboard.",
+    "Use each reference image as the visual anchor for its matching numbered scene. Preserve character identity, style, setting continuity, and the narrative order from scene 1 to scene 9.",
+    "Do not add subtitles, captions, logos, watermarks, or readable on-screen text. Use smooth cinematic transitions between storyboard beats.",
+    "Storyboard sequence:",
+    sequence
+  ].join("\n\n");
 }
 
 async function uploadSourceVideo(projectId: string, videoPath: string, current?: string | null) {
@@ -334,118 +350,81 @@ async function generateVideo(projectId: string) {
   });
   if (!project) throw new Error(`找不到專案：${projectId}`);
   if (project.scenes.length !== 9) throw new Error("需要 9 張分鏡圖才能生成影片");
+  if (project.scenes.some((scene) => !scene.imageUrl)) throw new Error("需要 9 張分鏡圖才能生成影片");
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "GENERATING", message: "正在把分鏡圖送入 Seedance", progress: 0.52, error: null }
+    data: { status: "GENERATING", message: "正在把 9 張分鏡圖一次送入 Seedance", progress: 0.52, error: null }
   });
 
-  // 冪等：重試時保留已成功的片段，僅對尚未成功的 scene 重新建立 Seedance 任務。
-  const scenesToStart = project.scenes.filter((scene) => !(scene.status === "SUCCEEDED" && scene.videoUrl));
-  await mapWithConcurrency(scenesToStart, SEEDANCE_CONCURRENCY, async (scene) => {
-    if (!scene.imageUrl) throw new Error(`第 ${scene.sceneNumber} 格缺少分鏡圖`);
-    await prisma.scene.update({
-      where: { id: scene.id },
-      data: { status: "QUEUED", seedanceTaskId: null, videoUrl: null, error: null }
-    });
-    const task = await createSeedanceTask(
-      scene.seedancePrompt,
-      {
-        ratio: project.ratio,
-        resolution: project.resolution,
-        duration: project.duration
-      },
-      scene.imageUrl
-    );
-    await prisma.scene.update({
-      where: { id: scene.id },
-      data: {
-        status: "GENERATING",
-        seedanceTaskId: task.id || task.task_id,
-        raw: jsonValue(task)
-      }
-    });
+  await prisma.scene.updateMany({
+    where: { projectId },
+    data: { status: "QUEUED", seedanceTaskId: null, videoUrl: null, localPath: null, error: null }
+  });
+
+  const task = await createSeedanceTask(
+    combinedSeedancePrompt(project.scenes),
+    {
+      ratio: project.ratio,
+      resolution: project.resolution,
+      duration: project.duration
+    },
+    project.scenes.map((scene) => scene.imageUrl!)
+  );
+  const taskId = task.id || task.task_id;
+  if (!taskId) throw new Error("Seedance 沒有回傳 task id");
+
+  await prisma.scene.updateMany({
+    where: { projectId },
+    data: { status: "GENERATING", seedanceTaskId: taskId, raw: jsonValue(task) }
   });
 
   const pollDeadline = Date.now() + SEEDANCE_POLL_TIMEOUT_MS;
+  let videoUrl = "";
   while (true) {
-    const current = await prisma.project.findUniqueOrThrow({
-      where: { id: projectId },
-      include: { scenes: { orderBy: { sceneNumber: "asc" } } }
-    });
+    let latestTask;
+    try {
+      latestTask = await getSeedanceTask(taskId);
+    } catch {
+      await sleep(SEEDANCE_POLL_INTERVAL_MS);
+      continue;
+    }
 
-    const pending = current.scenes.filter(
-      (scene) => scene.status !== "SUCCEEDED" && scene.status !== "FAILED" && scene.seedanceTaskId
-    );
-
-    await mapWithConcurrency(pending, SEEDANCE_CONCURRENCY, async (scene) => {
-      let task;
-      try {
-        task = await getSeedanceTask(scene.seedanceTaskId!);
-      } catch {
-        // 暫時性錯誤（網路/5xx/限流）：視為仍在處理，下一輪再查，不讓單次錯誤拖垮整個 job。
-        return;
-      }
-      const upstreamStatus = String(task.status || "").toLowerCase();
-      const videoUrl = extractSeedanceVideoUrl(task);
-
-      if (upstreamStatus === "succeeded" && videoUrl) {
-        await prisma.scene.update({
-          where: { id: scene.id },
-          data: { status: "SUCCEEDED", videoUrl, raw: jsonValue(task) }
-        });
-      } else if (["failed", "cancelled", "expired"].includes(upstreamStatus)) {
-        // 標記該 scene 失敗但不中止輪詢，讓其他 scene 跑完，最後一次性回報。
-        await prisma.scene.update({
-          where: { id: scene.id },
-          data: { status: "FAILED", error: upstreamStatus, raw: jsonValue(task) }
-        });
-      } else if (JSON.stringify(scene.raw) !== JSON.stringify(task)) {
-        await prisma.scene.update({ where: { id: scene.id }, data: { raw: jsonValue(task) } });
-      }
-    });
-
-    const latest = await prisma.scene.findMany({
-      where: { projectId },
-      select: { status: true, sceneNumber: true }
-    });
-    const done = latest.filter((scene) => scene.status === "SUCCEEDED").length;
-    const failed = latest.filter((scene) => scene.status === "FAILED");
+    const upstreamStatus = String(latestTask.status || "").toLowerCase();
+    videoUrl = extractSeedanceVideoUrl(latestTask);
 
     await prisma.project.update({
       where: { id: projectId },
       data: {
-        progress: 0.52 + (done / latest.length) * 0.38,
-        message: `Seedance 生成中：${done}/${latest.length}`
+        progress: upstreamStatus === "succeeded" && videoUrl ? 0.9 : 0.7,
+        message: "Seedance 正在根據 9 張分鏡圖生成影片"
       }
     });
 
-    if (failed.length > 0) {
-      const numbers = failed.map((scene) => scene.sceneNumber).sort((a, b) => a - b).join("、");
-      throw new Error(`第 ${numbers} 格生成失敗，請重試「生成影片」`);
+    if (upstreamStatus === "succeeded" && videoUrl) {
+      await prisma.scene.updateMany({
+        where: { projectId },
+        data: { status: "SUCCEEDED", raw: jsonValue(latestTask) }
+      });
+      break;
     }
-    if (done === latest.length) break;
+    if (["failed", "cancelled", "expired"].includes(upstreamStatus)) {
+      await prisma.scene.updateMany({
+        where: { projectId },
+        data: { status: "FAILED", error: upstreamStatus, raw: jsonValue(latestTask) }
+      });
+      throw new Error(`Seedance 生成失敗：${upstreamStatus}`);
+    }
+
     if (Date.now() > pollDeadline) {
       throw new Error("Seedance 生成逾時，請稍後重試「生成影片」");
     }
     await sleep(SEEDANCE_POLL_INTERVAL_MS);
   }
 
-  await prisma.project.update({ where: { id: projectId }, data: { status: "MERGING", message: "正在合成影片", progress: 0.92 } });
-  const finished = await prisma.project.findUniqueOrThrow({
-    where: { id: projectId },
-    include: { scenes: { orderBy: { sceneNumber: "asc" } } }
-  });
-
-  const clipPaths = await mapWithConcurrency(finished.scenes, SEEDANCE_CONCURRENCY, async (scene) => {
-    if (!scene.videoUrl) throw new Error(`第 ${scene.sceneNumber} 格沒有 videoUrl`);
-    const path = join(storageRoot(), projectId, `${String(scene.sceneNumber).padStart(2, "0")}.mp4`);
-    await downloadVideo(scene.videoUrl, path);
-    await prisma.scene.update({ where: { id: scene.id }, data: { localPath: path } });
-    return path;
-  });
-
-  const finalPath = await mergeVideos(projectId, clipPaths);
+  await prisma.project.update({ where: { id: projectId }, data: { status: "MERGING", message: "正在下載影片", progress: 0.92 } });
+  const finalPath = join(storageRoot(), projectId, "final.mp4");
+  await downloadVideo(videoUrl, finalPath);
   const finalVideoUrl = await uploadFileObject(`projects/${projectId}/final.mp4`, finalPath, "video/mp4");
 
   await prisma.project.update({
