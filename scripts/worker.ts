@@ -56,7 +56,9 @@ async function runAnalyze(projectId: string) {
 
   try {
     await withDownloadedVideo(project.sourceUrl, async (videoPath, dir) => {
-      if (!project.sourceVideoUrl) {
+      // 沒有來源網址、或舊網址是本機 fallback 路徑（非 http，跨服務撈不到）時，重新上傳到物件儲存。
+      const needsSourceUpload = !project.sourceVideoUrl || !/^https?:\/\//i.test(project.sourceVideoUrl);
+      if (needsSourceUpload) {
         const sourceVideoUrl = await uploadObject(
           `projects/${projectId}/source.mp4`,
           await readFile(videoPath),
