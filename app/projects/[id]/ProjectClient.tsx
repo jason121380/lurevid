@@ -381,8 +381,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const previewPanel = (
-    <div className="h-full w-full max-w-[325px] justify-self-center md:justify-self-start">
-      <div className="grid h-full min-h-[400px] w-full place-items-center overflow-hidden rounded-xl bg-transparent text-sm text-[var(--gray-500)]">
+    <div className="w-full max-w-[325px] justify-self-center md:justify-self-start">
+      <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-xl bg-transparent text-sm text-[var(--gray-500)]">
         <div className="relative h-full w-full overflow-hidden bg-transparent">
           {project.finalVideoUrl ? (
             <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
@@ -549,7 +549,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             {selectedPanel}
           </section>
 
-          <aside className="min-w-0">
+          <aside className="min-w-0 md:sticky md:top-6 md:h-fit">
             {previewPanel}
           </aside>
         </div>
@@ -586,7 +586,7 @@ function ProcessTimeline({
           const isActive = step.state === "active";
           const isFailed = step.state === "failed";
           const sectionLabel = stepNumber === 1 ? "分析" : stepNumber === 6 ? "再行銷" : null;
-          const barColor = isFailed ? "bg-[var(--red)]" : isDone ? "bg-[var(--green)]" : "bg-orange";
+          const barColor = isFailed ? "bg-[var(--red)]" : "bg-orange";
           const barPct = Math.round(Math.max(0, Math.min(1, step.progress)) * 100);
 
           return (
@@ -632,6 +632,7 @@ function ProcessTimeline({
                   <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(stepNumber)} type="button">
                     <div className="truncate text-xs font-medium leading-6">{step.title}</div>
                   </button>
+                  {isActive && <span className="shrink-0 text-[11px] tabular-nums text-orange">{barPct}%</span>}
                 </div>
                 <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
                   <div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${barPct}%` }} />
