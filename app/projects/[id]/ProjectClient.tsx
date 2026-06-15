@@ -1,7 +1,6 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Download, Eye, Loader2, Play, RotateCcw, X, XCircle } from "lucide-react";
-import Link from "next/link";
+import { CheckCircle2, Download, Eye, Loader2, Play, RotateCcw, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
 
@@ -419,14 +418,6 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   return (
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="flex min-h-[60px] flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-white px-3 py-3 md:px-6">
-          <Link className="btn btn-ghost min-w-0" href="/">
-            <ArrowLeft size={16} />
-            <span className="truncate">返回新增專案</span>
-          </Link>
-          <span className={`badge ${statusClass(project.status)}`}>{project.status}</span>
-        </div>
-
         <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[150px_minmax(0,1fr)] md:gap-4 md:p-6">
           <aside className="h-fit md:sticky md:top-6">
             <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
