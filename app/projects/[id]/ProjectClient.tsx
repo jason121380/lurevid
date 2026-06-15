@@ -111,6 +111,14 @@ function stepCanRun(project: Project, stepNumber: number) {
   return false;
 }
 
+// 抽影格間隔為 3 秒（lib/visual.ts 用 fps=1/3），故第 index 張約在 index*3 秒。
+function frameTime(index: number) {
+  const total = index * 3;
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 function sceneProgress(status: string): { pct: number; color: string } {
   switch (status) {
     case "IMAGE_GENERATING":
@@ -428,8 +436,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={`影格 ${index + 1}`} className="h-full w-full object-cover" />
               </div>
-              <div className="px-3 py-2 text-xs text-[var(--gray-500)]">
-                影格 {String(index + 1).padStart(2, "0")}
+              <div className="flex items-center justify-between px-3 py-2 text-xs text-[var(--gray-500)]">
+                <span>影格 {String(index + 1).padStart(2, "0")}</span>
+                <span className="tabular-nums text-orange">{frameTime(index)}</span>
               </div>
             </article>
           ))}
@@ -603,36 +612,32 @@ function ProcessTimeline({
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
                 }`}
               >
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
+                  {/* 數字圈：只當狀態指示與選取，不再是執行按鈕 */}
                   <button
-                    className={`group/runner grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] transition ${stepStateClass(step.state)} ${canRun ? "cursor-pointer hover:border-orange hover:bg-orange hover:text-white" : "cursor-default"}`}
-                    disabled={!canRun}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRunStep(stepNumber);
-                    }}
-                    title={canRun ? (isDone || isFailed ? "重新執行" : "開始執行") : undefined}
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] ${stepStateClass(step.state)}`}
+                    onClick={() => onSelectStep(stepNumber)}
                     type="button"
                   >
-                    {isActive ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : canRun && (isDone || isFailed) ? (
-                      <>
-                        <span className="group-hover/runner:hidden">{stepNumber}</span>
-                        <RotateCcw className="hidden group-hover/runner:block" size={12} />
-                      </>
-                    ) : canRun ? (
-                      <Play size={11} fill="currentColor" />
-                    ) : isFailed ? (
-                      <XCircle size={13} />
-                    ) : (
-                      stepNumber
-                    )}
+                    {isActive ? <Loader2 size={13} className="animate-spin" /> : isFailed ? <XCircle size={13} /> : stepNumber}
                   </button>
                   <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(stepNumber)} type="button">
                     <div className="truncate text-xs font-medium leading-6">{step.title}</div>
                   </button>
                   {isActive && <span className="shrink-0 text-[11px] tabular-nums text-orange">{barPct}%</span>}
+                  {/* 執行/重跑按鈕：單獨放右邊 */}
+                  <button
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${canRun ? "border-[var(--border-strong)] text-orange hover:bg-orange hover:text-white" : "border-[var(--border)] text-[var(--gray-300)]"}`}
+                    disabled={!canRun}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRunStep(stepNumber);
+                    }}
+                    title={canRun ? (isDone || isFailed ? "重新執行" : "開始執行") : "尚不能執行"}
+                    type="button"
+                  >
+                    {isActive ? <Loader2 size={13} className="animate-spin" /> : isDone || isFailed ? <RotateCcw size={12} /> : <Play size={11} fill="currentColor" />}
+                  </button>
                 </div>
                 <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
                   <div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${barPct}%` }} />
