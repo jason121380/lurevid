@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Wand2 } from "lucide-react";
+import { Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Shell } from "@/components/Shell";
@@ -42,17 +42,14 @@ export default function HomePage() {
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
         <div className="grid min-h-screen place-items-center p-4 md:p-8">
-          <section className="w-full max-w-3xl -translate-y-8 md:-translate-y-12">
-            <h2 className="mb-8 text-center text-2xl font-normal tracking-normal text-[var(--black)] md:text-3xl">
-              今天想分析哪支影片？
+          <section className="w-full max-w-xl -translate-y-8 md:-translate-y-12">
+            <h2 className="mb-5 text-center text-xl font-normal tracking-normal text-[var(--black)] md:text-2xl">
+              今天想分析哪支影片呢 👀
             </h2>
-            <div className="rounded-[24px] border border-[var(--border-strong)] bg-white px-3 py-2 shadow-[0_12px_42px_rgba(0,0,0,0.07)] md:rounded-[28px] md:px-4">
-              <div className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)_170px_auto] md:items-center">
-                <div className="hidden h-8 w-8 place-items-center text-[var(--black)] md:grid">
-                  <Plus size={20} strokeWidth={1.8} />
-                </div>
+            <div className="rounded-[18px] border border-[var(--border-strong)] bg-white px-2.5 py-1.5 md:rounded-[22px] md:px-3">
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_132px_auto] md:items-center">
                 <input
-                  className="min-w-0 border-0 bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-[var(--gray-300)] md:text-base"
+                  className="min-w-0 border-0 bg-transparent px-1 py-1 text-xs outline-none placeholder:text-[var(--gray-300)] md:text-sm"
                   placeholder="貼上 IG Reel 或 TikTok 影片連結"
                   value={sourceUrl}
                   onChange={(event) => setSourceUrl(event.target.value)}
@@ -61,7 +58,7 @@ export default function HomePage() {
                   }}
                 />
                 <input
-                  className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-xs outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
+                  className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-2.5 py-1 text-[11px] outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
                   placeholder="專案名稱"
                   value={projectTitle}
                   onChange={(event) => setProjectTitle(event.target.value)}
@@ -70,12 +67,12 @@ export default function HomePage() {
                   }}
                 />
                 <button
-                  className="grid h-10 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-11 md:w-11"
+                  className="grid h-8 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-9 md:w-9"
                   disabled={!projectTitle.trim() || !sourceUrl.trim() || loading}
                   onClick={start}
                   title={loading ? "建立中" : "開始分析"}
                 >
-                  <Wand2 size={17} />
+                  <Wand2 size={14} />
                 </button>
               </div>
             </div>
