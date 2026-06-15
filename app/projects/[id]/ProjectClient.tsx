@@ -472,10 +472,9 @@ function ProcessTimeline({
   const steps = buildProcessSteps(project);
 
   return (
-    <div className="p-1 md:p-0">
+    <div className="rounded-xl bg-white p-2 md:p-3">
       <div className="mb-2 flex items-center justify-between gap-3 px-1">
         <h2 className="text-sm">工作清單</h2>
-        <span className="text-xs text-[var(--gray-500)]">{Math.round(project.progress * 100)}%</span>
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
         {steps.map((step, index) => {
