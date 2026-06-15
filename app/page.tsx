@@ -1,7 +1,6 @@
 "use client";
 
-import { Plus, Settings, Wand2 } from "lucide-react";
-import Link from "next/link";
+import { Plus, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Shell } from "@/components/Shell";
@@ -42,26 +41,18 @@ export default function HomePage() {
   return (
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="flex min-h-[60px] flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:px-6">
-          <h1 className="min-w-0 text-sm md:text-base">lurevid | 短影音分析創作平台</h1>
-          <Link className="btn btn-ghost" href="/settings">
-            <Settings size={16} />
-            設定
-          </Link>
-        </div>
-
-        <div className="grid min-h-[calc(100vh-60px)] place-items-center p-4 md:p-8">
-          <section className="w-full max-w-5xl -translate-y-8 md:-translate-y-12">
-            <h2 className="mb-12 text-center text-3xl font-normal tracking-normal text-[var(--black)] md:text-4xl">
+        <div className="grid min-h-screen place-items-center p-4 md:p-8">
+          <section className="w-full max-w-3xl -translate-y-8 md:-translate-y-12">
+            <h2 className="mb-8 text-center text-2xl font-normal tracking-normal text-[var(--black)] md:text-3xl">
               今天想分析哪支影片？
             </h2>
-            <div className="rounded-[34px] border border-[var(--border-strong)] bg-white px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.08)] md:rounded-[40px] md:px-6">
-              <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_220px_auto] md:items-center">
-                <div className="hidden h-9 w-9 place-items-center text-[var(--black)] md:grid">
-                  <Plus size={25} strokeWidth={1.8} />
+            <div className="rounded-[24px] border border-[var(--border-strong)] bg-white px-3 py-2 shadow-[0_12px_42px_rgba(0,0,0,0.07)] md:rounded-[28px] md:px-4">
+              <div className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)_170px_auto] md:items-center">
+                <div className="hidden h-8 w-8 place-items-center text-[var(--black)] md:grid">
+                  <Plus size={20} strokeWidth={1.8} />
                 </div>
                 <input
-                  className="min-w-0 border-0 bg-transparent px-1 py-2 text-base outline-none placeholder:text-[var(--gray-300)] md:text-xl"
+                  className="min-w-0 border-0 bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-[var(--gray-300)] md:text-base"
                   placeholder="貼上 IG Reel 或 TikTok 影片連結"
                   value={sourceUrl}
                   onChange={(event) => setSourceUrl(event.target.value)}
@@ -70,7 +61,7 @@ export default function HomePage() {
                   }}
                 />
                 <input
-                  className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-4 py-2 text-sm outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
+                  className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-xs outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
                   placeholder="專案名稱"
                   value={projectTitle}
                   onChange={(event) => setProjectTitle(event.target.value)}
@@ -79,12 +70,12 @@ export default function HomePage() {
                   }}
                 />
                 <button
-                  className="grid h-12 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-14 md:w-14"
+                  className="grid h-10 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-11 md:w-11"
                   disabled={!projectTitle.trim() || !sourceUrl.trim() || loading}
                   onClick={start}
                   title={loading ? "建立中" : "開始分析"}
                 >
-                  <Wand2 size={21} />
+                  <Wand2 size={17} />
                 </button>
               </div>
             </div>
