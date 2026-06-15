@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import ffmpegStatic from "ffmpeg-static";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
+import { ffmpegPath } from "@/lib/ffmpeg";
 
 function run(command: string, args: string[]) {
   return new Promise<void>((resolvePromise, reject) => {
@@ -22,10 +22,6 @@ function run(command: string, args: string[]) {
   });
 }
 
-function ffmpegPath() {
-  return process.env.FFMPEG_PATH || ffmpegStatic || "ffmpeg";
-}
-
 export async function downloadSourceVideo(url: string) {
   const dir = await mkdtemp(join(tmpdir(), "lurevid-video-"));
   const output = join(dir, "source.%(ext)s");
@@ -38,6 +34,7 @@ export async function downloadSourceVideo(url: string) {
     "--no-warnings",
     "-o",
     output,
+    "--",
     url
   ]);
 

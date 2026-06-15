@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { enqueueProjectJob } from "@/lib/queue";
 import { loadOwnedProject } from "@/lib/project-access";
 import { MAX_TRANSCRIPT_LENGTH } from "@/lib/limits";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const owned = await loadOwnedProject(id);
   if (owned instanceof NextResponse) return owned;
+
+  const limited = await rateLimit(`analyze:${owned.user.id}`, 30, 3600);
+  if (!limited.ok) {
+    return NextResponse.json({ error: "重新分析太頻繁，請稍後再試" }, { status: 429 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const transcript = typeof body.transcript === "string" ? body.transcript.trim().slice(0, MAX_TRANSCRIPT_LENGTH) : "";

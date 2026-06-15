@@ -5,6 +5,7 @@ import { enqueueProjectJob } from "@/lib/queue";
 import { detectPlatform, isSupportedSourceUrl } from "@/lib/transcribe";
 import { currentUser } from "@/lib/authz";
 import { MAX_TRANSCRIPT_LENGTH } from "@/lib/limits";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -59,6 +60,11 @@ function toCreateProjectError(error: unknown) {
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
+  const limited = await rateLimit(`create:${user.id}`, 20, 3600);
+  if (!limited.ok) {
+    return NextResponse.json({ error: "建立專案太頻繁，請稍後再試" }, { status: 429 });
+  }
 
   try {
     const body = createProjectSchema.parse(await request.json());
