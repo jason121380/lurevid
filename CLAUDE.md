@@ -27,9 +27,18 @@ The worker should analyze:
 
 Manual transcript input is only a fallback when platform download or transcription fails.
 
+## Authentication
+
+This is a public multi-user app. All pages and API routes require login (NextAuth, Credentials + JWT).
+
+- Each `Project` is owned by a `User` (`Project.userId`); every project API checks ownership.
+- `/settings` and `/api/settings` are admin-only. Admins are listed in `ADMIN_EMAILS` (comma-separated).
+- `middleware.ts` protects page routes (redirect to `/login`); API routes self-check via `lib/authz.ts` and return JSON 401/403.
+- Edge constraint: `lib/auth.config.ts` is edge-safe (no Prisma/bcrypt) and is what `middleware.ts` imports. The Credentials provider (Prisma + bcrypt) lives only in `lib/auth.ts` (node runtime).
+
 ## Settings
 
-User-editable API settings are managed through `/settings` and persisted to PostgreSQL table `AppSetting`.
+Admin-editable API settings are managed through `/settings` and persisted to PostgreSQL table `AppSetting`.
 
 Do not require users to edit `.env` for OpenAI, Seedance, or S3 keys.
 
@@ -37,8 +46,11 @@ Keep these in deployment environment variables:
 
 - `DATABASE_URL`
 - `REDIS_URL`
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `ADMIN_EMAILS`
 
-These are needed before the app can read settings from the database.
+These are needed before the app can authenticate users and read settings from the database.
 
 ## Current Defaults
 
@@ -48,19 +60,31 @@ These are needed before the app can read settings from the database.
 - `OPENAI_TRANSCRIBE_MODEL`: `gpt-4o-transcribe`
 - `SEEDANCE_MODEL`: `dreamina-seedance-2-0-fast-260128`
 
-Note: `gpt-realtime-whisper` is a realtime transcription model and should not be sent to `/audio/transcriptions` for downloaded video files. The current file transcription flow uses `gpt-4o-transcribe`; if a user enters `gpt-realtime-whisper`, `lib/transcribe.ts` maps it to `gpt-4o-transcribe` to avoid the 404 invalid URL failure.
+Transcription model behavior (`lib/transcribe.ts`):
+
+- `whisper-1` → `verbose_json` with segment timestamps (the transcript UI splits by timestamp).
+- Any other file-transcription model (e.g. `gpt-4o-transcribe`, the default) → plain text transcript, no timestamps.
+- `gpt-realtime-whisper` is a realtime model that 404s on `/audio/transcriptions`; it is mapped to `gpt-4o-transcribe`.
 
 ## Key Files
 
 - `app/page.tsx`: URL entry and optional transcript fallback.
-- `app/settings/page.tsx`: user settings UI.
-- `app/api/settings/route.ts`: settings API.
-- `lib/settings.ts`: setting definitions and DB access.
+- `app/login/page.tsx`, `app/register/page.tsx`: auth pages.
+- `app/settings/page.tsx`: admin settings UI.
+- `app/api/settings/route.ts`: settings API (admin-only).
+- `app/api/auth/[...nextauth]/route.ts`, `app/api/register/route.ts`: auth endpoints.
+- `lib/auth.ts` / `lib/auth.config.ts`: NextAuth setup (node) / edge-safe base config.
+- `lib/authz.ts`, `lib/project-access.ts`: session + ownership helpers for API routes.
+- `lib/settings.ts`: setting definitions, DB access, and TTL cache.
 - `lib/openai.ts`: text, vision, storyboard, and image-generation OpenAI calls.
-- `lib/transcribe.ts`: audio transcription.
+- `lib/transcribe.ts`: audio transcription + source-URL allowlist.
 - `lib/visual.ts`: video download, frame extraction, visual analysis.
+- `lib/video.ts` / `lib/ffmpeg.ts`: clip download + ffmpeg merge / shared ffmpeg path.
+- `lib/safe-fetch.ts`: SSRF guard for fetching upstream URLs.
+- `lib/rate-limit.ts`: Redis-backed rate limiting.
+- `middleware.ts`: protects page routes.
 - `scripts/worker.ts`: BullMQ job processor.
-- `prisma/schema.prisma`: includes `Project`, `Scene`, and `AppSetting`.
+- `prisma/schema.prisma`: includes `User`, `Project`, `Scene`, and `AppSetting`.
 
 ## Commands
 
@@ -78,6 +102,8 @@ If global `npm` is unavailable in Codex, use the workspace-local npm CLI and bun
 - Keep UI copy in Traditional Chinese.
 - Do not print or commit actual API keys.
 - Do not commit `.npm-cache/`.
-- Keep `DATABASE_URL` and `REDIS_URL` out of user-facing documentation examples unless redacted.
-- Prefer clear user-facing error messages over raw Prisma, Redis, OpenAI, or Seedance errors.
-- If adding settings, update `lib/settings.ts`, `/settings`, README, and this file together.
+- Keep `DATABASE_URL`, `REDIS_URL`, and `NEXTAUTH_SECRET` out of user-facing documentation examples unless redacted.
+- Prefer clear user-facing error messages over raw Prisma, Redis, OpenAI, or Seedance errors. Do not leak raw URLs in error strings.
+- New API routes must enforce auth + ownership (`lib/authz.ts` / `lib/project-access.ts`).
+- Never `fetch` an upstream-provided URL without `lib/safe-fetch.ts`.
+- If adding settings, update `lib/settings.ts`, `/settings`, `.env.example`, README, and this file together.
