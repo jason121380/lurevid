@@ -70,8 +70,7 @@ export default function HomePage() {
                 onChange={(event) => setSourceUrl(event.target.value)}
               />
 
-              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div />
+              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                 <button className="btn btn-primary w-full sm:w-auto" disabled={!projectTitle.trim() || !sourceUrl.trim() || loading} onClick={start}>
                   <Wand2 size={16} />
                   {loading ? "建立中" : "開始分析"}
