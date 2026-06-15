@@ -461,12 +461,12 @@ function ProcessTimeline({
   const steps = buildProcessSteps(project);
 
   return (
-    <div className="card p-2.5 md:p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
+    <div className="p-1 md:p-0">
+      <div className="mb-2 flex items-center justify-between gap-3 px-1">
         <h2 className="text-sm">工作清單</h2>
         <span className="text-xs text-[var(--gray-500)]">{Math.round(project.progress * 100)}%</span>
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-1.5 md:overflow-visible md:pb-0">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
         {steps.map((step, index) => {
           const stepNumber = index + 1;
           const canRun = stepCanRun(project, stepNumber) && !busy;
@@ -476,10 +476,10 @@ function ProcessTimeline({
 
           return (
             <div
-              className={`flex min-w-[178px] items-center gap-1 rounded-lg border px-2.5 py-2 transition md:min-w-0 ${
+              className={`flex min-w-[150px] items-center gap-1 rounded-lg px-2 py-1.5 transition md:min-w-0 ${
                 activeStep === stepNumber
-                  ? "border-orange bg-orange-bg"
-                  : "border-[var(--border)] bg-white hover:border-orange/40 hover:bg-orange-bg/40"
+                  ? "bg-orange-bg text-orange"
+                  : "text-[var(--black)] hover:bg-[var(--warm-white)]"
               }`}
               key={step.title}
             >
@@ -510,8 +510,7 @@ function ProcessTimeline({
               </button>
               <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(stepNumber)} type="button">
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium">{step.title}</div>
-                  <p className="mt-0.5 truncate text-[11px] leading-4 text-[var(--gray-500)]">{step.description}</p>
+                  <div className="truncate text-xs font-medium leading-6">{step.title}</div>
                 </div>
               </button>
               {step.title === "下載影片" && project.sourceUrl && (
