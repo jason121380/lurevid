@@ -3,6 +3,7 @@
 import { ChevronDown, Eye, EyeOff, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
+import { useToast } from "@/components/Toast";
 
 type SettingField = {
   key: string;
@@ -51,6 +52,7 @@ const groups: SettingGroup[] = [
 ];
 
 export default function SettingsPage() {
+  const toast = useToast();
   const [fields, setFields] = useState<SettingField[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -108,9 +110,12 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "儲存設定失敗");
       setMessage("設定已儲存，下一個 worker 任務會使用最新設定。");
+      toast("設定已儲存");
       await loadSettings();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "儲存設定失敗");
+      const msg = err instanceof Error ? err.message : "儲存設定失敗";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setSaving(false);
     }

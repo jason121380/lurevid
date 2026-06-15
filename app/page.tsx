@@ -4,9 +4,11 @@ import { Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Shell } from "@/components/Shell";
+import { useToast } from "@/components/Toast";
 
 export default function HomePage() {
   const router = useRouter();
+  const toast = useToast();
   const [projectTitle, setProjectTitle] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,11 +30,14 @@ export default function HomePage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "建立專案失敗");
+        toast(data.error || "建立專案失敗", "error");
         return;
       }
+      toast("已建立專案，開始分析");
       router.push(`/projects/${data.id}`);
     } catch {
       setError("API 沒有回應，請確認伺服器正在執行");
+      toast("API 沒有回應", "error");
     } finally {
       setLoading(false);
     }
