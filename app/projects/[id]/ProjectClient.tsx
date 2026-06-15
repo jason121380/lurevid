@@ -4,7 +4,7 @@ import { CheckCircle2, Download, Eye, Loader2, Play, RotateCcw, X, XCircle } fro
 import { useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
 
-type Scene = {
+export type Scene = {
   id: string;
   sceneNumber: number;
   title: string;
@@ -17,7 +17,7 @@ type Scene = {
   error?: string;
 };
 
-type Project = {
+export type Project = {
   id: string;
   sourceUrl?: string;
   sourcePlatform?: string;
@@ -29,6 +29,9 @@ type Project = {
   status: string;
   message: string;
   progress: number;
+  ratio?: string;
+  resolution?: string;
+  duration?: number;
   finalVideoUrl?: string;
   error?: string;
   scenes: Scene[];
@@ -100,22 +103,43 @@ function sourceEmbedUrl(url?: string) {
   return url;
 }
 
-export function ProjectClient({ projectId }: { projectId: string }) {
-  const [project, setProject] = useState<Project | null>(null);
+export function ProjectClient({ projectId, initialProject }: { projectId: string; initialProject?: Project }) {
+  const [project, setProject] = useState<Project | null>(initialProject || null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const [analysis, setAnalysis] = useState("");
-  const [structure, setStructure] = useState("");
-  const [script, setScript] = useState("");
-  const [ratio, setRatio] = useState("9:16");
-  const [resolution, setResolution] = useState("720p");
-  const [duration, setDuration] = useState(5);
+  const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
+  const [structure, setStructure] = useState(initialProject?.structure || "");
+  const [script, setScript] = useState(initialProject?.adaptedScript || "");
+  const [ratio, setRatio] = useState(initialProject?.ratio || "9:16");
+  const [resolution, setResolution] = useState(initialProject?.resolution || "720p");
+  const [duration, setDuration] = useState(initialProject?.duration || 5);
   const [previewWidth, setPreviewWidth] = useState(0);
   const [activeStep, setActiveStep] = useState(1);
   const previewRef = useRef<HTMLDivElement | null>(null);
-  const settingsInit = useRef(false);
-  const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({});
+  const settingsInit = useRef(Boolean(initialProject));
+  const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({
+    analysis: initialProject?.analysis,
+    structure: initialProject?.structure,
+    adaptedScript: initialProject?.adaptedScript
+  });
+
+  useEffect(() => {
+    if (!initialProject) return;
+    setProject(initialProject);
+    setAnalysis(initialProject.analysis || "");
+    setStructure(initialProject.structure || "");
+    setScript(initialProject.adaptedScript || "");
+    setRatio(initialProject.ratio || "9:16");
+    setResolution(initialProject.resolution || "720p");
+    setDuration(initialProject.duration || 5);
+    lastServer.current = {
+      analysis: initialProject.analysis,
+      structure: initialProject.structure,
+      adaptedScript: initialProject.adaptedScript
+    };
+    settingsInit.current = true;
+  }, [initialProject, projectId]);
 
   useEffect(() => {
     let stopped = false;
