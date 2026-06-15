@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Download, Eye, Loader2, X, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, Eye, Loader2, Play, RotateCcw, X, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
@@ -70,6 +70,20 @@ function buildProcessSteps(project: Project): Array<{ title: string; description
     step("產生分鏡", "拆 9 鏡並產生分鏡圖", ["STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STORYBOARDING"),
     step("生成影片", "送 Seedance 產片段並合成 final.mp4", project.status === "COMPLETED", ["GENERATING", "MERGING"].includes(project.status))
   ];
+}
+
+function stepCanRun(project: Project, stepNumber: number) {
+  if (stepNumber === 1) return false;
+  if (stepNumber === 2) return true;
+  if (stepNumber === 3) return project.progress >= 0.1 || Boolean(project.sourceTranscript);
+  if (stepNumber === 4) return Boolean(project.sourceTranscript);
+  if (stepNumber === 5) return project.progress >= 0.17 || Boolean(project.analysis);
+  if (stepNumber === 6) return project.progress >= 0.19 || Boolean(project.analysis);
+  if (stepNumber === 7) return Boolean(project.analysis);
+  if (stepNumber === 8) return Boolean(project.structure);
+  if (stepNumber === 9) return Boolean(project.adaptedScript);
+  if (stepNumber === 10) return project.status === "STORYBOARD_READY" && project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
+  return false;
 }
 
 function statusClass(status: string) {
@@ -176,11 +190,34 @@ export function ProjectClient({ projectId }: { projectId: string }) {
     }
   }
 
+  function runStep(stepNumber: number) {
+    if (!project) return;
+    setActiveStep(stepNumber);
+    if (stepNumber >= 2 && stepNumber <= 6) {
+      post("/analyze");
+      return;
+    }
+    if (stepNumber === 7) {
+      post("/structure", { analysis: project.analysis || analysis });
+      return;
+    }
+    if (stepNumber === 8) {
+      post("/adapt", { structure });
+      return;
+    }
+    if (stepNumber === 9) {
+      post("/storyboard", { adaptedScript: script });
+      return;
+    }
+    if (stepNumber === 10) {
+      post("/video", { ratio, resolution, duration });
+    }
+  }
+
   if (error && !project) return <Shell><div className="p-6 text-[var(--red)]">{error}</div></Shell>;
   if (!project) return <Shell><div className="grid min-h-screen place-items-center"><Loader2 className="animate-spin text-orange" /></div></Shell>;
 
   const busy = BUSY.includes(project.status) || submitting;
-  const disabled = busy;
   const previewScale = previewWidth ? previewWidth / 540 : 1;
   const statusPanel = (
     <div className="card p-3 md:p-4">
@@ -287,9 +324,6 @@ export function ProjectClient({ projectId }: { projectId: string }) {
               <option value={4}>每段 4 秒</option>
               <option value={5}>每段 5 秒</option>
             </select>
-            <button className="btn btn-primary w-full sm:w-auto" disabled={disabled} onClick={() => post("/video", { ratio, resolution, duration })}>
-              變成影片
-            </button>
           </div>
         )}
       </div>
@@ -329,9 +363,6 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           index="6"
           title="影片分析"
           value={analysis}
-          actionLabel="確認分析 → 結構分析"
-          disabled={disabled}
-          onAction={() => post("/structure", { analysis: project.analysis || analysis })}
         />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未完成分析" description="系統會先抽取影格、理解畫面，再整合逐字稿與視覺洞察。" /></div>
@@ -344,9 +375,6 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           title="結構分析"
           value={structure}
           onChange={setStructure}
-          actionLabel="確認結構 → 改編腳本"
-          disabled={disabled}
-          onAction={() => post("/adapt", { structure })}
         />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未結構分析" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
@@ -359,9 +387,6 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           title="改編腳本"
           value={script}
           onChange={setScript}
-          actionLabel="確認腳本 → 產生分鏡圖"
-          disabled={disabled}
-          onAction={() => post("/storyboard", { adaptedScript: script })}
         />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未改編腳本" description="完成結構拆解後，會改寫成新的短影音腳本。" /></div>
@@ -384,7 +409,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
 
         <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[300px_minmax(0,1fr)] md:gap-4 md:p-6">
           <aside className="h-fit md:sticky md:top-6">
-            <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} />
+            <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
           </aside>
 
           <section className="min-w-0">
@@ -423,11 +448,15 @@ export function ProjectClient({ projectId }: { projectId: string }) {
 function ProcessTimeline({
   project,
   activeStep,
-  onSelectStep
+  busy,
+  onSelectStep,
+  onRunStep
 }: {
   project: Project;
   activeStep: number;
+  busy: boolean;
   onSelectStep: (step: number) => void;
+  onRunStep: (step: number) => void;
 }) {
   const steps = buildProcessSteps(project);
 
@@ -438,37 +467,67 @@ function ProcessTimeline({
         <span className="text-xs text-[var(--gray-500)]">{Math.round(project.progress * 100)}%</span>
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-1.5 md:overflow-visible md:pb-0">
-        {steps.map((step, index) => (
-          <div
-            className={`flex min-w-[178px] items-center gap-1 rounded-lg border px-2.5 py-2 transition md:min-w-0 ${
-              activeStep === index + 1
-                ? "border-orange bg-orange-bg"
-                : "border-[var(--border)] bg-white hover:border-orange/40 hover:bg-orange-bg/40"
-            }`}
-            key={step.title}
-          >
-            <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(index + 1)} type="button">
-              <div className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] ${stepStateClass(step.state)}`}>
-                {step.state === "active" ? <Loader2 size={13} className="animate-spin" /> : step.state === "failed" ? <XCircle size={13} /> : index + 1}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-medium">{step.title}</div>
-                <p className="mt-0.5 truncate text-[11px] leading-4 text-[var(--gray-500)]">{step.description}</p>
-              </div>
-            </button>
-            {step.title === "下載影片" && project.sourceUrl && (
-              <a
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-white hover:text-orange"
-                href={project.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                title="開啟原始影片"
+        {steps.map((step, index) => {
+          const stepNumber = index + 1;
+          const canRun = stepCanRun(project, stepNumber) && !busy;
+          const isDone = step.state === "done";
+          const isActive = step.state === "active";
+          const isFailed = step.state === "failed";
+
+          return (
+            <div
+              className={`flex min-w-[178px] items-center gap-1 rounded-lg border px-2.5 py-2 transition md:min-w-0 ${
+                activeStep === stepNumber
+                  ? "border-orange bg-orange-bg"
+                  : "border-[var(--border)] bg-white hover:border-orange/40 hover:bg-orange-bg/40"
+              }`}
+              key={step.title}
+            >
+              <button
+                className={`group/runner grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] transition ${stepStateClass(step.state)} ${canRun ? "cursor-pointer hover:border-orange hover:bg-orange hover:text-white" : "cursor-default"}`}
+                disabled={!canRun}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRunStep(stepNumber);
+                }}
+                title={canRun ? (isDone || isFailed ? "重新執行" : "開始執行") : undefined}
+                type="button"
               >
-                <Download size={14} />
-              </a>
-            )}
-          </div>
-        ))}
+                {isActive ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : canRun && (isDone || isFailed) ? (
+                  <>
+                    <span className="group-hover/runner:hidden">{stepNumber}</span>
+                    <RotateCcw className="hidden group-hover/runner:block" size={12} />
+                  </>
+                ) : canRun ? (
+                  <Play size={11} fill="currentColor" />
+                ) : isFailed ? (
+                  <XCircle size={13} />
+                ) : (
+                  stepNumber
+                )}
+              </button>
+              <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(stepNumber)} type="button">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium">{step.title}</div>
+                  <p className="mt-0.5 truncate text-[11px] leading-4 text-[var(--gray-500)]">{step.description}</p>
+                </div>
+              </button>
+              {step.title === "下載影片" && project.sourceUrl && (
+                <a
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-white hover:text-orange"
+                  href={project.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="開啟原始影片"
+                >
+                  <Download size={14} />
+                </a>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -565,17 +624,11 @@ function TranscriptResult({ value }: { value: string }) {
 function ResultCard({
   index,
   title,
-  value,
-  actionLabel,
-  onAction,
-  disabled
+  value
 }: {
   index: string;
   title: string;
   value: string;
-  actionLabel: string;
-  onAction: () => void;
-  disabled: boolean;
 }) {
   return (
     <div className="card p-3 md:p-4">
@@ -586,9 +639,6 @@ function ResultCard({
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
       </div>
       <MarkdownResult value={value} />
-      <button className="btn btn-primary mt-3 w-full sm:w-auto" disabled={disabled || !value.trim()} onClick={onAction}>
-        {actionLabel}
-      </button>
     </div>
   );
 }
@@ -597,18 +647,12 @@ function StepCard({
   index,
   title,
   value,
-  onChange,
-  actionLabel,
-  onAction,
-  disabled
+  onChange
 }: {
   index: string;
   title: string;
   value: string;
   onChange: (value: string) => void;
-  actionLabel: string;
-  onAction: () => void;
-  disabled: boolean;
 }) {
   return (
     <div className="card p-3 md:p-4">
@@ -623,9 +667,6 @@ function StepCard({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      <button className="btn btn-primary mt-3 w-full sm:w-auto" disabled={disabled || !value.trim()} onClick={onAction}>
-        {actionLabel}
-      </button>
     </div>
   );
 }
