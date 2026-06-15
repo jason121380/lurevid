@@ -412,7 +412,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const transcriptPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm">2 · 轉錄音訊</h2>
+        <h2 className="text-sm font-bold">2 · 轉錄音訊</h2>
         <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
       </div>
       {project.sourceTranscript ? (
@@ -425,7 +425,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const framePanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm">3 · 抽取影格</h2>
+        <h2 className="text-sm font-bold">3 · 抽取影格</h2>
         <span className="text-[11px] text-[var(--gray-500)]">{project.sourceFrameUrls?.length || 0} 張</span>
       </div>
       {project.sourceFrameUrls?.length ? (
@@ -451,9 +451,14 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const storyboardPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm">7 · 產生分鏡</h2>
+        <h2 className="text-sm font-bold">{activeStep === 8 ? "8 · 生成影片" : "7 · 產生分鏡"}</h2>
         {project.status === "STORYBOARD_READY" && (
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
+              <option value={3}>每段 3 秒</option>
+              <option value={4}>每段 4 秒</option>
+              <option value={5}>每段 5 秒</option>
+            </select>
             <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={ratio} onChange={(event) => setRatio(event.target.value)}>
               <option>9:16</option>
               <option>16:9</option>
@@ -464,11 +469,15 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               <option>1080p</option>
               <option>480p</option>
             </select>
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
-              <option value={3}>每段 3 秒</option>
-              <option value={4}>每段 4 秒</option>
-              <option value={5}>每段 5 秒</option>
-            </select>
+            <button
+              className="btn btn-primary"
+              disabled={busy || submitting}
+              onClick={() => post("/video", { ratio, resolution, duration }, "已開始生成影片")}
+              type="button"
+            >
+              <Play size={14} />
+              生成影片
+            </button>
           </div>
         )}
       </div>
@@ -483,7 +492,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
                 <div className={`h-full transition-all duration-500 ${sceneProgress(scene.status).color}`} style={{ width: `${sceneProgress(scene.status).pct}%` }} />
               </div>
-              <h3 className="text-sm">{scene.title}</h3>
+              <h3 className="text-sm font-bold">{scene.title}</h3>
               <div className="mt-3 grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
                 {scene.videoUrl ? (
                   <video src={scene.videoUrl} className="h-full w-full object-cover" muted loop autoPlay playsInline />
@@ -571,7 +580,7 @@ function ProcessTimeline({
   return (
     <div className="rounded-xl bg-white p-2 md:p-3">
       <div className="mb-2 flex items-center justify-between gap-3 px-1">
-        <h2 className="text-sm">功能選單</h2>
+        <h2 className="text-sm font-bold">功能選單</h2>
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
         {steps.map((step, index) => {
@@ -741,7 +750,7 @@ function ResultCard({
   return (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm">
+        <h2 className="text-sm font-bold">
           {index} · {title}
         </h2>
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
@@ -765,7 +774,7 @@ function StepCard({
   return (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm">
+        <h2 className="text-sm font-bold">
           {index} · {title}
         </h2>
         <span className="text-[11px] text-[var(--gray-500)]">可編輯後再繼續</span>
