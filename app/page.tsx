@@ -46,7 +46,7 @@ export default function HomePage() {
             <h2 className="mb-5 text-center text-xl font-normal tracking-normal text-[var(--black)] md:text-2xl">
               今天想分析哪支影片呢 👀
             </h2>
-            <div className="rounded-full border border-[var(--border-strong)] bg-white px-3 py-2">
+            <div className="rounded-full border border-[var(--border-strong)] bg-white px-3 py-2 transition focus-within:border-orange">
               <div className="grid min-h-10 gap-2 md:grid-cols-[minmax(0,1fr)_132px_auto] md:items-center">
                 <input
                   className="min-w-0 border-0 bg-transparent px-1 py-1 text-xs outline-none placeholder:text-[var(--gray-300)] md:text-sm"
