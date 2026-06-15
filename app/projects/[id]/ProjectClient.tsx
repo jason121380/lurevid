@@ -44,7 +44,7 @@ const BUSY = ["QUEUED", "ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING",
 type StepState = "done" | "active" | "waiting" | "failed";
 
 function stepStateClass(state: StepState) {
-  if (state === "done") return "border-[var(--green)] bg-[var(--green-bg)] text-[var(--green)]";
+  if (state === "done") return "border-orange bg-orange text-white";
   if (state === "active") return "border-orange bg-orange-bg text-orange";
   if (state === "failed") return "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]";
   return "border-[var(--gray-200)] bg-white text-[var(--gray-300)]";
@@ -123,6 +123,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [project, setProject] = useState<Project | null>(initialProject || null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [titleSaved, setTitleSaved] = useState(false);
 
   const [projectTitle, setProjectTitle] = useState(initialProject?.title || "");
   const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
@@ -240,6 +241,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (!title || title === project.title) return;
     setSubmitting(true);
     setError("");
+    setTitleSaved(false);
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
@@ -253,6 +255,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       }
       setProject(data);
       setProjectTitle(data.title || "");
+      setTitleSaved(true);
     } catch {
       setError("API 沒有回應");
     } finally {
@@ -300,12 +303,15 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   );
   const namePanel = (
     <div className="rounded-xl bg-white p-3 text-sm md:p-4">
-      <p className="mb-2 text-[11px] uppercase text-orange">命名</p>
+      <p className="mb-2 text-[11px] uppercase text-orange">專案命名</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
           className="min-w-0 flex-1 rounded-full border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
           value={projectTitle}
-          onChange={(event) => setProjectTitle(event.target.value)}
+          onChange={(event) => {
+            setProjectTitle(event.target.value);
+            setTitleSaved(false);
+          }}
           onBlur={saveProjectTitle}
           onKeyDown={(event) => {
             if (event.key === "Enter") saveProjectTitle();
@@ -316,13 +322,15 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           儲存
         </button>
       </div>
+      {titleSaved && <p className="mt-2 text-xs text-[var(--green)]">已儲存名稱</p>}
+      {error && <p className="mt-2 text-xs text-[var(--red)]">{error}</p>}
     </div>
   );
   const sourcePanel = (
     <div className="space-y-3">
       {namePanel}
       <div className="rounded-xl bg-white p-3 text-sm md:p-4">
-        <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
+        <p className="text-[11px] text-orange">來源 · {project.sourcePlatform || "影片"}</p>
         {project.sourceUrl && (
           <a className="mt-1 block break-all text-xs text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
             {project.sourceUrl}

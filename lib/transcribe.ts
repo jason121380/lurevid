@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 
-const ALLOWED_HOSTS = ["tiktok.com", "instagram.com"];
+const ALLOWED_HOSTS = ["tiktok.com", "instagram.com", "douyin.com", "iesdouyin.com"];
 
 function parseAllowedUrl(url: string): URL | null {
   let parsed: URL;
@@ -27,6 +27,7 @@ export function detectPlatform(url: string) {
   const host = parsed.hostname.toLowerCase();
   if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return "TikTok";
   if (host === "instagram.com" || host.endsWith(".instagram.com")) return "Instagram";
+  if (host.endsWith("douyin.com") || host.endsWith("iesdouyin.com")) return "抖音";
   return "Unknown";
 }
 
