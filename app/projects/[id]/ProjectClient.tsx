@@ -38,6 +38,7 @@ export type Project = {
   duration?: number;
   finalVideoUrl?: string;
   error?: string;
+  steps?: Record<string, { status?: string; progress?: number; message?: string }>;
   scenes: Scene[];
 };
 
@@ -51,44 +52,82 @@ function stepStateClass(state: StepState) {
   return "border-[var(--gray-200)] bg-white text-[var(--gray-300)]";
 }
 
-function buildProcessSteps(project: Project): Array<{ title: string; description: string; state: StepState }> {
-  const failed = project.status === "FAILED";
-  const doneAfterAnalyze = !["DRAFT", "QUEUED", "ANALYZING", "FAILED"].includes(project.status) || Boolean(project.analysis);
-  const activeMessage = project.message || "";
-  const step = (
-    title: string,
-    description: string,
-    done: boolean,
-    active: boolean
-  ): { title: string; description: string; state: StepState } => {
-    const state: StepState = failed && active ? "failed" : done ? "done" : active ? "active" : "waiting";
-    return { title, description, state };
+type StepInfo = { title: string; description: string; state: StepState; progress: number };
+
+function buildProcessSteps(project: Project): StepInfo[] {
+  const steps = (project.steps || {}) as Record<string, { status?: string; progress?: number }>;
+  const storyboardDone = project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
+
+  // 步驟 1-4（分析子步驟）：用 project.steps 的狀態 + 既有產物判斷。
+  const sub = (key: string, done: boolean): StepState => {
+    const s = steps[key]?.status;
+    if (s === "running") return "active";
+    if (s === "failed") return "failed";
+    if (done) return "done";
+    return "waiting";
   };
+  const subProgress = (key: string, state: StepState): number => {
+    if (state === "done") return 1;
+    if (state === "active") return steps[key]?.progress ?? 0.3;
+    return 0;
+  };
+  // 步驟 5-8（再行銷）：用整體 status + 產物判斷。
+  const phase = (done: boolean, active: boolean): StepState =>
+    project.status === "FAILED" && active ? "failed" : done ? "done" : active ? "active" : "waiting";
+
+  const mk = (title: string, description: string, state: StepState, progress?: number): StepInfo => ({
+    title,
+    description,
+    state,
+    progress: progress ?? (state === "done" ? 1 : state === "active" ? 0.5 : 0)
+  });
+
+  const s1 = sub("source", Boolean(project.sourceVideoUrl));
+  const s2 = sub("transcribe", Boolean(project.sourceTranscript));
+  const s3 = sub("frames", Boolean(project.sourceFrameUrls?.length));
+  const s4 = sub("analyze", Boolean(project.analysis));
 
   return [
-    step("基本資料", "來源、命名與下載 MP4", Boolean(project.sourceUrl), project.status === "QUEUED" || (project.status === "ANALYZING" && activeMessage.includes("下載"))),
-    step("轉錄音訊", "把影片聲音轉成逐字稿", Boolean(project.sourceTranscript), project.status === "ANALYZING" && (activeMessage.includes("轉錄") || activeMessage.includes("逐字稿") || activeMessage.includes("音訊"))),
-    step("抽取影格", "用 ffmpeg 抽出代表性畫面", Boolean(project.sourceFrameUrls?.length), project.status === "ANALYZING" && activeMessage.includes("抽取")),
-    step("視覺分析", "AI 分析畫面、字幕、構圖與分鏡節奏", Boolean(project.visualAnalysis), project.status === "ANALYZING" && (activeMessage.includes("畫面") || activeMessage.includes("影格") || activeMessage.includes("分鏡") || activeMessage.includes("視覺"))),
-    step("影片分析", "合併逐字稿與視覺分析產出洞察", doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("整合")),
-    step("結構分析", "拆 hook、鋪陳、賣點與 CTA", ["STRUCTURE_READY", "ADAPTING", "ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STRUCTURING"),
-    step("改編腳本", "改寫成全新原創短影音腳本", ["ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "ADAPTING"),
-    step("產生分鏡", "拆 9 鏡並產生分鏡圖", ["STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STORYBOARDING"),
-    step("生成影片", "送 Seedance 產片段並合成 final.mp4", project.status === "COMPLETED", ["GENERATING", "MERGING"].includes(project.status))
+    mk("基本資料", "來源連結與下載 MP4", s1, subProgress("source", s1)),
+    mk("轉錄音訊", "把影片聲音轉成逐字稿", s2, subProgress("transcribe", s2)),
+    mk("抽取影格", "用 ffmpeg 抽出代表性畫面", s3, subProgress("frames", s3)),
+    mk("影片分析", "整合畫面與逐字稿產出洞察", s4, subProgress("analyze", s4)),
+    mk("結構分析", "拆 hook、鋪陳、賣點與 CTA", phase(Boolean(project.structure), project.status === "STRUCTURING")),
+    mk("改編腳本", "改寫成全新原創短影音腳本", phase(Boolean(project.adaptedScript), project.status === "ADAPTING")),
+    mk("產生分鏡", "拆 9 鏡並產生分鏡圖", phase(storyboardDone, project.status === "STORYBOARDING")),
+    mk("生成影片", "送 Seedance 產片段並合成 final.mp4", phase(project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["GENERATING", "MERGING"].includes(project.status)))
   ];
 }
 
 function stepCanRun(project: Project, stepNumber: number) {
   if (stepNumber === 1) return Boolean(project.sourceUrl);
-  if (stepNumber === 2) return Boolean(project.sourceVideoUrl) || Boolean(project.sourceTranscript);
-  if (stepNumber === 3) return Boolean(project.sourceTranscript);
-  if (stepNumber === 4) return Boolean(project.sourceFrameUrls?.length) || Boolean(project.visualAnalysis);
-  if (stepNumber === 5) return project.progress >= 0.19 || Boolean(project.analysis);
-  if (stepNumber === 6) return Boolean(project.analysis);
-  if (stepNumber === 7) return Boolean(project.structure);
-  if (stepNumber === 8) return Boolean(project.adaptedScript);
-  if (stepNumber === 9) return project.status === "STORYBOARD_READY" && project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
+  if (stepNumber === 2) return Boolean(project.sourceUrl);
+  if (stepNumber === 3) return Boolean(project.sourceUrl);
+  if (stepNumber === 4) return Boolean(project.sourceTranscript);
+  if (stepNumber === 5) return Boolean(project.analysis);
+  if (stepNumber === 6) return Boolean(project.structure);
+  if (stepNumber === 7) return Boolean(project.adaptedScript);
+  if (stepNumber === 8) return project.status === "STORYBOARD_READY" && project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
   return false;
+}
+
+function sceneProgress(status: string): { pct: number; color: string } {
+  switch (status) {
+    case "IMAGE_GENERATING":
+      return { pct: 30, color: "bg-orange" };
+    case "IMAGE_READY":
+      return { pct: 50, color: "bg-orange" };
+    case "QUEUED":
+      return { pct: 60, color: "bg-orange" };
+    case "GENERATING":
+      return { pct: 80, color: "bg-orange" };
+    case "SUCCEEDED":
+      return { pct: 100, color: "bg-[var(--green)]" };
+    case "FAILED":
+      return { pct: 100, color: "bg-[var(--red)]" };
+    default:
+      return { pct: 10, color: "bg-orange" };
+  }
 }
 
 function statusClass(status: string) {
@@ -167,10 +206,12 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const schedule = () => {
+    const schedule = (status?: string) => {
       if (stopped) return;
-      // 分頁在背景時拉長間隔，減少不必要的請求。
-      const delay = typeof document !== "undefined" && document.hidden ? 20000 : 5000;
+      const hidden = typeof document !== "undefined" && document.hidden;
+      // 背景分頁拉長；有任務在跑時加快（讓步驟完成更即時反映）。
+      const busyNow = status ? BUSY.includes(status) : false;
+      const delay = hidden ? 20000 : busyNow ? 2500 : 5000;
       timer = setTimeout(load, delay);
     };
 
@@ -199,8 +240,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         }
 
         setProject(data);
-        // 終態（完成/失敗）就停止輪詢；其餘狀態繼續輪詢。
-        if (!["COMPLETED", "FAILED"].includes(data.status)) schedule();
+        // 終態（完成/失敗）就停止輪詢；其餘狀態繼續輪詢（有任務在跑時更頻繁）。
+        if (!["COMPLETED", "FAILED"].includes(data.status)) schedule(data.status);
       } catch {
         if (stopped) return;
         setError("暫時讀不到專案資料，稍後會自動重試。");
@@ -271,25 +312,14 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   function runStep(stepNumber: number) {
     if (!project) return;
     setActiveStep(stepNumber);
-    if (stepNumber >= 1 && stepNumber <= 5) {
-      post("/analyze", stepNumber === 2 ? { retranscribe: true } : undefined, stepNumber === 2 ? "已開始重新轉錄" : "已開始重新分析");
-      return;
-    }
-    if (stepNumber === 6) {
-      post("/structure", { analysis: project.analysis || analysis }, "已開始結構分析");
-      return;
-    }
-    if (stepNumber === 7) {
-      post("/adapt", { structure }, "已開始改編腳本");
-      return;
-    }
-    if (stepNumber === 8) {
-      post("/storyboard", { adaptedScript: script }, "已開始產生分鏡");
-      return;
-    }
-    if (stepNumber === 9) {
-      post("/video", { ratio, resolution, duration }, "已開始生成影片");
-    }
+    if (stepNumber === 1) return void post("/source", undefined, "已開始重新下載來源");
+    if (stepNumber === 2) return void post("/transcribe", undefined, "已開始轉錄");
+    if (stepNumber === 3) return void post("/frames", undefined, "已開始抽取影格");
+    if (stepNumber === 4) return void post("/analyze", undefined, "已開始影片分析");
+    if (stepNumber === 5) return void post("/structure", { analysis: project.analysis || analysis }, "已開始結構分析");
+    if (stepNumber === 6) return void post("/adapt", { structure }, "已開始改編腳本");
+    if (stepNumber === 7) return void post("/storyboard", { adaptedScript: script }, "已開始產生分鏡");
+    if (stepNumber === 8) return void post("/video", { ratio, resolution, duration }, "已開始生成影片");
   }
 
   if (error && !project) return <Shell><div className="p-6 text-[var(--red)]">{error}</div></Shell>;
@@ -455,8 +485,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                 <span className="text-xs text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
                 <span className={`badge ${statusClass(scene.status)}`}>{scene.status}</span>
               </div>
+              <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
+                <div className={`h-full transition-all duration-500 ${sceneProgress(scene.status).color}`} style={{ width: `${sceneProgress(scene.status).pct}%` }} />
+              </div>
               <h3 className="text-sm">{scene.title}</h3>
-              <div className="mt-3 grid aspect-video place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
+              <div className="mt-3 grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
                 {scene.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={scene.imageUrl} alt={scene.title} className="h-full w-full object-cover" />
@@ -478,51 +511,27 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (activeStep === 2) return transcriptPanel;
     if (activeStep === 3) return framePanel;
     if (activeStep === 4) {
-      return project.visualAnalysis ? (
-        <ResultCard
-          index="4"
-          title="視覺分析"
-          value={visualAnalysis}
-        />
+      return project.analysis ? (
+        <ResultCard index="4" title="影片分析" value={analysis} />
       ) : (
-        <div className="card p-4"><EmptyPanel title="尚未完成視覺分析" description="系統會先抽取影格，再分析畫面、字幕、構圖與分鏡節奏。" /></div>
+        <div className="card p-4"><EmptyPanel title="尚未完成影片分析" description="完成轉錄與抽取影格後，會整合畫面與逐字稿產出洞察。" /></div>
       );
     }
     if (activeStep === 5) {
-      return project.analysis ? (
-        <ResultCard
-          index="5"
-          title="影片分析"
-          value={analysis}
-        />
-      ) : (
-        <div className="card p-4"><EmptyPanel title="尚未完成分析" description="系統會先抽取影格、理解畫面，再整合逐字稿與視覺洞察。" /></div>
-      );
-    }
-    if (activeStep === 6) {
       return project.structure ? (
-        <ResultCard
-          index="6"
-          title="結構分析"
-          value={structure}
-        />
+        <ResultCard index="5" title="結構分析" value={structure} />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未結構分析" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
       );
     }
-    if (activeStep === 7) {
+    if (activeStep === 6) {
       return project.adaptedScript ? (
-        <StepCard
-          index="7"
-          title="改編腳本"
-          value={script}
-          onChange={setScript}
-        />
+        <StepCard index="6" title="改編腳本" value={script} onChange={setScript} />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未改編腳本" description="完成結構拆解後，會改寫成新的短影音腳本。" /></div>
       );
     }
-    if (activeStep === 8) return storyboardPanel;
+    if (activeStep === 7 || activeStep === 8) return storyboardPanel;
     return sourcePanel;
   })();
 
@@ -574,52 +583,57 @@ function ProcessTimeline({
           const isDone = step.state === "done";
           const isActive = step.state === "active";
           const isFailed = step.state === "failed";
-          const sectionLabel = stepNumber === 1 ? "分析" : stepNumber === 7 ? "再行銷" : null;
+          const sectionLabel = stepNumber === 1 ? "分析" : stepNumber === 6 ? "再行銷" : null;
+          const barColor = isFailed ? "bg-[var(--red)]" : isDone ? "bg-[var(--green)]" : "bg-orange";
+          const barPct = Math.round(Math.max(0, Math.min(1, step.progress)) * 100);
 
           return (
             <div className="contents" key={step.title}>
               {sectionLabel && (
-                <div className={`px-2 pt-2 text-[11px] uppercase tracking-wide text-[var(--gray-500)] ${stepNumber === 7 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
+                <div className={`px-2 pt-2 text-[11px] uppercase tracking-wide text-[var(--gray-500)] ${stepNumber === 6 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
                   {sectionLabel}
                 </div>
               )}
               <div
-                className={`flex min-w-[150px] items-center gap-1 rounded-lg px-2 py-1.5 transition md:min-w-0 ${
+                className={`min-w-[150px] rounded-lg px-2 py-1.5 transition md:min-w-0 ${
                   activeStep === stepNumber
                     ? "bg-orange-bg text-orange"
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
                 }`}
               >
-              <button
-                className={`group/runner grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] transition ${stepStateClass(step.state)} ${canRun ? "cursor-pointer hover:border-orange hover:bg-orange hover:text-white" : "cursor-default"}`}
-                disabled={!canRun}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRunStep(stepNumber);
-                }}
-                title={canRun ? (isDone || isFailed ? "重新執行" : "開始執行") : undefined}
-                type="button"
-              >
-                {isActive ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : canRun && (isDone || isFailed) ? (
-                  <>
-                    <span className="group-hover/runner:hidden">{stepNumber}</span>
-                    <RotateCcw className="hidden group-hover/runner:block" size={12} />
-                  </>
-                ) : canRun ? (
-                  <Play size={11} fill="currentColor" />
-                ) : isFailed ? (
-                  <XCircle size={13} />
-                ) : (
-                  stepNumber
-                )}
-              </button>
-              <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(stepNumber)} type="button">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-medium leading-6">{step.title}</div>
+                <div className="flex items-center gap-1">
+                  <button
+                    className={`group/runner grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] transition ${stepStateClass(step.state)} ${canRun ? "cursor-pointer hover:border-orange hover:bg-orange hover:text-white" : "cursor-default"}`}
+                    disabled={!canRun}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRunStep(stepNumber);
+                    }}
+                    title={canRun ? (isDone || isFailed ? "重新執行" : "開始執行") : undefined}
+                    type="button"
+                  >
+                    {isActive ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : canRun && (isDone || isFailed) ? (
+                      <>
+                        <span className="group-hover/runner:hidden">{stepNumber}</span>
+                        <RotateCcw className="hidden group-hover/runner:block" size={12} />
+                      </>
+                    ) : canRun ? (
+                      <Play size={11} fill="currentColor" />
+                    ) : isFailed ? (
+                      <XCircle size={13} />
+                    ) : (
+                      stepNumber
+                    )}
+                  </button>
+                  <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(stepNumber)} type="button">
+                    <div className="truncate text-xs font-medium leading-6">{step.title}</div>
+                  </button>
                 </div>
-              </button>
+                <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
+                  <div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${barPct}%` }} />
+                </div>
               </div>
             </div>
           );

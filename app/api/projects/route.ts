@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       include: { scenes: { orderBy: { sceneNumber: "asc" } } }
     });
 
-    await enqueueProjectJob(project.id, "analyze");
+    await enqueueProjectJob(project.id, "full");
 
     return NextResponse.json(project, { status: 202 });
   } catch (error) {

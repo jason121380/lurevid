@@ -4,7 +4,16 @@ import IORedis from "ioredis";
 export const PROJECT_QUEUE_NAME = "seedance-projects";
 export const WORKER_HEARTBEAT_KEY = "lurevid:worker:heartbeat";
 
-export type ProjectAction = "analyze" | "structure" | "adapt" | "storyboard" | "video";
+export type ProjectAction =
+  | "full"
+  | "source"
+  | "transcribe"
+  | "frames"
+  | "analyze"
+  | "structure"
+  | "adapt"
+  | "storyboard"
+  | "video";
 
 export function createRedisConnection() {
   const redisUrl = process.env.REDIS_URL;

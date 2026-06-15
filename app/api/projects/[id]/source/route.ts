@@ -6,23 +6,18 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
-// 第 4 步「影片分析」：用已存的逐字稿＋影格重新分析，不重新下載影片。
+// 第 1 步「基本資料」：重新下載來源影片並上傳物件儲存。
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const owned = await loadOwnedProject(id);
   if (owned instanceof NextResponse) return owned;
-  if (!owned.project.sourceTranscript) {
-    return NextResponse.json({ error: "尚未取得逐字稿，請先完成轉錄" }, { status: 400 });
-  }
+  if (!owned.project.sourceUrl) return NextResponse.json({ error: "缺少來源影片連結" }, { status: 400 });
 
-  const limited = await rateLimit(`analyze:${owned.user.id}`, 60, 3600);
+  const limited = await rateLimit(`source:${owned.user.id}`, 30, 3600);
   if (!limited.ok) return NextResponse.json({ error: "操作太頻繁，請稍後再試" }, { status: 429 });
 
-  await prisma.project.update({
-    where: { id },
-    data: { analysis: null, status: "ANALYZING", message: "正在做影片分析", error: null }
-  });
-  await enqueueProjectJob(id, "analyze");
+  await prisma.project.update({ where: { id }, data: { status: "ANALYZING", message: "正在重新下載來源影片", error: null } });
+  await enqueueProjectJob(id, "source");
 
   const next = await prisma.project.findUnique({ where: { id }, include: { scenes: { orderBy: { sceneNumber: "asc" } } } });
   return NextResponse.json(next, { status: 202 });
