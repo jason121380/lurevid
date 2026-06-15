@@ -1,6 +1,6 @@
 "use client";
 
-import { Link2, Settings, Wand2 } from "lucide-react";
+import { Plus, Settings, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -50,38 +50,49 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="p-3 md:p-4 lg:p-6">
-          <section className="space-y-4">
-            <div className="card p-3 md:p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Link2 size={18} className="text-orange" />
-                <h2 className="text-sm">貼上影片連結</h2>
-              </div>
-              <input
-                className="mb-3 w-full rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm outline-none focus:border-orange md:p-4"
-                placeholder="專案名稱"
-                value={projectTitle}
-                onChange={(event) => setProjectTitle(event.target.value)}
-              />
-              <input
-                className="w-full rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm outline-none focus:border-orange md:p-4"
-                placeholder="https://www.instagram.com/reel/...　或　https://www.tiktok.com/@.../video/..."
-                value={sourceUrl}
-                onChange={(event) => setSourceUrl(event.target.value)}
-              />
-
-              <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-                <button className="btn btn-primary w-full sm:w-auto" disabled={!projectTitle.trim() || !sourceUrl.trim() || loading} onClick={start}>
-                  <Wand2 size={16} />
-                  {loading ? "建立中" : "開始分析"}
+        <div className="grid min-h-[calc(100vh-60px)] place-items-center p-4 md:p-8">
+          <section className="w-full max-w-5xl -translate-y-8 md:-translate-y-12">
+            <h2 className="mb-12 text-center text-3xl font-normal tracking-normal text-[var(--black)] md:text-4xl">
+              今天想分析哪支影片？
+            </h2>
+            <div className="rounded-[34px] border border-[var(--border-strong)] bg-white px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.08)] md:rounded-[40px] md:px-6">
+              <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_220px_auto] md:items-center">
+                <div className="hidden h-9 w-9 place-items-center text-[var(--black)] md:grid">
+                  <Plus size={25} strokeWidth={1.8} />
+                </div>
+                <input
+                  className="min-w-0 border-0 bg-transparent px-1 py-2 text-base outline-none placeholder:text-[var(--gray-300)] md:text-xl"
+                  placeholder="貼上 IG Reel 或 TikTok 影片連結"
+                  value={sourceUrl}
+                  onChange={(event) => setSourceUrl(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") start();
+                  }}
+                />
+                <input
+                  className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-4 py-2 text-sm outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
+                  placeholder="專案名稱"
+                  value={projectTitle}
+                  onChange={(event) => setProjectTitle(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") start();
+                  }}
+                />
+                <button
+                  className="grid h-12 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-14 md:w-14"
+                  disabled={!projectTitle.trim() || !sourceUrl.trim() || loading}
+                  onClick={start}
+                  title={loading ? "建立中" : "開始分析"}
+                >
+                  <Wand2 size={21} />
                 </button>
               </div>
-              {error && (
-                <div className="mt-3 rounded-xl border border-[var(--red)] bg-red-50 p-3 text-sm leading-6 text-[var(--red)]" role="alert">
-                  {error}
-                </div>
-              )}
             </div>
+            {error && (
+              <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-[var(--red)] bg-red-50 p-3 text-sm leading-6 text-[var(--red)]" role="alert">
+                {error}
+              </div>
+            )}
           </section>
         </div>
       </div>
