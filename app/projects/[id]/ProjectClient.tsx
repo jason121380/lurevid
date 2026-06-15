@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Download, Loader2, Play, RotateCcw, XCircle } from "lucide-react";
+import { Download, Loader2, Play, RotateCcw, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
 
@@ -297,11 +297,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const previewPanel = (
     <div className="w-full max-w-[360px]">
       <div className="card overflow-hidden">
-        <div className="flex items-center gap-2 p-3 md:p-4">
-          {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
-          {project.status === "FAILED" && <XCircle className="text-[var(--red)]" />}
-          <h2 className="text-lg">{project.finalVideoUrl ? "輸出影片" : "影片預覽"}</h2>
-        </div>
         <div ref={previewRef} className="relative -mx-px grid w-[calc(100%+2px)] aspect-[9/16] place-items-center overflow-hidden bg-[#111] text-sm text-white">
           {project.finalVideoUrl ? (
             <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
@@ -323,17 +318,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             "尚未取得來源影片"
           )}
         </div>
-        {!project.finalVideoUrl && project.sourceUrl && (
-          <a className="btn btn-ghost m-3 w-[calc(100%-1.5rem)] md:m-4 md:w-[calc(100%-2rem)]" href={project.sourceUrl} target="_blank" rel="noreferrer">
-            開啟原始影片
-          </a>
-        )}
-        {project.finalVideoUrl && (
-          <a className="btn btn-primary m-3 w-[calc(100%-1.5rem)] md:m-4 md:w-[calc(100%-2rem)]" href={project.finalVideoUrl} target="_blank" rel="noreferrer">
-            <Download size={16} />
-            下載完成影片
-          </a>
-        )}
       </div>
     </div>
   );
