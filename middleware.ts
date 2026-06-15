@@ -12,5 +12,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/", "/projects/:path*", "/settings/:path*"]
+  matcher: ["/", "/projects/:path*", "/settings/:path*", "/health", "/health/:path*"]
 };

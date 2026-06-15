@@ -2,6 +2,7 @@ import { Queue, type JobsOptions } from "bullmq";
 import IORedis from "ioredis";
 
 export const PROJECT_QUEUE_NAME = "seedance-projects";
+export const WORKER_HEARTBEAT_KEY = "lurevid:worker:heartbeat";
 
 export type ProjectAction = "analyze" | "structure" | "adapt" | "storyboard" | "video";
 
