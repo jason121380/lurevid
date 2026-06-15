@@ -24,6 +24,7 @@ export type Project = {
   sourceVideoUrl?: string;
   sourceFrameUrls?: string[];
   sourceTranscript?: string;
+  visualAnalysis?: string;
   analysis?: string;
   structure?: string;
   adaptedScript?: string;
@@ -67,7 +68,7 @@ function buildProcessSteps(project: Project): Array<{ title: string; description
     step("下載影片", "worker 用 yt-dlp 取得 IG/TikTok 影片", Boolean(project.sourceVideoUrl), project.status === "ANALYZING" && activeMessage.includes("下載")),
     step("轉錄音訊", "把影片聲音轉成逐字稿", Boolean(project.sourceTranscript), project.status === "ANALYZING" && (activeMessage.includes("轉錄") || activeMessage.includes("逐字稿") || activeMessage.includes("音訊"))),
     step("抽取影格", "用 ffmpeg 抽出代表性畫面", Boolean(project.sourceFrameUrls?.length), project.status === "ANALYZING" && activeMessage.includes("抽取")),
-    step("視覺分析", "AI 分析畫面、字幕、構圖與分鏡節奏", project.progress >= 0.19 || doneAfterAnalyze, project.status === "ANALYZING" && (activeMessage.includes("畫面") || activeMessage.includes("影格") || activeMessage.includes("分鏡"))),
+    step("視覺分析", "AI 分析畫面、字幕、構圖與分鏡節奏", Boolean(project.visualAnalysis), project.status === "ANALYZING" && (activeMessage.includes("畫面") || activeMessage.includes("影格") || activeMessage.includes("分鏡") || activeMessage.includes("視覺"))),
     step("影片分析", "合併逐字稿與視覺分析產出洞察", doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("整合")),
     step("結構分析", "拆 hook、鋪陳、賣點與 CTA", ["STRUCTURE_READY", "ADAPTING", "ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STRUCTURING"),
     step("改編腳本", "改寫成全新原創短影音腳本", ["ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "ADAPTING"),
@@ -81,7 +82,7 @@ function stepCanRun(project: Project, stepNumber: number) {
   if (stepNumber === 2) return true;
   if (stepNumber === 3) return Boolean(project.sourceVideoUrl) || Boolean(project.sourceTranscript);
   if (stepNumber === 4) return Boolean(project.sourceTranscript);
-  if (stepNumber === 5) return Boolean(project.sourceFrameUrls?.length) || Boolean(project.analysis);
+  if (stepNumber === 5) return Boolean(project.sourceFrameUrls?.length) || Boolean(project.visualAnalysis);
   if (stepNumber === 6) return project.progress >= 0.19 || Boolean(project.analysis);
   if (stepNumber === 7) return Boolean(project.analysis);
   if (stepNumber === 8) return Boolean(project.structure);
@@ -110,6 +111,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [submitting, setSubmitting] = useState(false);
 
   const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
+  const [visualAnalysis, setVisualAnalysis] = useState(initialProject?.visualAnalysis || "");
   const [structure, setStructure] = useState(initialProject?.structure || "");
   const [script, setScript] = useState(initialProject?.adaptedScript || "");
   const [ratio, setRatio] = useState(initialProject?.ratio || "9:16");
@@ -119,7 +121,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [activeStep, setActiveStep] = useState(1);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const settingsInit = useRef(Boolean(initialProject));
-  const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({
+  const lastServer = useRef<{ visualAnalysis?: string; analysis?: string; structure?: string; adaptedScript?: string }>({
+    visualAnalysis: initialProject?.visualAnalysis,
     analysis: initialProject?.analysis,
     structure: initialProject?.structure,
     adaptedScript: initialProject?.adaptedScript
@@ -128,6 +131,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   useEffect(() => {
     if (!initialProject) return;
     setProject(initialProject);
+    setVisualAnalysis(initialProject.visualAnalysis || "");
     setAnalysis(initialProject.analysis || "");
     setStructure(initialProject.structure || "");
     setScript(initialProject.adaptedScript || "");
@@ -135,6 +139,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     setResolution(initialProject.resolution || "720p");
     setDuration(initialProject.duration || 5);
     lastServer.current = {
+      visualAnalysis: initialProject.visualAnalysis,
       analysis: initialProject.analysis,
       structure: initialProject.structure,
       adaptedScript: initialProject.adaptedScript
@@ -155,10 +160,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         }
         setError("");
         // 只有當伺服器的值改變時才覆寫本地編輯，避免蓋掉使用者正在編輯的內容。
+        if (data.visualAnalysis !== lastServer.current.visualAnalysis) setVisualAnalysis(data.visualAnalysis || "");
         if (data.analysis !== lastServer.current.analysis) setAnalysis(data.analysis || "");
         if (data.structure !== lastServer.current.structure) setStructure(data.structure || "");
         if (data.adaptedScript !== lastServer.current.adaptedScript) setScript(data.adaptedScript || "");
-        lastServer.current = { analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
+        lastServer.current = { visualAnalysis: data.visualAnalysis, analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
         if (!settingsInit.current) {
           if (data.ratio) setRatio(data.ratio);
           if (data.resolution) setResolution(data.resolution);
@@ -420,7 +426,18 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (activeStep === 2) return downloadPanel;
     if (activeStep === 3) return transcriptPanel;
     if (activeStep === 4) return framePanel;
-    if ([5, 6].includes(activeStep)) {
+    if (activeStep === 5) {
+      return project.visualAnalysis ? (
+        <ResultCard
+          index="5"
+          title="視覺分析"
+          value={visualAnalysis}
+        />
+      ) : (
+        <div className="card p-4"><EmptyPanel title="尚未完成視覺分析" description="系統會先抽取影格，再分析畫面、字幕、構圖與分鏡節奏。" /></div>
+      );
+    }
+    if (activeStep === 6) {
       return project.analysis ? (
         <ResultCard
           index="6"

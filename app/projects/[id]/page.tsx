@@ -25,6 +25,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         sourceVideoUrl: project.sourceVideoUrl || undefined,
         sourceFrameUrls: stringArray(project.sourceFrameUrls),
         sourceTranscript: project.sourceTranscript || undefined,
+        visualAnalysis: project.visualAnalysis || undefined,
         analysis: project.analysis || undefined,
         structure: project.structure || undefined,
         adaptedScript: project.adaptedScript || undefined,

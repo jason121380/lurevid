@@ -4,7 +4,7 @@ import { enqueueProjectJob } from "@/lib/queue";
 
 export const runtime = "nodejs";
 
-// 重新分析（含手動貼上逐字稿後重試）。
+// 重新分析影片，會重跑下載、轉錄、視覺分析與整合分析流程。
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const project = await prisma.project.findUnique({ where: { id } });
@@ -18,6 +18,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     where: { id },
     data: {
       ...(retranscribe ? { sourceTranscript: null } : transcript ? { sourceTranscript: transcript } : {}),
+      visualAnalysis: null,
+      analysis: null,
       status: "ANALYZING",
       message: "正在分析",
       progress: 0.05,

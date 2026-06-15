@@ -44,6 +44,7 @@ model Project {
   sourceVideoUrl   String?
   sourceFrameUrls  Json?
   sourceTranscript String?       @db.Text
+  visualAnalysis   String?       @db.Text
   analysis         String?       @db.Text
   structure        String?       @db.Text
   adaptedScript    String?       @db.Text

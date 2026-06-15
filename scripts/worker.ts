@@ -105,6 +105,10 @@ async function runAnalyze(projectId: string) {
           }
         });
         visualAnalysis = await analyzeVideoFrames(frames, transcript, platform);
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { visualAnalysis, message: "視覺分析完成，準備整合逐字稿", progress: 0.18 }
+        });
       } catch (error) {
         visualError = error instanceof Error ? error.message : "未知錯誤";
       }
@@ -131,10 +135,14 @@ async function runAnalyze(projectId: string) {
     where: { id: projectId },
     data: { message: "正在整合逐字稿與畫面分析", progress: 0.19 }
   });
+  const visualContext = visualAnalysis || (visualError ? `視覺分析未完成：${visualError}` : "");
+  if (!visualAnalysis && visualContext) {
+    await prisma.project.update({ where: { id: projectId }, data: { visualAnalysis: visualContext } });
+  }
   const analysis = await analyzeVideo(
     transcript,
     platform,
-    visualAnalysis || (visualError ? `視覺分析未完成：${visualError}` : "")
+    visualContext
   );
   await prisma.project.update({
     where: { id: projectId },
