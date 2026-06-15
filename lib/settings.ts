@@ -5,6 +5,7 @@ type SettingField = {
   label: string;
   secret: boolean;
   defaultValue?: string;
+  placeholder?: string;
   envFallback: boolean;
 };
 
@@ -22,13 +23,37 @@ export const APP_SETTING_FIELDS = [
     defaultValue: "dreamina-seedance-2-0-fast-260128",
     envFallback: true
   },
-  { key: "S3_ENDPOINT", label: "S3 Endpoint", secret: false, envFallback: true },
-  { key: "S3_REGION", label: "S3 Region", secret: false, defaultValue: "auto", envFallback: true },
-  { key: "S3_BUCKET", label: "S3 Bucket", secret: false, envFallback: true },
-  { key: "S3_ACCESS_KEY_ID", label: "S3 Access Key ID", secret: true, envFallback: true },
-  { key: "S3_SECRET_ACCESS_KEY", label: "S3 Secret Access Key", secret: true, envFallback: true },
-  { key: "S3_PUBLIC_URL", label: "S3 Public URL", secret: false, envFallback: true },
-  { key: "S3_FORCE_PATH_STYLE", label: "S3 Force Path Style", secret: false, defaultValue: "false", envFallback: true }
+  {
+    key: "S3_ENDPOINT",
+    label: "S3 Endpoint（R2）",
+    secret: false,
+    placeholder: "https://<account_id>.r2.cloudflarestorage.com",
+    envFallback: true
+  },
+  { key: "S3_REGION", label: "S3 Region（R2 用 auto）", secret: false, defaultValue: "auto", envFallback: true },
+  { key: "S3_BUCKET", label: "S3 Bucket", secret: false, placeholder: "lurevid", envFallback: true },
+  {
+    key: "S3_ACCESS_KEY_ID",
+    label: "S3 Access Key ID（R2 API Token）",
+    secret: true,
+    placeholder: "R2 API Token 的 Access Key ID",
+    envFallback: true
+  },
+  {
+    key: "S3_SECRET_ACCESS_KEY",
+    label: "S3 Secret Access Key（R2 API Token）",
+    secret: true,
+    placeholder: "R2 API Token 的 Secret Access Key",
+    envFallback: true
+  },
+  {
+    key: "S3_PUBLIC_URL",
+    label: "S3 Public URL（R2 公開網址）",
+    secret: false,
+    placeholder: "https://pub-xxxx.r2.dev 或自訂網域",
+    envFallback: true
+  },
+  { key: "S3_FORCE_PATH_STYLE", label: "S3 Force Path Style（R2 用 false）", secret: false, defaultValue: "false", envFallback: true }
 ] as const satisfies readonly SettingField[];
 
 export type AppSettingKey = (typeof APP_SETTING_FIELDS)[number]["key"];
@@ -81,7 +106,8 @@ export function publicSettingFields() {
     key: field.key,
     label: field.label,
     secret: field.secret,
-    defaultValue: defaultValue(field)
+    defaultValue: defaultValue(field),
+    placeholder: (field as { placeholder?: string }).placeholder || ""
   }));
 }
 

@@ -10,7 +10,7 @@ import { rateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 
 const createProjectSchema = z.object({
-  title: z.string().trim().min(1, "請輸入專案名稱").max(80, "專案名稱太長"),
+  title: z.string().trim().max(80, "專案名稱太長").optional(),
   sourceUrl: z.string().url(),
   transcript: z.string().max(MAX_TRANSCRIPT_LENGTH, "逐字稿太長").optional(),
   settings: z
@@ -26,7 +26,7 @@ function toCreateProjectError(error: unknown) {
   if (error instanceof z.ZodError) {
     const first = error.issues[0];
     return {
-      message: first?.path[0] === "title" ? first.message : "請貼上有效的 Instagram Reels 或 TikTok 連結",
+      message: first?.path[0] === "title" ? first.message : "請貼上有效的 Instagram Reels、TikTok 或抖音連結",
       status: 400
     };
   }
@@ -69,13 +69,13 @@ export async function POST(request: Request) {
   try {
     const body = createProjectSchema.parse(await request.json());
     if (!isSupportedSourceUrl(body.sourceUrl)) {
-      return NextResponse.json({ error: "目前僅支援 Instagram Reels 與 TikTok 連結" }, { status: 400 });
+      return NextResponse.json({ error: "目前支援 Instagram Reels、TikTok 與抖音連結" }, { status: 400 });
     }
 
     const project = await prisma.project.create({
       data: {
         userId: user.id,
-        title: body.title,
+        title: body.title || undefined,
         sourceUrl: body.sourceUrl,
         sourcePlatform: detectPlatform(body.sourceUrl),
         sourceTranscript: body.transcript?.trim() || null,

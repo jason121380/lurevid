@@ -13,7 +13,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
 
   async function start() {
-    if (!projectTitle.trim() || !sourceUrl.trim()) return;
+    if (!sourceUrl.trim()) return;
     setError("");
     setLoading(true);
     try {
@@ -21,7 +21,7 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: projectTitle.trim(),
+          title: projectTitle.trim() || undefined,
           sourceUrl: sourceUrl.trim()
         })
       });
@@ -50,31 +50,33 @@ export default function HomePage() {
               <div className="grid min-h-10 gap-2 md:grid-cols-[minmax(0,1fr)_132px_auto] md:items-center">
                 <input
                   className="min-w-0 border-0 bg-transparent px-1 py-1 text-xs outline-none placeholder:text-[var(--gray-300)] md:text-sm"
-                  placeholder="貼上 IG Reel 或 TikTok 影片連結"
+                  placeholder="貼上 IG Reel、TikTok 或抖音影片連結"
                   value={sourceUrl}
                   onChange={(event) => setSourceUrl(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") start();
-                  }}
                 />
                 <input
                   className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-[11px] outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
                   placeholder="命名專案名稱"
                   value={projectTitle}
                   onChange={(event) => setProjectTitle(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") start();
-                  }}
                 />
                 <button
                   className="grid h-8 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-9 md:w-9"
-                  disabled={!projectTitle.trim() || !sourceUrl.trim() || loading}
+                  disabled={!sourceUrl.trim() || loading}
                   onClick={start}
                   title={loading ? "建立中" : "開始分析"}
                 >
                   <Wand2 size={14} />
                 </button>
               </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-[var(--gray-500)]">
+              <span>支援平台</span>
+              {["Instagram", "TikTok", "抖音"].map((name) => (
+                <span key={name} className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[var(--gray-500)]">
+                  {name}
+                </span>
+              ))}
             </div>
             {error && (
               <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-[var(--red)] bg-red-50 p-3 text-sm leading-6 text-[var(--red)]" role="alert">

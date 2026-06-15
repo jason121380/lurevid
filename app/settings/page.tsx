@@ -9,6 +9,7 @@ type SettingField = {
   label: string;
   secret: boolean;
   defaultValue: string;
+  placeholder?: string;
   value: string;
   configured: boolean;
   maskedValue: string;
@@ -42,8 +43,8 @@ const groups: SettingGroup[] = [
     requiredKeys: ["ARK_API_KEY", "SEEDANCE_MODEL"]
   },
   {
-    title: "S3 物件儲存",
-    description: "儲存分鏡圖、影片片段與 final.mp4，並提供前台播放網址。",
+    title: "S3 物件儲存（相容 Cloudflare R2）",
+    description: "儲存分鏡圖、影片片段與 final.mp4，並提供前台播放網址。建議用 Cloudflare R2，bucket 需開公開讀取。",
     keys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL", "S3_FORCE_PATH_STYLE"],
     requiredKeys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL"]
   }
@@ -219,7 +220,7 @@ export default function SettingsPage() {
                                 <div className="flex items-center gap-2">
                                   <input
                                     className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
-                                    placeholder={field.secret && field.configured ? field.maskedValue : field.defaultValue || field.key}
+                                    placeholder={field.secret && field.configured ? field.maskedValue : field.placeholder || field.defaultValue || field.key}
                                     type={inputType}
                                     value={values[key] || ""}
                                     onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))}
