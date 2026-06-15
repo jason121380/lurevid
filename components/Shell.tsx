@@ -31,7 +31,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const [editingId, setEditingId] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
   const [savingId, setSavingId] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] || "";
 
@@ -46,7 +46,8 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
-    setCollapsed(window.localStorage.getItem("lurevid-sidebar-collapsed") === "true");
+    const stored = window.localStorage.getItem("lurevid-sidebar-collapsed");
+    setCollapsed(stored === null ? true : stored === "true");
   }, []);
 
   function toggleSidebar() {
@@ -187,7 +188,7 @@ export function Shell({ children }: { children: ReactNode }) {
               })}
             </div>
           </div>
-          <div className="mt-3 border-t border-[var(--border)] pt-3">
+          <div className="mt-auto border-t border-[var(--border)] pt-3">
             <Link
               className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
               href="/settings"
