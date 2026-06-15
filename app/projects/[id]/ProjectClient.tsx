@@ -407,7 +407,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
           <span className={`badge ${statusClass(project.status)}`}>{project.status}</span>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[300px_minmax(0,1fr)] md:gap-4 md:p-6">
+        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[150px_minmax(0,1fr)] md:gap-4 md:p-6">
           <aside className="h-fit md:sticky md:top-6">
             <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
           </aside>
@@ -513,17 +513,6 @@ function ProcessTimeline({
                   <div className="truncate text-xs font-medium leading-6">{step.title}</div>
                 </div>
               </button>
-              {step.title === "下載影片" && project.sourceUrl && (
-                <a
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[var(--gray-500)] hover:bg-white hover:text-orange"
-                  href={project.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="開啟原始影片"
-                >
-                  <Download size={14} />
-                </a>
-              )}
             </div>
           );
         })}
