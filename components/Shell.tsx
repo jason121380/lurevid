@@ -104,7 +104,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <button className="grid h-10 w-10 place-items-center rounded-xl text-[var(--gray-500)]" onClick={() => setMobileOpen(true)} title="開啟選單">
           <Menu size={19} />
         </button>
-        <div className="min-w-0 truncate px-2 text-sm text-[var(--black)]">lurevid</div>
+        <img className="h-5 w-auto max-w-[118px]" src="/logo.svg" alt="lurevid" />
         <Link className="grid h-10 w-10 place-items-center rounded-xl text-orange" href="/" title="新增專案">
           <Plus size={18} />
         </Link>
@@ -112,7 +112,7 @@ export function Shell({ children }: { children: ReactNode }) {
       {mobileOpen && <button className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={closeMobileMenu} aria-label="關閉選單" />}
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,300px)] flex-col border-r border-[var(--border)] bg-white transition-transform duration-200 md:z-40 md:translate-x-0 md:transition-[width] ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "md:w-16" : "md:w-[var(--sidebar-w)]"}`}>
         <div className={`flex h-[60px] items-center border-b border-[var(--border)] ${collapsed ? "md:justify-center md:px-2" : "justify-between px-5"}`}>
-          {!collapsed && <div className="text-sm text-[var(--black)]">lurevid</div>}
+          {!collapsed && <img className="h-5 w-auto max-w-[132px]" src="/logo.svg" alt="lurevid" />}
           <button className="hidden h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange md:grid" onClick={toggleSidebar} title={collapsed ? "展開選單" : "收合選單"}>
             <Menu size={18} />
           </button>
