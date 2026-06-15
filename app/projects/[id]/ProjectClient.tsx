@@ -351,8 +351,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const previewPanel = (
-    <div className="w-full max-w-[325px] justify-self-center md:justify-self-start">
-      <div className="grid h-[min(720px,calc(100vh-48px))] min-h-[520px] w-full place-items-center overflow-hidden rounded-xl bg-transparent text-sm text-[var(--gray-500)]">
+    <div className="h-full w-full max-w-[325px] justify-self-center md:justify-self-start">
+      <div className="grid h-full min-h-[400px] w-full place-items-center overflow-hidden rounded-xl bg-transparent text-sm text-[var(--gray-500)]">
         <div className="relative h-full w-full overflow-hidden bg-transparent">
           {project.finalVideoUrl ? (
             <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
@@ -538,7 +538,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             {selectedPanel}
           </section>
 
-          <aside className="min-w-0 md:sticky md:top-6 md:h-fit">
+          <aside className="min-w-0">
             {previewPanel}
           </aside>
         </div>
