@@ -42,6 +42,7 @@ model Project {
   sourceUrl        String?
   sourcePlatform   String?
   sourceVideoUrl   String?
+  sourceFrameUrls  Json?
   sourceTranscript String?       @db.Text
   analysis         String?       @db.Text
   structure        String?       @db.Text

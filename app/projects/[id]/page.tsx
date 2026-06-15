@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ProjectClient } from "./ProjectClient";
 
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : undefined;
+}
+
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const project = await prisma.project.findUnique({
@@ -19,6 +23,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         sourceUrl: project.sourceUrl || undefined,
         sourcePlatform: project.sourcePlatform || undefined,
         sourceVideoUrl: project.sourceVideoUrl || undefined,
+        sourceFrameUrls: stringArray(project.sourceFrameUrls),
         sourceTranscript: project.sourceTranscript || undefined,
         analysis: project.analysis || undefined,
         structure: project.structure || undefined,

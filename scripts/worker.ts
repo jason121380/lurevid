@@ -25,6 +25,11 @@ async function fetchToBuffer(url: string) {
   return Buffer.from(await response.arrayBuffer());
 }
 
+function frameDataUrlToBuffer(dataUrl: string) {
+  const [, base64 = ""] = dataUrl.split(",");
+  return Buffer.from(base64, "base64");
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const IMAGE_CONCURRENCY = Number(process.env.IMAGE_CONCURRENCY || 3);
@@ -82,9 +87,22 @@ async function runAnalyze(projectId: string) {
           data: { message: "正在抽取影片畫面影格", progress: 0.15 }
         });
         const frames = await extractVideoFrames(videoPath, dir);
+        const sourceFrameUrls = await Promise.all(
+          frames.map((frame, index) =>
+            uploadObject(
+              `projects/${projectId}/frames/${String(index + 1).padStart(2, "0")}.jpg`,
+              frameDataUrlToBuffer(frame),
+              "image/jpeg"
+            )
+          )
+        );
         await prisma.project.update({
           where: { id: projectId },
-          data: { message: `正在用 AI 分析畫面分鏡（${frames.length} 張影格）`, progress: 0.17 }
+          data: {
+            sourceFrameUrls,
+            message: `正在用 AI 分析畫面分鏡（${frames.length} 張影格）`,
+            progress: 0.17
+          }
         });
         visualAnalysis = await analyzeVideoFrames(frames, transcript, platform);
       } catch (error) {

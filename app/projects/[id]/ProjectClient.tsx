@@ -22,6 +22,7 @@ export type Project = {
   sourceUrl?: string;
   sourcePlatform?: string;
   sourceVideoUrl?: string;
+  sourceFrameUrls?: string[];
   sourceTranscript?: string;
   analysis?: string;
   structure?: string;
@@ -65,7 +66,7 @@ function buildProcessSteps(project: Project): Array<{ title: string; description
     step("建立專案", "儲存來源連結並排入 Redis queue", project.progress >= 0.03, project.status === "QUEUED"),
     step("下載影片", "worker 用 yt-dlp 取得 IG/TikTok 影片", Boolean(project.sourceVideoUrl), project.status === "ANALYZING" && activeMessage.includes("下載")),
     step("轉錄音訊", "把影片聲音轉成逐字稿", Boolean(project.sourceTranscript), project.status === "ANALYZING" && (activeMessage.includes("轉錄") || activeMessage.includes("逐字稿") || activeMessage.includes("音訊"))),
-    step("抽取影格", "用 ffmpeg 抽出代表性畫面", project.progress >= 0.17 || doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("抽取")),
+    step("抽取影格", "用 ffmpeg 抽出代表性畫面", Boolean(project.sourceFrameUrls?.length), project.status === "ANALYZING" && activeMessage.includes("抽取")),
     step("視覺分析", "AI 分析畫面、字幕、構圖與分鏡節奏", project.progress >= 0.19 || doneAfterAnalyze, project.status === "ANALYZING" && (activeMessage.includes("畫面") || activeMessage.includes("影格") || activeMessage.includes("分鏡"))),
     step("影片分析", "合併逐字稿與視覺分析產出洞察", doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("整合")),
     step("結構分析", "拆 hook、鋪陳、賣點與 CTA", ["STRUCTURE_READY", "ADAPTING", "ADAPT_READY", "STORYBOARDING", "STORYBOARD_READY", "GENERATING", "MERGING", "COMPLETED"].includes(project.status), project.status === "STRUCTURING"),
@@ -80,7 +81,7 @@ function stepCanRun(project: Project, stepNumber: number) {
   if (stepNumber === 2) return true;
   if (stepNumber === 3) return Boolean(project.sourceVideoUrl) || Boolean(project.sourceTranscript);
   if (stepNumber === 4) return Boolean(project.sourceTranscript);
-  if (stepNumber === 5) return project.progress >= 0.17 || Boolean(project.analysis);
+  if (stepNumber === 5) return Boolean(project.sourceFrameUrls?.length) || Boolean(project.analysis);
   if (stepNumber === 6) return project.progress >= 0.19 || Boolean(project.analysis);
   if (stepNumber === 7) return Boolean(project.analysis);
   if (stepNumber === 8) return Boolean(project.structure);
@@ -346,6 +347,31 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       )}
     </div>
   );
+  const framePanel = (
+    <div className="card p-3 md:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm">4 · 抽取影格</h2>
+        <span className="text-[11px] text-[var(--gray-500)]">{project.sourceFrameUrls?.length || 0} 張</span>
+      </div>
+      {project.sourceFrameUrls?.length ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {project.sourceFrameUrls.map((url, index) => (
+            <article className="overflow-hidden rounded-xl border border-[var(--border)] bg-white" key={`${url}-${index}`}>
+              <div className="aspect-video bg-[var(--warm-white)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt={`影格 ${index + 1}`} className="h-full w-full object-cover" />
+              </div>
+              <div className="px-3 py-2 text-xs text-[var(--gray-500)]">
+                影格 {String(index + 1).padStart(2, "0")}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyPanel title="尚未抽取影格" description="按工作清單第 4 步的 play，系統會用 ffmpeg 從影片抽出代表性畫面。" />
+      )}
+    </div>
+  );
   const storyboardPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -400,7 +426,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (activeStep === 1) return statusPanel;
     if (activeStep === 2) return downloadPanel;
     if (activeStep === 3) return transcriptPanel;
-    if ([4, 5, 6].includes(activeStep)) {
+    if (activeStep === 4) return framePanel;
+    if ([5, 6].includes(activeStep)) {
       return project.analysis ? (
         <ResultCard
           index="6"
