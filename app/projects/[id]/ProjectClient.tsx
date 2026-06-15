@@ -194,7 +194,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
     if (!project) return;
     setActiveStep(stepNumber);
     if (stepNumber >= 2 && stepNumber <= 6) {
-      post("/analyze");
+      post("/analyze", stepNumber === 3 ? { retranscribe: true } : undefined);
       return;
     }
     if (stepNumber === 7) {
@@ -601,16 +601,20 @@ function TranscriptResult({ value }: { value: string }) {
     .filter(Boolean)
     .map((line) => {
       const match = line.match(/^\[([^\]]+)\]\s*(.+)$/);
-      return match ? { time: match[1], text: match[2] } : { time: "", text: line };
+      return match ? { time: match[1], text: match[2] } : { time: "00:00", text: line };
     });
 
   return (
     <div className="max-h-[560px] overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-2 text-sm md:p-3">
-      <div className="space-y-1">
+      <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 border-b border-[var(--border)] px-2 pb-2 text-xs font-semibold text-[var(--gray-500)] sm:grid-cols-[112px_minmax(0,1fr)]">
+        <div>秒數</div>
+        <div>逐字稿</div>
+      </div>
+      <div className="space-y-1 pt-1">
         {rows.map((row, index) => (
-          <div className="grid gap-2 rounded-lg px-2 py-2 sm:grid-cols-[112px_minmax(0,1fr)]" key={`${row.time}-${index}`}>
+          <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 rounded-lg px-2 py-2 sm:grid-cols-[112px_minmax(0,1fr)]" key={`${row.time}-${index}`}>
             <div className="text-xs leading-6 text-[var(--gray-500)]">
-              {row.time || "全文"}
+              {row.time}
             </div>
             <p className="leading-6 text-[var(--black)]">{row.text}</p>
           </div>

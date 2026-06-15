@@ -12,11 +12,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const body = await request.json().catch(() => ({}));
   const transcript = typeof body.transcript === "string" ? body.transcript.trim() : "";
+  const retranscribe = body.retranscribe === true;
 
   await prisma.project.update({
     where: { id },
     data: {
-      ...(transcript ? { sourceTranscript: transcript } : {}),
+      ...(retranscribe ? { sourceTranscript: null } : transcript ? { sourceTranscript: transcript } : {}),
       status: "ANALYZING",
       message: "正在分析",
       progress: 0.05,
