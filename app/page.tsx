@@ -46,8 +46,8 @@ export default function HomePage() {
             <h2 className="mb-5 text-center text-xl font-normal tracking-normal text-[var(--black)] md:text-2xl">
               今天想分析哪支影片呢 👀
             </h2>
-            <div className="rounded-[18px] border border-[var(--border-strong)] bg-white px-2.5 py-1.5 md:rounded-[22px] md:px-3">
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_132px_auto] md:items-center">
+            <div className="rounded-full border border-[var(--border-strong)] bg-white px-3 py-2">
+              <div className="grid min-h-10 gap-2 md:grid-cols-[minmax(0,1fr)_132px_auto] md:items-center">
                 <input
                   className="min-w-0 border-0 bg-transparent px-1 py-1 text-xs outline-none placeholder:text-[var(--gray-300)] md:text-sm"
                   placeholder="貼上 IG Reel 或 TikTok 影片連結"
@@ -58,7 +58,7 @@ export default function HomePage() {
                   }}
                 />
                 <input
-                  className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-2.5 py-1 text-[11px] outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
+                  className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-[11px] outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
                   placeholder="專案名稱"
                   value={projectTitle}
                   onChange={(event) => setProjectTitle(event.target.value)}
