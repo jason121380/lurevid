@@ -121,9 +121,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [ratio, setRatio] = useState(initialProject?.ratio || "9:16");
   const [resolution, setResolution] = useState(initialProject?.resolution || "720p");
   const [duration, setDuration] = useState(initialProject?.duration || 5);
-  const [previewWidth, setPreviewWidth] = useState(0);
   const [activeStep, setActiveStep] = useState(1);
-  const previewRef = useRef<HTMLDivElement | null>(null);
   const settingsInit = useRef(Boolean(initialProject));
   const lastServer = useRef<{ visualAnalysis?: string; analysis?: string; structure?: string; adaptedScript?: string }>({
     visualAnalysis: initialProject?.visualAnalysis,
@@ -190,19 +188,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     };
   }, [projectId]);
 
-  useEffect(() => {
-    const element = previewRef.current;
-    if (!element) return;
-
-    const observer = new ResizeObserver(([entry]) => {
-      setPreviewWidth(entry.contentRect.width);
-    });
-    observer.observe(element);
-    setPreviewWidth(element.getBoundingClientRect().width);
-
-    return () => observer.disconnect();
-  }, [project?.id]);
-
   async function post(path: string, payload?: Record<string, unknown>) {
     setSubmitting(true);
     setError("");
@@ -253,7 +238,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   if (!project) return <Shell><div className="grid min-h-screen place-items-center"><Loader2 className="animate-spin text-orange" /></div></Shell>;
 
   const busy = BUSY.includes(project.status) || submitting;
-  const previewScale = previewWidth ? previewWidth / 540 : 1;
   const downloadPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -295,21 +279,15 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const previewPanel = (
-    <div className="w-full max-w-[360px]">
-      <div className="card overflow-hidden">
-        <div ref={previewRef} className="relative -mx-px grid w-[calc(100%+2px)] aspect-[9/16] place-items-center overflow-hidden bg-[#111] text-sm text-white">
+    <div className="w-full max-w-[325px] justify-self-center md:justify-self-start">
+      <div className="grid h-[min(720px,calc(100vh-48px))] min-h-[520px] w-full place-items-center overflow-hidden rounded-xl bg-transparent text-sm text-[var(--gray-500)]">
+        <div className="relative h-full w-full overflow-hidden bg-transparent">
           {project.finalVideoUrl ? (
             <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
           ) : project.sourceUrl ? (
             <iframe
-              className="absolute left-0 top-0 border-0 bg-white"
+              className="h-full w-full border-0 bg-transparent"
               src={sourceEmbedUrl(project.sourceUrl)}
-              style={{
-                width: 540,
-                height: 960,
-                transform: `scale(${previewScale})`,
-                transformOrigin: "top left"
-              }}
               title="來源影片預覽"
               loading="lazy"
               allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
