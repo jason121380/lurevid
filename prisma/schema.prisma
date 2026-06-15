@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // 部署 runtime（Debian bookworm / OpenSSL 3.0）需要 debian-openssl-3.0.x engine；
+  // native 供本機開發使用。
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

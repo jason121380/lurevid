@@ -33,8 +33,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {
+    console.error("[register]", error);
     const message = error instanceof Error ? error.message : "";
+    const name = error instanceof Error ? error.name : "";
     const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+    // P2002: email 已存在（理論上前面已擋，保險起見）。
+    if (code === "P2002") {
+      return NextResponse.json({ error: "這個 Email 已經註冊過了" }, { status: 409 });
+    }
     // P2021: 資料表不存在；P1001/P1000: 連不到資料庫。
     if (code === "P2021" || message.includes("does not exist") || message.includes("relation")) {
       return NextResponse.json(
@@ -44,6 +50,13 @@ export async function POST(request: Request) {
     }
     if (code === "P1001" || code === "P1000" || message.includes("Can't reach database server")) {
       return NextResponse.json({ error: "目前連不到資料庫，請稍後再試。" }, { status: 503 });
+    }
+    // Prisma 初始化問題（例如 query engine binary target 不符、或 DATABASE_URL 未設）。
+    if (name === "PrismaClientInitializationError" || message.includes("Query Engine") || message.includes("Environment variable not found")) {
+      return NextResponse.json(
+        { error: "伺服器資料庫設定有問題，請稍後再試或聯絡管理員。" },
+        { status: 503 }
+      );
     }
     return NextResponse.json({ error: "註冊失敗，請稍後再試。" }, { status: 500 });
   }
