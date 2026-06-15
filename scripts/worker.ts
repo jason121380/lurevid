@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { Worker } from "bullmq";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/async";
-import { PROJECT_QUEUE_NAME, createRedisConnection } from "@/lib/queue";
+import { PROJECT_QUEUE_NAME, WORKER_HEARTBEAT_KEY, createRedisConnection } from "@/lib/queue";
 import { readFile } from "node:fs/promises";
 import {
   adaptScript,
@@ -434,5 +434,17 @@ const worker = new Worker(
 
 worker.on("completed", (job) => console.log(`completed ${job.id}`));
 worker.on("failed", (job, error) => console.error(`failed ${job?.id}`, error));
+
+// 心跳：定期寫入 Redis，讓 /health 能判斷 worker 是否還活著。
+const heartbeatRedis = createRedisConnection();
+async function sendHeartbeat() {
+  try {
+    await heartbeatRedis.set(WORKER_HEARTBEAT_KEY, Date.now().toString(), "EX", 60);
+  } catch (error) {
+    console.error("heartbeat failed", error);
+  }
+}
+sendHeartbeat();
+setInterval(sendHeartbeat, 15000);
 
 console.log("Seedance worker started");

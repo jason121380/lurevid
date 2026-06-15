@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LogOut, Menu, Pencil, Plus, Settings, X } from "lucide-react";
+import { Activity, Check, LogOut, Menu, Pencil, Plus, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -193,15 +193,26 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
           <div className="mt-auto space-y-1 border-t border-[var(--border)] pt-3">
             {isAdmin && (
-              <Link
-                className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
-                href="/settings"
-                onClick={closeMobileMenu}
-                title="設定"
-              >
-                <Settings size={17} />
-                <span className={collapsed ? "md:hidden" : ""}>設定</span>
-              </Link>
+              <>
+                <Link
+                  className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/health" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+                  href="/health"
+                  onClick={closeMobileMenu}
+                  title="系統健康檢查"
+                >
+                  <Activity size={17} />
+                  <span className={collapsed ? "md:hidden" : ""}>健康檢查</span>
+                </Link>
+                <Link
+                  className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+                  href="/settings"
+                  onClick={closeMobileMenu}
+                  title="設定"
+                >
+                  <Settings size={17} />
+                  <span className={collapsed ? "md:hidden" : ""}>設定</span>
+                </Link>
+              </>
             )}
             {session?.user && (
               <>
