@@ -163,7 +163,7 @@ export async function expandSeedancePrompts(
       {
         role: "system",
         content:
-          "你是 AI 影像與 Seedance 2.0 prompt engineer。把每個分鏡改寫成英文 image prompt 與英文影片生成 prompt，必須連續一致、可商業使用、無字幕、無畫面文字。輸出只能是 JSON。"
+          "你是 AI 影像與 Seedance 2.0 prompt engineer。把每個分鏡改寫成英文 image prompt 與英文影片生成 prompt，必須連續一致、可商業使用、無字幕、無畫面文字。所有出現的人物一律為東亞／台灣人外貌（East Asian, Taiwanese），每個 prompt 都要明確寫出。輸出只能是 JSON。"
       },
       {
         role: "user",
@@ -172,6 +172,7 @@ export async function expandSeedancePrompts(
           rules: [
             "正好 9 個 scenes",
             "保留 sceneNumber/title/visualGoal，且 title 與 visualGoal 維持繁體中文不變",
+            "所有人物外貌一律為東亞／台灣人，imagePrompt 與 seedancePrompt 都要明確包含 'East Asian Taiwanese'",
             "imagePrompt 用英文，產生單張分鏡圖，包含構圖、主體、場景、光線、風格、連續性",
             "seedancePrompt 用英文，基於該分鏡圖延展成影片，包含動作、鏡頭運動、光線、節奏、避免文字"
           ],
@@ -224,9 +225,11 @@ export async function generateStoryboardImage(prompt: string, ratio: string) {
   const openai = await client(openaiImageTimeoutMs(), 2);
   const model = (await getAppSettings()).OPENAI_IMAGE_MODEL || "gpt-image-2";
   const size = ratio === "9:16" ? "1024x1536" : ratio === "1:1" ? "1024x1024" : "1536x1024";
+  // 統一：所有人物為東亞／台灣人外貌。
+  const finalPrompt = /east asian|taiwanese/i.test(prompt) ? prompt : `${prompt}\n\nAll people are East Asian (Taiwanese).`;
   const response = await openai.images.generate({
     model,
-    prompt,
+    prompt: finalPrompt,
     size,
     n: 1
   } as any);
