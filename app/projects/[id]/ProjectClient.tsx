@@ -3,6 +3,7 @@
 import { Download, Loader2, Play, RotateCcw, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
+import { useToast } from "@/components/Toast";
 
 export type Scene = {
   id: string;
@@ -120,10 +121,10 @@ function sourceEmbedUrl(url?: string) {
 }
 
 export function ProjectClient({ projectId, initialProject }: { projectId: string; initialProject?: Project }) {
+  const toast = useToast();
   const [project, setProject] = useState<Project | null>(initialProject || null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [titleSaved, setTitleSaved] = useState(false);
 
   const [projectTitle, setProjectTitle] = useState(initialProject?.title || "");
   const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
@@ -213,7 +214,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     };
   }, [projectId]);
 
-  async function post(path: string, payload?: Record<string, unknown>) {
+  async function post(path: string, payload?: Record<string, unknown>, successMessage = "已送出") {
     setSubmitting(true);
     setError("");
     try {
@@ -225,11 +226,14 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "操作失敗");
+        toast(data.error || "操作失敗", "error");
         return;
       }
       setProject(data);
+      toast(successMessage);
     } catch {
       setError("API 沒有回應");
+      toast("API 沒有回應", "error");
     } finally {
       setSubmitting(false);
     }
@@ -241,7 +245,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (!title || title === project.title) return;
     setSubmitting(true);
     setError("");
-    setTitleSaved(false);
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
@@ -251,13 +254,15 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "儲存名稱失敗");
+        toast(data.error || "儲存名稱失敗", "error");
         return;
       }
       setProject(data);
       setProjectTitle(data.title || "");
-      setTitleSaved(true);
+      toast("已儲存專案名稱");
     } catch {
       setError("API 沒有回應");
+      toast("API 沒有回應", "error");
     } finally {
       setSubmitting(false);
     }
@@ -267,23 +272,23 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (!project) return;
     setActiveStep(stepNumber);
     if (stepNumber >= 1 && stepNumber <= 5) {
-      post("/analyze", stepNumber === 2 ? { retranscribe: true } : undefined);
+      post("/analyze", stepNumber === 2 ? { retranscribe: true } : undefined, stepNumber === 2 ? "已開始重新轉錄" : "已開始重新分析");
       return;
     }
     if (stepNumber === 6) {
-      post("/structure", { analysis: project.analysis || analysis });
+      post("/structure", { analysis: project.analysis || analysis }, "已開始結構分析");
       return;
     }
     if (stepNumber === 7) {
-      post("/adapt", { structure });
+      post("/adapt", { structure }, "已開始改編腳本");
       return;
     }
     if (stepNumber === 8) {
-      post("/storyboard", { adaptedScript: script });
+      post("/storyboard", { adaptedScript: script }, "已開始產生分鏡");
       return;
     }
     if (stepNumber === 9) {
-      post("/video", { ratio, resolution, duration });
+      post("/video", { ratio, resolution, duration }, "已開始生成影片");
     }
   }
 
@@ -308,10 +313,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <input
           className="min-w-0 flex-1 rounded-full border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
           value={projectTitle}
-          onChange={(event) => {
-            setProjectTitle(event.target.value);
-            setTitleSaved(false);
-          }}
+          onChange={(event) => setProjectTitle(event.target.value)}
           onBlur={saveProjectTitle}
           onKeyDown={(event) => {
             if (event.key === "Enter") saveProjectTitle();
@@ -322,8 +324,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           儲存
         </button>
       </div>
-      {titleSaved && <p className="mt-2 text-xs text-[var(--green)]">已儲存名稱</p>}
-      {error && <p className="mt-2 text-xs text-[var(--red)]">{error}</p>}
     </div>
   );
   const sourcePanel = (
@@ -394,7 +394,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {project.sourceFrameUrls.map((url, index) => (
             <article className="overflow-hidden rounded-xl border border-[var(--border)] bg-white" key={`${url}-${index}`}>
-              <div className="aspect-video bg-[var(--warm-white)]">
+              <div className="aspect-[9/16] bg-[var(--warm-white)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={`影格 ${index + 1}`} className="h-full w-full object-cover" />
               </div>
@@ -418,7 +418,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             <button
               className="btn btn-ghost h-8 px-3 text-xs"
               disabled={busy || submitting}
-              onClick={() => post("/storyboard", { adaptedScript: script })}
+              onClick={() => post("/storyboard", { adaptedScript: script }, "已開始產生分鏡")}
               type="button"
               title="重新產生全部 9 張分鏡圖"
             >
