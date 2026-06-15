@@ -15,15 +15,17 @@ RUN npm run build
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-# 可釘版本以利重現建置；預設 latest（IG/TikTok 變動頻繁時較不易壞）。
-ARG YTDLP_VERSION=latest
+# yt-dlp 頻道：nightly（預設，最能跟上 IG/TikTok 改版）、stable，或指定版本 tag。
+ARG YTDLP_CHANNEL=nightly
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl \
   && rm -rf /var/lib/apt/lists/* \
-  && if [ "$YTDLP_VERSION" = "latest" ]; then \
+  && if [ "$YTDLP_CHANNEL" = "nightly" ]; then \
+       YTDLP_URL="https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux"; \
+     elif [ "$YTDLP_CHANNEL" = "stable" ]; then \
        YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"; \
      else \
-       YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_linux"; \
+       YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_CHANNEL}/yt-dlp_linux"; \
      fi \
   && curl -fSL --retry 3 --max-time 120 "$YTDLP_URL" -o /usr/local/bin/yt-dlp \
   && chmod a+rx /usr/local/bin/yt-dlp \
