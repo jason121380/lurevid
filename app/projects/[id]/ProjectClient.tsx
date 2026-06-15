@@ -490,7 +490,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               </div>
               <h3 className="text-sm">{scene.title}</h3>
               <div className="mt-3 grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
-                {scene.imageUrl ? (
+                {scene.videoUrl ? (
+                  <video src={scene.videoUrl} className="h-full w-full object-cover" muted loop autoPlay playsInline />
+                ) : scene.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={scene.imageUrl} alt={scene.title} className="h-full w-full object-cover" />
                 ) : (
