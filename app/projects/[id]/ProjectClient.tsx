@@ -413,11 +413,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     }
     if (activeStep === 7) {
       return project.structure ? (
-        <StepCard
+        <ResultCard
           index="7"
           title="結構分析"
           value={structure}
-          onChange={setStructure}
         />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未結構分析" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
