@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, Loader2, Play, RotateCcw, XCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
 
 export type Scene = {
@@ -98,14 +98,25 @@ function statusClass(status: string) {
 
 function sourceEmbedUrl(url?: string) {
   if (!url) return "";
-  if (/instagram\.com\/(?:reels?|p)\//i.test(url)) {
-    return `${url.split("?")[0].replace(/\/+$/, "").replace(/\/reels\//i, "/reel/")}/embed`;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return "";
   }
-  const tiktokVideoId = url.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/i)?.[1];
-  if (tiktokVideoId) {
-    return `https://www.tiktok.com/embed/v2/${tiktokVideoId}`;
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+  const host = parsed.hostname.toLowerCase();
+
+  if (host === "instagram.com" || host.endsWith(".instagram.com")) {
+    if (!/\/(?:reels?|p)\//i.test(parsed.pathname)) return "";
+    const path = parsed.pathname.replace(/\/+$/, "").replace(/\/reels\//i, "/reel/");
+    return `https://www.instagram.com${path}/embed`;
   }
-  return url;
+  if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
+    const tiktokVideoId = parsed.pathname.match(/\/@[^/]+\/video\/(\d+)/i)?.[1];
+    return tiktokVideoId ? `https://www.tiktok.com/embed/v2/${tiktokVideoId}` : "";
+  }
+  return "";
 }
 
 export function ProjectClient({ projectId, initialProject }: { projectId: string; initialProject?: Project }) {
@@ -152,6 +163,15 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
 
   useEffect(() => {
     let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const schedule = () => {
+      if (stopped) return;
+      // 分頁在背景時拉長間隔，減少不必要的請求。
+      const delay = typeof document !== "undefined" && document.hidden ? 20000 : 5000;
+      timer = setTimeout(load, delay);
+    };
+
     async function load() {
       try {
         const res = await fetch(`/api/projects/${projectId}`);
@@ -159,6 +179,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         if (stopped) return;
         if (!res.ok) {
           setError(data.error || "讀取失敗");
+          schedule();
           return;
         }
         setError("");
@@ -176,16 +197,18 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         }
 
         setProject(data);
-        if (!["COMPLETED", "FAILED"].includes(data.status)) setTimeout(load, 5000);
+        // 終態（完成/失敗）就停止輪詢；其餘狀態繼續輪詢。
+        if (!["COMPLETED", "FAILED"].includes(data.status)) schedule();
       } catch {
         if (stopped) return;
         setError("暫時讀不到專案資料，稍後會自動重試。");
-        setTimeout(load, 5000);
+        schedule();
       }
     }
     load();
     return () => {
       stopped = true;
+      if (timer) clearTimeout(timer);
     };
   }, [projectId]);
 
@@ -601,7 +624,7 @@ function renderInlineMarkdown(text: string) {
 }
 
 function MarkdownResult({ value }: { value: string }) {
-  const lines = value.split(/\r?\n/);
+  const lines = useMemo(() => value.split(/\r?\n/), [value]);
 
   return (
     <div className="max-h-[60vh] overflow-y-auto px-1 py-1 text-sm leading-7 md:max-h-[560px]">

@@ -43,18 +43,33 @@ function defaultValue(field: SettingField) {
   return field.defaultValue || "";
 }
 
+// 短 TTL 進程內快取：getAppSettings 在 worker 的上傳/多 scene 路徑會被重複呼叫。
+const SETTINGS_CACHE_TTL_MS = Number(process.env.SETTINGS_CACHE_TTL_MS || 5000);
+let settingsCache: { value: Record<AppSettingKey, string>; expiresAt: number } | null = null;
+
+export function invalidateAppSettingsCache() {
+  settingsCache = null;
+}
+
 export async function getAppSettings() {
+  if (settingsCache && settingsCache.expiresAt > Date.now()) {
+    return settingsCache.value;
+  }
+
   const rows = await prisma.appSetting.findMany();
   const fromDb = new Map(rows.map((row) => [row.key, row.value]));
 
-  return Object.fromEntries(
+  const value = Object.fromEntries(
     APP_SETTING_FIELDS.map((field) => {
       const dbValue = fromDb.get(field.key);
       const envValue = field.envFallback ? process.env[field.key] : undefined;
-      const value = dbValue || (!isPlaceholder(envValue) ? envValue : undefined) || defaultValue(field);
-      return [field.key, value];
+      const resolved = dbValue || (!isPlaceholder(envValue) ? envValue : undefined) || defaultValue(field);
+      return [field.key, resolved];
     })
   ) as Record<AppSettingKey, string>;
+
+  settingsCache = { value, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
+  return value;
 }
 
 export async function getAppSetting(key: AppSettingKey) {
@@ -84,4 +99,6 @@ export async function saveAppSettings(values: Partial<Record<AppSettingKey, stri
       });
     })
   );
+
+  invalidateAppSettingsCache();
 }

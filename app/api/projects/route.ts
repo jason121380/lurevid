@@ -3,13 +3,16 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { enqueueProjectJob } from "@/lib/queue";
 import { detectPlatform, isSupportedSourceUrl } from "@/lib/transcribe";
+import { currentUser } from "@/lib/authz";
+import { MAX_TRANSCRIPT_LENGTH } from "@/lib/limits";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 const createProjectSchema = z.object({
   title: z.string().trim().min(1, "請輸入專案名稱").max(80, "專案名稱太長"),
   sourceUrl: z.string().url(),
-  transcript: z.string().optional(),
+  transcript: z.string().max(MAX_TRANSCRIPT_LENGTH, "逐字稿太長").optional(),
   settings: z
     .object({
       ratio: z.string().default("9:16"),
@@ -55,6 +58,14 @@ function toCreateProjectError(error: unknown) {
 }
 
 export async function POST(request: Request) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
+  const limited = await rateLimit(`create:${user.id}`, 20, 3600);
+  if (!limited.ok) {
+    return NextResponse.json({ error: "建立專案太頻繁，請稍後再試" }, { status: 429 });
+  }
+
   try {
     const body = createProjectSchema.parse(await request.json());
     if (!isSupportedSourceUrl(body.sourceUrl)) {
@@ -63,6 +74,7 @@ export async function POST(request: Request) {
 
     const project = await prisma.project.create({
       data: {
+        userId: user.id,
         title: body.title,
         sourceUrl: body.sourceUrl,
         sourcePlatform: detectPlatform(body.sourceUrl),
@@ -87,9 +99,13 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+
   const projects = await prisma.project.findMany({
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: 50,
     select: {
       id: true,
       title: true,

@@ -6,14 +6,36 @@ import { join } from "node:path";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 
+const ALLOWED_HOSTS = ["tiktok.com", "instagram.com"];
+
+function parseAllowedUrl(url: string): URL | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  const host = parsed.hostname.toLowerCase();
+  const allowed = ALLOWED_HOSTS.some((base) => host === base || host.endsWith(`.${base}`));
+  return allowed ? parsed : null;
+}
+
 export function detectPlatform(url: string) {
-  if (/tiktok\.com/i.test(url)) return "TikTok";
-  if (/instagram\.com/i.test(url)) return "Instagram";
+  const parsed = parseAllowedUrl(url);
+  if (!parsed) return "Unknown";
+  const host = parsed.hostname.toLowerCase();
+  if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return "TikTok";
+  if (host === "instagram.com" || host.endsWith(".instagram.com")) return "Instagram";
   return "Unknown";
 }
 
+/**
+ * 只接受 http(s) 的 TikTok / Instagram 連結。
+ * 用 URL 解析（而非寬鬆 regex）以擋掉內網 SSRF 與 yt-dlp 參數注入（例如 `-` 開頭）。
+ */
 export function isSupportedSourceUrl(url: string) {
-  return /^https?:\/\/.+/i.test(url) && detectPlatform(url) !== "Unknown";
+  return parseAllowedUrl(url) !== null && detectPlatform(url) !== "Unknown";
 }
 
 function run(command: string, args: string[]) {
@@ -69,6 +91,7 @@ export async function fetchTranscript(url: string): Promise<string> {
       "--no-warnings",
       "-o",
       join(dir, "source.%(ext)s"),
+      "--",
       url
     ]);
 
@@ -84,20 +107,33 @@ export async function fetchTranscript(url: string): Promise<string> {
 
 export async function transcribeMediaFile(path: string): Promise<string> {
   const settings = await getAppSettings();
+  // gpt-realtime-whisper 是 Realtime 串流模型，不能丟到檔案轉錄 endpoint，改用 gpt-4o-transcribe。
   const configuredModel =
     settings.OPENAI_TRANSCRIBE_MODEL === "gpt-realtime-whisper"
       ? "gpt-4o-transcribe"
-      : settings.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe";
-  const timestampModel = configuredModel === "whisper-1" ? configuredModel : "whisper-1";
+      : settings.OPENAI_TRANSCRIBE_MODEL || "whisper-1";
 
-  const result = await (await openaiClient()).audio.transcriptions.create({
+  const openai = await openaiClient();
+
+  // 只有 whisper-1 支援 verbose_json 的 segment 時間戳；逐字稿 UI 會用時間戳分行。
+  if (configuredModel === "whisper-1") {
+    const result = await openai.audio.transcriptions.create({
+      file: createReadStream(path) as any,
+      model: "whisper-1",
+      response_format: "verbose_json",
+      timestamp_granularities: ["segment"]
+    } as any);
+    const text = formatTimestampedTranscript(result as any);
+    if (!text) throw new Error("轉錄結果為空");
+    return text;
+  }
+
+  // 其他模型（如 gpt-4o-transcribe）：取純文字逐字稿，無時間戳。
+  const result = await openai.audio.transcriptions.create({
     file: createReadStream(path) as any,
-    model: timestampModel,
-    response_format: "verbose_json",
-    timestamp_granularities: ["segment"]
+    model: configuredModel
   } as any);
-
-  const text = formatTimestampedTranscript(result as any);
+  const text = (result as { text?: string }).text?.trim() || "";
   if (!text) throw new Error("轉錄結果為空");
   return text;
 }

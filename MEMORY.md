@@ -2,16 +2,24 @@
 
 ## Current Goal
 
-lurevid is a short-video analysis and adaptation app. Users paste an Instagram Reels or TikTok URL. The system should analyze not only transcript text, but also video frames, captions/on-screen text, shot composition, editing rhythm, and visual storytelling.
+lurevid is a public multi-user short-video analysis and adaptation app. Users register/login, paste an Instagram Reels or TikTok URL, and the system analyzes not only transcript text, but also video frames, captions/on-screen text, shot composition, editing rhythm, and visual storytelling.
 
 ## Runtime Setup
 
 - Web runs on Next.js App Router.
 - Worker runs with BullMQ.
 - PostgreSQL and Redis are expected to be cloud services, currently configured through environment variables.
-- `DATABASE_URL` and `REDIS_URL` must stay in `.env` / deployment environment because the app needs them before it can read user settings from the database.
-- User-managed API settings live in PostgreSQL table `AppSetting` and are edited at `/settings`.
-- Web and worker both read OpenAI / Seedance / S3 settings from `AppSetting`, falling back to environment variables only when useful.
+- `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, and `ADMIN_EMAILS` must stay in `.env` / deployment environment: the app needs them to authenticate users before it can read settings from the database.
+- Admin-managed API settings live in PostgreSQL table `AppSetting` and are edited at `/settings` (admin-only).
+- Web and worker both read OpenAI / Seedance / S3 settings from `AppSetting`, falling back to environment variables only when useful. Settings are cached in-process with a short TTL.
+
+## Authentication & Ownership
+
+- NextAuth (Credentials provider, JWT session). Register at `/register`, login at `/login`.
+- `User` model in Prisma; `Project.userId` ties each project to its creator.
+- All project APIs check ownership; `/settings` + `/api/settings` are admin-only (`ADMIN_EMAILS`).
+- `middleware.ts` (edge, imports only `lib/auth.config.ts`) guards page routes. API routes self-check via `lib/authz.ts`.
+- bcrypt + Prisma only live in `lib/auth.ts` (node), never imported into middleware/edge.
 
 ## User Settings
 
@@ -44,7 +52,7 @@ Secret fields are not returned in full by `/api/settings`; the API returns confi
 - File transcription model: `gpt-4o-transcribe`
 - Seedance model: `dreamina-seedance-2-0-fast-260128`
 
-Note: `gpt-realtime-whisper` is a realtime transcription model. The current app transcribes downloaded video/audio files through the file transcription endpoint, so `gpt-4o-transcribe` is the compatible default. If a user enters `gpt-realtime-whisper`, `lib/transcribe.ts` maps it to `gpt-4o-transcribe` for file uploads.
+Note: `whisper-1` yields segment-timestamped transcripts; `gpt-4o-transcribe` (default) yields plain-text transcripts. `gpt-realtime-whisper` is a realtime model that 404s on the file endpoint, so `lib/transcribe.ts` maps it to `gpt-4o-transcribe`.
 
 ## Analysis Pipeline
 
