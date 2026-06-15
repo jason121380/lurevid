@@ -19,6 +19,8 @@ type ProjectListItem = {
 function projectDisplayTitle(project: Pick<ProjectListItem, "title">) {
   const title = project.title?.trim();
   if (!title || title === "AI 分析中") return "未命名專案";
+  const legacyGeneratedTitlePrefixes = ["服務業反轉爽劇", "孩子偏心爸爸的花", "髮型與整體造型是"];
+  if (legacyGeneratedTitlePrefixes.some((prefix) => title.startsWith(prefix))) return "未命名專案";
   return title;
 }
 
