@@ -551,7 +551,7 @@ function ProcessTimeline({
   return (
     <div className="rounded-xl bg-white p-2 md:p-3">
       <div className="mb-2 flex items-center justify-between gap-3 px-1">
-        <h2 className="text-sm">工作清單</h2>
+        <h2 className="text-sm">功能選單</h2>
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
         {steps.map((step, index) => {
@@ -560,16 +560,22 @@ function ProcessTimeline({
           const isDone = step.state === "done";
           const isActive = step.state === "active";
           const isFailed = step.state === "failed";
+          const sectionLabel = stepNumber === 1 ? "分析" : stepNumber === 7 ? "再行銷" : null;
 
           return (
-            <div
-              className={`flex min-w-[150px] items-center gap-1 rounded-lg px-2 py-1.5 transition md:min-w-0 ${
-                activeStep === stepNumber
-                  ? "bg-orange-bg text-orange"
-                  : "text-[var(--black)] hover:bg-[var(--warm-white)]"
-              }`}
-              key={step.title}
-            >
+            <div className="contents" key={step.title}>
+              {sectionLabel && (
+                <div className={`px-2 pt-2 text-[11px] uppercase tracking-wide text-[var(--gray-500)] ${stepNumber === 7 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
+                  {sectionLabel}
+                </div>
+              )}
+              <div
+                className={`flex min-w-[150px] items-center gap-1 rounded-lg px-2 py-1.5 transition md:min-w-0 ${
+                  activeStep === stepNumber
+                    ? "bg-orange-bg text-orange"
+                    : "text-[var(--black)] hover:bg-[var(--warm-white)]"
+                }`}
+              >
               <button
                 className={`group/runner grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] transition ${stepStateClass(step.state)} ${canRun ? "cursor-pointer hover:border-orange hover:bg-orange hover:text-white" : "cursor-default"}`}
                 disabled={!canRun}
@@ -600,6 +606,7 @@ function ProcessTimeline({
                   <div className="truncate text-xs font-medium leading-6">{step.title}</div>
                 </div>
               </button>
+              </div>
             </div>
           );
         })}
