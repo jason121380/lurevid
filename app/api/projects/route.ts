@@ -37,6 +37,13 @@ function toCreateProjectError(error: unknown) {
     };
   }
 
+  if (message.includes("Timed out fetching a new connection") || message.includes("connection pool")) {
+    return {
+      message: "資料庫連線池暫時滿了，請稍等幾秒再試；若持續發生，請重啟本機 dev server 或 worker。",
+      status: 503
+    };
+  }
+
   if (code === "ECONNREFUSED" || message.includes("ECONNREFUSED") || message.includes("Redis")) {
     return {
       message: "Redis 尚未連線，請先設定 REDIS_URL 並啟動 worker queue 後再開始分析。",
