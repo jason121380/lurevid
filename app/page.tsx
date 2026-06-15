@@ -59,7 +59,7 @@ export default function HomePage() {
                 />
                 <input
                   className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-[11px] outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
-                  placeholder="專案名稱"
+                  placeholder="命名專案名稱"
                   value={projectTitle}
                   onChange={(event) => setProjectTitle(event.target.value)}
                   onKeyDown={(event) => {
