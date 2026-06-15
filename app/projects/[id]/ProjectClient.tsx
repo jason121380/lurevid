@@ -266,9 +266,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         {busy && <Loader2 size={14} className="animate-spin text-orange" />}
         {project.message}
       </p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--border)]">
-        <div className="h-full rounded-full bg-orange transition-all" style={{ width: `${Math.round(project.progress * 100)}%` }} />
-      </div>
       {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-sm text-[var(--red)]">{project.error}</p>}
     </div>
   );
