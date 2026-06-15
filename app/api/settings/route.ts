@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { APP_SETTING_FIELDS, getAppSettings, publicSettingFields, saveAppSettings } from "@/lib/settings";
+import { requireAdmin, isResponse } from "@/lib/authz";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,9 @@ function maskSecret(value: string) {
 }
 
 export async function GET() {
+  const admin = await requireAdmin();
+  if (isResponse(admin)) return admin;
+
   const values = await getAppSettings();
   const fields = publicSettingFields().map((field) => {
     const value = values[field.key] || "";
@@ -30,6 +34,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const admin = await requireAdmin();
+  if (isResponse(admin)) return admin;
+
   const body = settingsSchema.parse(await request.json());
   const secretKeys = new Set(APP_SETTING_FIELDS.filter((field) => field.secret).map((field) => field.key));
 

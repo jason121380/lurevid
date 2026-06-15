@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { currentUser } from "@/lib/authz";
 import { ProjectClient } from "./ProjectClient";
 
 function stringArray(value: unknown) {
@@ -8,12 +9,15 @@ function stringArray(value: unknown) {
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const user = await currentUser();
+  if (!user) redirect(`/login?callbackUrl=/projects/${id}`);
+
   const project = await prisma.project.findUnique({
     where: { id },
     include: { scenes: { orderBy: { sceneNumber: "asc" } } }
   });
 
-  if (!project) notFound();
+  if (!project || project.userId !== user.id) notFound();
 
   return (
     <ProjectClient

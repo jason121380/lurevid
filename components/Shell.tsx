@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Menu, Pencil, Plus, Settings, X } from "lucide-react";
+import { Check, LogOut, Menu, Pencil, Plus, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
@@ -27,6 +28,8 @@ function projectDisplayTitle(project: Pick<ProjectListItem, "title">) {
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = Boolean(session?.user?.isAdmin);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [editingId, setEditingId] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
@@ -188,16 +191,36 @@ export function Shell({ children }: { children: ReactNode }) {
               })}
             </div>
           </div>
-          <div className="mt-auto border-t border-[var(--border)] pt-3">
-            <Link
-              className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
-              href="/settings"
-              onClick={closeMobileMenu}
-              title="設定"
-            >
-              <Settings size={17} />
-              <span className={collapsed ? "md:hidden" : ""}>設定</span>
-            </Link>
+          <div className="mt-auto space-y-1 border-t border-[var(--border)] pt-3">
+            {isAdmin && (
+              <Link
+                className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+                href="/settings"
+                onClick={closeMobileMenu}
+                title="設定"
+              >
+                <Settings size={17} />
+                <span className={collapsed ? "md:hidden" : ""}>設定</span>
+              </Link>
+            )}
+            {session?.user && (
+              <>
+                {!collapsed && (
+                  <div className="truncate px-3 py-1 text-[11px] text-[var(--gray-400)]" title={session.user.email || ""}>
+                    {session.user.email}
+                  </div>
+                )}
+                <button
+                  className={`flex w-full items-center rounded-xl py-3 text-sm text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"}`}
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  title="登出"
+                  type="button"
+                >
+                  <LogOut size={17} />
+                  <span className={collapsed ? "md:hidden" : ""}>登出</span>
+                </button>
+              </>
+            )}
           </div>
         </nav>
       </aside>
