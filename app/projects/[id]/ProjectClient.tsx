@@ -269,21 +269,23 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       )}
     </div>
   );
+  const sourcePanel = (
+    <div className="rounded-xl bg-white p-3 text-sm md:p-4">
+      <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
+      {project.sourceUrl && (
+        <a className="mt-1 block break-all text-xs text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
+          {project.sourceUrl}
+        </a>
+      )}
+      <p className="mt-2 flex items-center gap-2 text-xs text-[var(--gray-500)]">
+        {busy && <Loader2 size={13} className="animate-spin text-orange" />}
+        {project.message}
+      </p>
+      {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
+    </div>
+  );
   const previewPanel = (
     <div className="w-full max-w-[360px]">
-      <div className="mb-3 rounded-xl bg-white p-3 text-sm">
-        <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
-        {project.sourceUrl && (
-          <a className="mt-1 block break-all text-xs text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
-            {project.sourceUrl}
-          </a>
-        )}
-        <p className="mt-2 flex items-center gap-2 text-xs text-[var(--gray-500)]">
-          {busy && <Loader2 size={13} className="animate-spin text-orange" />}
-          {project.message}
-        </p>
-        {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
-      </div>
       <div className="card overflow-hidden">
         <div className="flex items-center gap-2 p-3 md:p-4">
           {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
@@ -414,7 +416,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const selectedPanel = (() => {
-    if (activeStep === 1) return previewPanel;
+    if (activeStep === 1) return sourcePanel;
     if (activeStep === 2) return downloadPanel;
     if (activeStep === 3) return transcriptPanel;
     if (activeStep === 4) return framePanel;
@@ -453,13 +455,13 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       );
     }
     if (activeStep === 9) return storyboardPanel;
-    return previewPanel;
+    return sourcePanel;
   })();
 
   return (
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[150px_minmax(0,1fr)] md:gap-4 md:p-6">
+        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[150px_minmax(0,1fr)_360px] md:gap-4 md:p-6">
           <aside className="h-fit md:sticky md:top-6">
             <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
           </aside>
@@ -467,6 +469,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           <section className="min-w-0">
             {selectedPanel}
           </section>
+
+          <aside className="min-w-0 md:sticky md:top-6 md:h-fit">
+            {previewPanel}
+          </aside>
         </div>
       </div>
     </Shell>
