@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Uploadable } from "openai";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 
@@ -83,6 +84,7 @@ function formatTimestampedTranscript(result: {
  * 機房 IP 常被 IG/TikTok 阻擋，失敗時拋錯，由 worker 顯示重試或換公開連結。
  */
 export async function fetchTranscript(url: string): Promise<string> {
+  if (!isSupportedSourceUrl(url)) throw new Error("不支援的來源影片連結");
   const dir = await mkdtemp(join(tmpdir(), "lurevid-"));
   try {
     await run("yt-dlp", [
@@ -119,21 +121,21 @@ export async function transcribeMediaFile(path: string): Promise<string> {
   // 只有 whisper-1 支援 verbose_json 的 segment 時間戳；逐字稿 UI 會用時間戳分行。
   if (configuredModel === "whisper-1") {
     const result = await openai.audio.transcriptions.create({
-      file: createReadStream(path) as any,
+      file: createReadStream(path) as Uploadable,
       model: "whisper-1",
       response_format: "verbose_json",
       timestamp_granularities: ["segment"]
-    } as any);
-    const text = formatTimestampedTranscript(result as any);
+    });
+    const text = formatTimestampedTranscript(result);
     if (!text) throw new Error("轉錄結果為空");
     return text;
   }
 
   // 其他模型（如 gpt-4o-transcribe）：取純文字逐字稿，無時間戳。
   const result = await openai.audio.transcriptions.create({
-    file: createReadStream(path) as any,
+    file: createReadStream(path) as Uploadable,
     model: configuredModel
-  } as any);
+  });
   const text = (result as { text?: string }).text?.trim() || "";
   if (!text) throw new Error("轉錄結果為空");
   return text;

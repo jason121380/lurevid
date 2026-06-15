@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -50,7 +51,7 @@ export default function RegisterPage() {
     <div className="grid min-h-screen place-items-center bg-[var(--warm-white)] p-4">
       <section className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <img className="mx-auto h-7 w-auto" src="/logo.svg" alt="lurevid" />
+          <Image className="mx-auto h-7 w-auto" src="/logo.svg" alt="lurevid" width={132} height={28} priority />
           <h1 className="mt-4 text-lg text-[var(--black)]">註冊 lurevid</h1>
         </div>
         <div className="card space-y-3 p-5">

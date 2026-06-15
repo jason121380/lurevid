@@ -4,23 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { enqueueProjectJob } from "@/lib/queue";
 import { detectPlatform, isSupportedSourceUrl } from "@/lib/transcribe";
 import { currentUser } from "@/lib/authz";
-import { MAX_TRANSCRIPT_LENGTH } from "@/lib/limits";
 import { rateLimit } from "@/lib/rate-limit";
+import { createProjectSchema } from "@/lib/project-schemas";
 
 export const runtime = "nodejs";
-
-const createProjectSchema = z.object({
-  title: z.string().trim().max(80, "專案名稱太長").optional(),
-  sourceUrl: z.string().url(),
-  transcript: z.string().max(MAX_TRANSCRIPT_LENGTH, "逐字稿太長").optional(),
-  settings: z
-    .object({
-      ratio: z.string().default("9:16"),
-      resolution: z.string().default("720p"),
-      duration: z.number().int().min(2).max(15).default(5)
-    })
-    .default({})
-});
 
 function toCreateProjectError(error: unknown) {
   if (error instanceof z.ZodError) {

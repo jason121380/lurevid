@@ -111,6 +111,12 @@ export function publicSettingFields() {
   }));
 }
 
+export function maskSecret(value: string) {
+  if (!value) return "";
+  if (value.length <= 8) return "••••••••";
+  return `${value.slice(0, 4)}••••${value.slice(-4)}`;
+}
+
 export async function saveAppSettings(values: Partial<Record<AppSettingKey, string>>) {
   const updates = Object.entries(values).filter(([key]) => fieldByKey.has(key as AppSettingKey));
 

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { APP_SETTING_FIELDS, getAppSettings, publicSettingFields, saveAppSettings } from "@/lib/settings";
+import {
+  APP_SETTING_FIELDS,
+  type AppSettingKey,
+  getAppSettings,
+  maskSecret,
+  publicSettingFields,
+  saveAppSettings
+} from "@/lib/settings";
 import { requireAdmin, isResponse } from "@/lib/authz";
 
 export const runtime = "nodejs";
@@ -8,12 +15,6 @@ export const runtime = "nodejs";
 const settingsSchema = z.object({
   values: z.record(z.string(), z.string())
 });
-
-function maskSecret(value: string) {
-  if (!value) return "";
-  if (value.length <= 8) return "••••••••";
-  return `${value.slice(0, 4)}••••${value.slice(-4)}`;
-}
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -38,16 +39,18 @@ export async function POST(request: Request) {
   if (isResponse(admin)) return admin;
 
   const body = settingsSchema.parse(await request.json());
-  const secretKeys = new Set(APP_SETTING_FIELDS.filter((field) => field.secret).map((field) => field.key));
+  const knownKeys = new Set<AppSettingKey>(APP_SETTING_FIELDS.map((field) => field.key));
+  const secretKeys = new Set<AppSettingKey>(APP_SETTING_FIELDS.filter((field) => field.secret).map((field) => field.key));
+  const values: Partial<Record<AppSettingKey, string>> = {};
 
-  await saveAppSettings(
-    Object.fromEntries(
-      Object.entries(body.values).filter(([key, value]) => {
-        if (!secretKeys.has(key as any)) return true;
-        return value.trim() !== "";
-      })
-    ) as any
-  );
+  for (const [key, value] of Object.entries(body.values)) {
+    if (!knownKeys.has(key as AppSettingKey)) continue;
+    const settingKey = key as AppSettingKey;
+    if (secretKeys.has(settingKey) && value.trim() === "") continue;
+    values[settingKey] = value;
+  }
+
+  await saveAppSettings(values);
 
   return NextResponse.json({ ok: true });
 }

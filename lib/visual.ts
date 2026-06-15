@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 import { ffmpegPath } from "@/lib/ffmpeg";
+import { isSupportedSourceUrl } from "@/lib/transcribe";
 
 function run(command: string, args: string[]) {
   return new Promise<void>((resolvePromise, reject) => {
@@ -23,6 +24,7 @@ function run(command: string, args: string[]) {
 }
 
 export async function downloadSourceVideo(url: string) {
+  if (!isSupportedSourceUrl(url)) throw new Error("不支援的來源影片連結");
   const dir = await mkdtemp(join(tmpdir(), "lurevid-video-"));
   const output = join(dir, "source.%(ext)s");
   await run("yt-dlp", [

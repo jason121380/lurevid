@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,11 @@ const registerSchema = z.object({
   name: z.string().trim().max(80, "名稱太長").optional()
 });
 
+function clientIp(request: Request) {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || request.headers.get("x-real-ip") || "unknown";
+}
+
 export async function POST(request: Request) {
   let body: z.infer<typeof registerSchema>;
   try {
@@ -18,6 +24,14 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof z.ZodError ? error.issues[0]?.message : "註冊資料格式錯誤";
     return NextResponse.json({ error: message || "註冊資料格式錯誤" }, { status: 400 });
+  }
+
+  const [ipLimit, emailLimit] = await Promise.all([
+    rateLimit(`register:ip:${clientIp(request)}`, 20, 3600),
+    rateLimit(`register:email:${body.email}`, 5, 3600)
+  ]);
+  if (!ipLimit.ok || !emailLimit.ok) {
+    return NextResponse.json({ error: "註冊太頻繁，請稍後再試。" }, { status: 429 });
   }
 
   try {

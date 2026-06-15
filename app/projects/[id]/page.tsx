@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@/lib/authz";
+import { projectWithScenesInclude } from "@/lib/project-access";
 import { ProjectClient } from "./ProjectClient";
 
 function stringArray(value: unknown) {
@@ -12,12 +13,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const user = await currentUser();
   if (!user) redirect(`/login?callbackUrl=/projects/${id}`);
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: { scenes: { orderBy: { sceneNumber: "asc" } } }
+  const project = await prisma.project.findFirst({
+    where: { id, userId: user.id },
+    include: projectWithScenesInclude
   });
 
-  if (!project || project.userId !== user.id) notFound();
+  if (!project) notFound();
 
   return (
     <ProjectClient

@@ -29,14 +29,13 @@ export const authConfig = {
     jwt({ token, user }) {
       if (user) {
         token.uid = user.id;
-        token.isAdmin = emailIsAdmin(user.email);
       }
       return token;
     },
     session({ session, token }) {
       if (session.user) {
         session.user.id = (token.uid as string) || session.user.id;
-        session.user.isAdmin = Boolean(token.isAdmin);
+        session.user.isAdmin = emailIsAdmin(session.user.email || token.email);
       }
       return session;
     }

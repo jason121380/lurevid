@@ -224,7 +224,8 @@ export async function generateStoryboardWithTwoModels(idea: string) {
 export async function generateStoryboardImage(prompt: string, ratio: string) {
   const openai = await client(openaiImageTimeoutMs(), 2);
   const model = (await getAppSettings()).OPENAI_IMAGE_MODEL || "gpt-image-2";
-  const size = ratio === "9:16" ? "1024x1536" : ratio === "1:1" ? "1024x1024" : "1536x1024";
+  const size: "1024x1536" | "1024x1024" | "1536x1024" =
+    ratio === "9:16" ? "1024x1536" : ratio === "1:1" ? "1024x1024" : "1536x1024";
   // 統一：所有人物為東亞／台灣人外貌。
   const finalPrompt = /east asian|taiwanese/i.test(prompt) ? prompt : `${prompt}\n\nAll people are East Asian (Taiwanese).`;
   const response = await openai.images.generate({
@@ -232,7 +233,7 @@ export async function generateStoryboardImage(prompt: string, ratio: string) {
     prompt: finalPrompt,
     size,
     n: 1
-  } as any);
+  });
   const image = response.data?.[0] as { b64_json?: string; url?: string } | undefined;
   if (!image?.b64_json && !image?.url) throw new Error("OpenAI 沒有回傳分鏡圖");
   return image;

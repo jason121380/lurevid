@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { currentUser } from "@/lib/authz";
+import { projectWithScenesInclude } from "@/lib/project-access";
 
 export const runtime = "nodejs";
 
@@ -14,12 +15,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: { scenes: { orderBy: { sceneNumber: "asc" } } }
+  const project = await prisma.project.findFirst({
+    where: { id, userId: user.id },
+    include: projectWithScenesInclude
   });
 
-  if (!project || project.userId !== user.id) return NextResponse.json({ error: "找不到專案" }, { status: 404 });
+  if (!project) return NextResponse.json({ error: "找不到專案" }, { status: 404 });
   return NextResponse.json(project);
 }
 
@@ -27,9 +28,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
-
-  const owned = await prisma.project.findUnique({ where: { id }, select: { userId: true } });
-  if (!owned || owned.userId !== user.id) return NextResponse.json({ error: "找不到專案" }, { status: 404 });
 
   let body: z.infer<typeof updateProjectSchema>;
   try {
@@ -39,10 +37,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: message || "資料格式錯誤" }, { status: 400 });
   }
 
+  const owned = await prisma.project.findFirst({ where: { id, userId: user.id }, select: { id: true } });
+  if (!owned) return NextResponse.json({ error: "找不到專案" }, { status: 404 });
+
   const project = await prisma.project.update({
-    where: { id },
+    where: { id: owned.id },
     data: body.title ? { title: body.title } : {},
-    include: { scenes: { orderBy: { sceneNumber: "asc" } } }
+    include: projectWithScenesInclude
   });
 
   return NextResponse.json(project);
@@ -53,9 +54,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
-  const owned = await prisma.project.findUnique({ where: { id }, select: { userId: true } });
-  if (!owned || owned.userId !== user.id) return NextResponse.json({ error: "找不到專案" }, { status: 404 });
+  const owned = await prisma.project.findFirst({ where: { id, userId: user.id }, select: { id: true } });
+  if (!owned) return NextResponse.json({ error: "找不到專案" }, { status: 404 });
 
-  await prisma.project.delete({ where: { id } });
+  await prisma.project.delete({ where: { id: owned.id } });
   return NextResponse.json({ ok: true });
 }

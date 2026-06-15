@@ -15,21 +15,27 @@ export type ProjectAction =
   | "storyboard"
   | "video";
 
-export function createRedisConnection() {
-  const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) throw new Error("缺少 REDIS_URL");
-  return new IORedis(redisUrl, {
+export function redisConnectionOptions() {
+  return {
     connectTimeout: 5000,
     enableOfflineQueue: true,
     keepAlive: 10000,
-    retryStrategy: (times) => Math.min(times * 1000, 10000),
+    retryStrategy: (times: number) => Math.min(times * 1000, 10000),
     maxRetriesPerRequest: null
-  }) as any;
+  };
+}
+
+export function createRedisConnection(): IORedis {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) throw new Error("缺少 REDIS_URL");
+  return new IORedis(redisUrl, redisConnectionOptions());
 }
 
 export function createProjectQueue() {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) throw new Error("缺少 REDIS_URL");
   return new Queue(PROJECT_QUEUE_NAME, {
-    connection: createRedisConnection()
+    connection: { url: redisUrl, ...redisConnectionOptions() }
   });
 }
 

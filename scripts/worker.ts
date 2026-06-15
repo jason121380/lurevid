@@ -1,10 +1,10 @@
 import "dotenv/config";
 import { join } from "node:path";
 import { Worker } from "bullmq";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/async";
-import { PROJECT_QUEUE_NAME, WORKER_HEARTBEAT_KEY, createRedisConnection } from "@/lib/queue";
-import { readFile } from "node:fs/promises";
+import { PROJECT_QUEUE_NAME, WORKER_HEARTBEAT_KEY, createRedisConnection, redisConnectionOptions } from "@/lib/queue";
 import {
   adaptScript,
   analyzeStructure,
@@ -16,15 +16,17 @@ import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
 import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
 import { analyzeVideoFrames, extractVideoFrames, withDownloadedVideo } from "@/lib/visual";
 import { downloadVideo, mergeVideos, storageRoot } from "@/lib/video";
-import { uploadObject } from "@/lib/storage";
+import { uploadFileObject, uploadObject } from "@/lib/storage";
 import { transcribeMediaFile } from "@/lib/transcribe";
 import { safeFetch } from "@/lib/safe-fetch";
 import { markStepDone, markStepFailed, markStepRunning, type StepKey } from "@/lib/steps";
 
 async function fetchToBuffer(url: string) {
-  const response = await safeFetch(url);
+  const response = await safeFetch(url, { maxBytes: 25 * 1024 * 1024 });
   if (!response.ok) throw new Error("下載產生的檔案失敗");
-  return Buffer.from(await response.arrayBuffer());
+  const bytes = await response.arrayBuffer();
+  if (bytes.byteLength > 25 * 1024 * 1024) throw new Error("產生的圖片檔案過大");
+  return Buffer.from(bytes);
 }
 
 function frameDataUrlToBuffer(dataUrl: string) {
@@ -38,12 +40,18 @@ const IMAGE_CONCURRENCY = Number(process.env.IMAGE_CONCURRENCY || 3);
 const SEEDANCE_CONCURRENCY = Number(process.env.SEEDANCE_CONCURRENCY || 3);
 const SEEDANCE_POLL_INTERVAL_MS = Number(process.env.SEEDANCE_POLL_INTERVAL_MS || 8000);
 const SEEDANCE_POLL_TIMEOUT_MS = Number(process.env.SEEDANCE_POLL_TIMEOUT_MS || 20 * 60 * 1000);
+const REDIS_URL = process.env.REDIS_URL;
+if (!REDIS_URL) throw new Error("缺少 REDIS_URL");
 
 const analysisIdleStatus = (analysis: string | null) => (analysis ? "ANALYSIS_READY" : "DRAFT");
 
+function jsonValue(value: unknown): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
+
 async function uploadSourceVideo(projectId: string, videoPath: string, current?: string | null) {
   if (current && /^https?:\/\//i.test(current)) return;
-  const sourceVideoUrl = await uploadObject(`projects/${projectId}/source.mp4`, await readFile(videoPath), "video/mp4");
+  const sourceVideoUrl = await uploadFileObject(`projects/${projectId}/source.mp4`, videoPath, "video/mp4");
   await prisma.project.update({ where: { id: projectId }, data: { sourceVideoUrl, message: "來源影片已下載，可下載 MP4" } });
 }
 
@@ -354,7 +362,7 @@ async function generateVideo(projectId: string) {
       data: {
         status: "GENERATING",
         seedanceTaskId: task.id || task.task_id,
-        raw: task
+        raw: jsonValue(task)
       }
     });
   });
@@ -371,7 +379,7 @@ async function generateVideo(projectId: string) {
     );
 
     await mapWithConcurrency(pending, SEEDANCE_CONCURRENCY, async (scene) => {
-      let task: any;
+      let task;
       try {
         task = await getSeedanceTask(scene.seedanceTaskId!);
       } catch {
@@ -384,16 +392,16 @@ async function generateVideo(projectId: string) {
       if (upstreamStatus === "succeeded" && videoUrl) {
         await prisma.scene.update({
           where: { id: scene.id },
-          data: { status: "SUCCEEDED", videoUrl, raw: task }
+          data: { status: "SUCCEEDED", videoUrl, raw: jsonValue(task) }
         });
       } else if (["failed", "cancelled", "expired"].includes(upstreamStatus)) {
         // 標記該 scene 失敗但不中止輪詢，讓其他 scene 跑完，最後一次性回報。
         await prisma.scene.update({
           where: { id: scene.id },
-          data: { status: "FAILED", error: upstreamStatus, raw: task }
+          data: { status: "FAILED", error: upstreamStatus, raw: jsonValue(task) }
         });
-      } else {
-        await prisma.scene.update({ where: { id: scene.id }, data: { raw: task } });
+      } else if (JSON.stringify(scene.raw) !== JSON.stringify(task)) {
+        await prisma.scene.update({ where: { id: scene.id }, data: { raw: jsonValue(task) } });
       }
     });
 
@@ -438,11 +446,7 @@ async function generateVideo(projectId: string) {
   });
 
   const finalPath = await mergeVideos(projectId, clipPaths);
-  const finalVideoUrl = await uploadObject(
-    `projects/${projectId}/final.mp4`,
-    await readFile(finalPath),
-    "video/mp4"
-  );
+  const finalVideoUrl = await uploadFileObject(`projects/${projectId}/final.mp4`, finalPath, "video/mp4");
 
   await prisma.project.update({
     where: { id: projectId },
@@ -483,7 +487,7 @@ const worker = new Worker(
     }
   },
   {
-    connection: createRedisConnection(),
+    connection: { url: REDIS_URL, ...redisConnectionOptions() },
     concurrency: Number(process.env.WORKER_CONCURRENCY || 1)
   }
 );

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { enqueueProjectJob } from "@/lib/queue";
-import { loadOwnedProject } from "@/lib/project-access";
+import { loadOwnedProject, projectWithScenesInclude } from "@/lib/project-access";
 import { rateLimit } from "@/lib/rate-limit";
 import { MAX_TRANSCRIPT_LENGTH } from "@/lib/limits";
 
@@ -32,6 +32,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   await prisma.project.update({ where: { id }, data: { status: "ANALYZING", message: "正在轉錄音訊", error: null } });
   await enqueueProjectJob(id, "transcribe");
 
-  const next = await prisma.project.findUnique({ where: { id }, include: { scenes: { orderBy: { sceneNumber: "asc" } } } });
+  const next = await prisma.project.findFirst({
+    where: { id, userId: owned.user.id },
+    include: projectWithScenesInclude
+  });
   return NextResponse.json(next, { status: 202 });
 }

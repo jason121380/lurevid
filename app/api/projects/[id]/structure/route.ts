@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { enqueueProjectJob } from "@/lib/queue";
-import { loadOwnedProject } from "@/lib/project-access";
+import { loadOwnedProject, projectWithScenesInclude } from "@/lib/project-access";
 import { MAX_ANALYSIS_LENGTH } from "@/lib/limits";
 
 export const runtime = "nodejs";
@@ -23,6 +23,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await enqueueProjectJob(id, "structure");
 
-  const next = await prisma.project.findUnique({ where: { id }, include: { scenes: { orderBy: { sceneNumber: "asc" } } } });
+  const next = await prisma.project.findFirst({
+    where: { id, userId: owned.user.id },
+    include: projectWithScenesInclude
+  });
   return NextResponse.json(next, { status: 202 });
 }

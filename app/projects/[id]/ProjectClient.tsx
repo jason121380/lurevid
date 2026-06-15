@@ -175,7 +175,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
 
   const [projectTitle, setProjectTitle] = useState(initialProject?.title || "");
   const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
-  const [visualAnalysis, setVisualAnalysis] = useState(initialProject?.visualAnalysis || "");
   const [structure, setStructure] = useState(initialProject?.structure || "");
   const [script, setScript] = useState(initialProject?.adaptedScript || "");
   const [ratio, setRatio] = useState(initialProject?.ratio || "9:16");
@@ -183,8 +182,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [duration, setDuration] = useState(initialProject?.duration || 5);
   const [activeStep, setActiveStep] = useState(1);
   const settingsInit = useRef(Boolean(initialProject));
-  const lastServer = useRef<{ visualAnalysis?: string; analysis?: string; structure?: string; adaptedScript?: string }>({
-    visualAnalysis: initialProject?.visualAnalysis,
+  const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({
     analysis: initialProject?.analysis,
     structure: initialProject?.structure,
     adaptedScript: initialProject?.adaptedScript
@@ -194,7 +192,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (!initialProject) return;
     setProject(initialProject);
     setProjectTitle(initialProject.title || "");
-    setVisualAnalysis(initialProject.visualAnalysis || "");
     setAnalysis(initialProject.analysis || "");
     setStructure(initialProject.structure || "");
     setScript(initialProject.adaptedScript || "");
@@ -202,7 +199,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     setResolution(initialProject.resolution || "720p");
     setDuration(initialProject.duration || 5);
     lastServer.current = {
-      visualAnalysis: initialProject.visualAnalysis,
       analysis: initialProject.analysis,
       structure: initialProject.structure,
       adaptedScript: initialProject.adaptedScript
@@ -235,11 +231,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         }
         setError("");
         // 只有當伺服器的值改變時才覆寫本地編輯，避免蓋掉使用者正在編輯的內容。
-        if (data.visualAnalysis !== lastServer.current.visualAnalysis) setVisualAnalysis(data.visualAnalysis || "");
         if (data.analysis !== lastServer.current.analysis) setAnalysis(data.analysis || "");
         if (data.structure !== lastServer.current.structure) setStructure(data.structure || "");
         if (data.adaptedScript !== lastServer.current.adaptedScript) setScript(data.adaptedScript || "");
-        lastServer.current = { visualAnalysis: data.visualAnalysis, analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
+        lastServer.current = { analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
         if (!settingsInit.current) {
           if (data.ratio) setRatio(data.ratio);
           if (data.resolution) setResolution(data.resolution);
@@ -548,18 +543,15 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   return (
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[150px_minmax(0,1fr)_360px] md:gap-4 md:p-6">
+        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[420px_minmax(0,1fr)] md:gap-4 md:p-6">
           <aside className="h-fit md:sticky md:top-6">
             <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
           </aside>
 
-          <section className="min-w-0">
+          <section className="min-w-0 space-y-4">
             {selectedPanel}
-          </section>
-
-          <aside className="min-w-0 md:sticky md:top-6 md:h-fit">
             {previewPanel}
-          </aside>
+          </section>
         </div>
       </div>
     </Shell>
@@ -605,7 +597,7 @@ function ProcessTimeline({
                 </div>
               )}
               <div
-                className={`min-w-[150px] rounded-lg px-2 py-1.5 transition md:min-w-0 ${
+                className={`min-w-[260px] rounded-lg px-2 py-1.5 transition md:min-w-0 ${
                   activeStep === stepNumber
                     ? "bg-orange-bg text-orange"
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
@@ -621,7 +613,7 @@ function ProcessTimeline({
                     {isActive ? <Loader2 size={13} className="animate-spin" /> : isFailed ? <XCircle size={13} /> : stepNumber}
                   </button>
                   <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(stepNumber)} type="button">
-                    <div className="truncate text-xs font-medium leading-6">{step.title}</div>
+                    <div className="text-xs font-medium leading-5">{step.title}</div>
                   </button>
                   {isActive && <span className="shrink-0 text-[11px] tabular-nums text-orange">{barPct}%</span>}
                   {/* 執行/重跑按鈕：單獨放右邊 */}
