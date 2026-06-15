@@ -20,6 +20,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       projectId={id}
       initialProject={{
         id: project.id,
+        title: project.title,
         sourceUrl: project.sourceUrl || undefined,
         sourcePlatform: project.sourcePlatform || undefined,
         sourceVideoUrl: project.sourceVideoUrl || undefined,

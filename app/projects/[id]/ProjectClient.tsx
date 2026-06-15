@@ -19,6 +19,7 @@ export type Scene = {
 
 export type Project = {
   id: string;
+  title?: string;
   sourceUrl?: string;
   sourcePlatform?: string;
   sourceVideoUrl?: string;
@@ -64,8 +65,7 @@ function buildProcessSteps(project: Project): Array<{ title: string; description
   };
 
   return [
-    step("建立專案", "儲存來源連結並排入 Redis queue", project.progress >= 0.03, project.status === "QUEUED"),
-    step("下載影片", "worker 用 yt-dlp 取得 IG/TikTok 影片", Boolean(project.sourceVideoUrl), project.status === "ANALYZING" && activeMessage.includes("下載")),
+    step("基本資料", "來源、命名與下載 MP4", Boolean(project.sourceUrl), project.status === "QUEUED" || (project.status === "ANALYZING" && activeMessage.includes("下載"))),
     step("轉錄音訊", "把影片聲音轉成逐字稿", Boolean(project.sourceTranscript), project.status === "ANALYZING" && (activeMessage.includes("轉錄") || activeMessage.includes("逐字稿") || activeMessage.includes("音訊"))),
     step("抽取影格", "用 ffmpeg 抽出代表性畫面", Boolean(project.sourceFrameUrls?.length), project.status === "ANALYZING" && activeMessage.includes("抽取")),
     step("視覺分析", "AI 分析畫面、字幕、構圖與分鏡節奏", Boolean(project.visualAnalysis), project.status === "ANALYZING" && (activeMessage.includes("畫面") || activeMessage.includes("影格") || activeMessage.includes("分鏡") || activeMessage.includes("視覺"))),
@@ -78,16 +78,15 @@ function buildProcessSteps(project: Project): Array<{ title: string; description
 }
 
 function stepCanRun(project: Project, stepNumber: number) {
-  if (stepNumber === 1) return false;
-  if (stepNumber === 2) return true;
-  if (stepNumber === 3) return Boolean(project.sourceVideoUrl) || Boolean(project.sourceTranscript);
-  if (stepNumber === 4) return Boolean(project.sourceTranscript);
-  if (stepNumber === 5) return Boolean(project.sourceFrameUrls?.length) || Boolean(project.visualAnalysis);
-  if (stepNumber === 6) return project.progress >= 0.19 || Boolean(project.analysis);
-  if (stepNumber === 7) return Boolean(project.analysis);
-  if (stepNumber === 8) return Boolean(project.structure);
-  if (stepNumber === 9) return Boolean(project.adaptedScript);
-  if (stepNumber === 10) return project.status === "STORYBOARD_READY" && project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
+  if (stepNumber === 1) return Boolean(project.sourceUrl);
+  if (stepNumber === 2) return Boolean(project.sourceVideoUrl) || Boolean(project.sourceTranscript);
+  if (stepNumber === 3) return Boolean(project.sourceTranscript);
+  if (stepNumber === 4) return Boolean(project.sourceFrameUrls?.length) || Boolean(project.visualAnalysis);
+  if (stepNumber === 5) return project.progress >= 0.19 || Boolean(project.analysis);
+  if (stepNumber === 6) return Boolean(project.analysis);
+  if (stepNumber === 7) return Boolean(project.structure);
+  if (stepNumber === 8) return Boolean(project.adaptedScript);
+  if (stepNumber === 9) return project.status === "STORYBOARD_READY" && project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
   return false;
 }
 
@@ -114,6 +113,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const [projectTitle, setProjectTitle] = useState(initialProject?.title || "");
   const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
   const [visualAnalysis, setVisualAnalysis] = useState(initialProject?.visualAnalysis || "");
   const [structure, setStructure] = useState(initialProject?.structure || "");
@@ -133,6 +133,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   useEffect(() => {
     if (!initialProject) return;
     setProject(initialProject);
+    setProjectTitle(initialProject.title || "");
     setVisualAnalysis(initialProject.visualAnalysis || "");
     setAnalysis(initialProject.analysis || "");
     setStructure(initialProject.structure || "");
@@ -210,26 +211,52 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     }
   }
 
+  async function saveProjectTitle() {
+    if (!project) return;
+    const title = projectTitle.trim();
+    if (!title || title === project.title) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "儲存名稱失敗");
+        return;
+      }
+      setProject(data);
+      setProjectTitle(data.title || "");
+    } catch {
+      setError("API 沒有回應");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function runStep(stepNumber: number) {
     if (!project) return;
     setActiveStep(stepNumber);
-    if (stepNumber >= 2 && stepNumber <= 6) {
-      post("/analyze", stepNumber === 3 ? { retranscribe: true } : undefined);
+    if (stepNumber >= 1 && stepNumber <= 5) {
+      post("/analyze", stepNumber === 2 ? { retranscribe: true } : undefined);
       return;
     }
-    if (stepNumber === 7) {
+    if (stepNumber === 6) {
       post("/structure", { analysis: project.analysis || analysis });
       return;
     }
-    if (stepNumber === 8) {
+    if (stepNumber === 7) {
       post("/adapt", { structure });
       return;
     }
-    if (stepNumber === 9) {
+    if (stepNumber === 8) {
       post("/storyboard", { adaptedScript: script });
       return;
     }
-    if (stepNumber === 10) {
+    if (stepNumber === 9) {
       post("/video", { ratio, resolution, duration });
     }
   }
@@ -238,44 +265,58 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   if (!project) return <Shell><div className="grid min-h-screen place-items-center"><Loader2 className="animate-spin text-orange" /></div></Shell>;
 
   const busy = BUSY.includes(project.status) || submitting;
-  const downloadPanel = (
-    <div className="card p-3 md:p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm">2 · 下載影片</h2>
-        <span className="text-[11px] text-[var(--gray-500)]">MP4</span>
+  const downloadButton = project.sourceVideoUrl ? (
+    <a className="btn btn-primary w-full sm:w-auto" href={project.sourceVideoUrl} download target="_blank" rel="noreferrer">
+      <Download size={16} />
+      下載 MP4
+    </a>
+  ) : (
+    <button className="btn btn-ghost w-full cursor-default text-[var(--gray-400)] sm:w-auto" disabled type="button">
+      尚未取得 MP4
+    </button>
+  );
+  const namePanel = (
+    <div className="rounded-xl bg-white p-3 text-sm md:p-4">
+      <p className="mb-2 text-[11px] uppercase text-orange">命名</p>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          className="min-w-0 flex-1 rounded-full border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
+          value={projectTitle}
+          onChange={(event) => setProjectTitle(event.target.value)}
+          onBlur={saveProjectTitle}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") saveProjectTitle();
+          }}
+          placeholder="命名專案名稱"
+        />
+        <button className="btn btn-primary" disabled={submitting || !projectTitle.trim() || projectTitle.trim() === project.title} onClick={saveProjectTitle} type="button">
+          儲存
+        </button>
       </div>
-      {project.sourceVideoUrl ? (
-        <div className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4">
-          <p className="text-sm font-medium text-[var(--black)]">來源影片已下載</p>
-          <a className="btn btn-primary mt-3 w-full sm:w-auto" href={project.sourceVideoUrl} download target="_blank" rel="noreferrer">
-            <Download size={16} />
-            下載 MP4
-          </a>
-        </div>
-      ) : project.analysis || project.sourceTranscript ? (
-        <div className="rounded-xl border border-[var(--orange-border)] bg-orange-bg p-3 text-sm leading-6 text-[var(--gray-500)] md:p-4">
-          <p className="font-medium text-[var(--black)]">沒有取得可下載的 MP4</p>
-          <p className="mt-1">影片下載失敗，但系統已用可取得的音訊/內容完成後續分析。若一定要 MP4，請按左側第 2 步重新下載，或換一支可公開下載的影片。</p>
-          {project.error && <p className="mt-2 text-[var(--red)]">{project.error}</p>}
-        </div>
-      ) : (
-        <EmptyPanel title="尚未下載影片" description="按工作清單第 2 步的 play，worker 會用 yt-dlp 下載並存成 MP4。" />
-      )}
     </div>
   );
   const sourcePanel = (
-    <div className="rounded-xl bg-white p-3 text-sm md:p-4">
-      <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
-      {project.sourceUrl && (
-        <a className="mt-1 block break-all text-xs text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
-          {project.sourceUrl}
-        </a>
-      )}
-      <p className="mt-2 flex items-center gap-2 text-xs text-[var(--gray-500)]">
-        {busy && <Loader2 size={13} className="animate-spin text-orange" />}
-        {project.message}
-      </p>
-      {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
+    <div className="space-y-3">
+      {namePanel}
+      <div className="rounded-xl bg-white p-3 text-sm md:p-4">
+        <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
+        {project.sourceUrl && (
+          <a className="mt-1 block break-all text-xs text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
+            {project.sourceUrl}
+          </a>
+        )}
+        <p className="mt-2 flex items-center gap-2 text-xs text-[var(--gray-500)]">
+          {busy && <Loader2 size={13} className="animate-spin text-orange" />}
+          {project.message}
+        </p>
+        {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
+      </div>
+      <div className="rounded-xl bg-white p-3 md:p-4">
+        {downloadButton}
+        {!project.sourceVideoUrl && (project.analysis || project.sourceTranscript) && (
+          <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">影片下載失敗，但已用可取得的音訊/內容完成後續分析。若需要 MP4，請重跑「基本資料」或換一支公開影片。</p>
+        )}
+      </div>
     </div>
   );
   const previewPanel = (
@@ -302,7 +343,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const transcriptPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm">3 · 轉錄音訊</h2>
+        <h2 className="text-sm">2 · 轉錄音訊</h2>
         <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
       </div>
       {project.sourceTranscript ? (
@@ -315,7 +356,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const framePanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm">4 · 抽取影格</h2>
+        <h2 className="text-sm">3 · 抽取影格</h2>
         <span className="text-[11px] text-[var(--gray-500)]">{project.sourceFrameUrls?.length || 0} 張</span>
       </div>
       {project.sourceFrameUrls?.length ? (
@@ -333,14 +374,14 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           ))}
         </div>
       ) : (
-        <EmptyPanel title="尚未抽取影格" description="按工作清單第 4 步的 play，系統會用 ffmpeg 從影片抽出代表性畫面。" />
+        <EmptyPanel title="尚未抽取影格" description="按工作清單第 3 步的 play，系統會用 ffmpeg 從影片抽出代表性畫面。" />
       )}
     </div>
   );
   const storyboardPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm">9 · 產生分鏡</h2>
+        <h2 className="text-sm">8 · 產生分鏡</h2>
         {project.status === "STORYBOARD_READY" && (
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={ratio} onChange={(event) => setRatio(event.target.value)}>
@@ -389,13 +430,12 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   );
   const selectedPanel = (() => {
     if (activeStep === 1) return sourcePanel;
-    if (activeStep === 2) return downloadPanel;
-    if (activeStep === 3) return transcriptPanel;
-    if (activeStep === 4) return framePanel;
-    if (activeStep === 5) {
+    if (activeStep === 2) return transcriptPanel;
+    if (activeStep === 3) return framePanel;
+    if (activeStep === 4) {
       return project.visualAnalysis ? (
         <ResultCard
-          index="5"
+          index="4"
           title="視覺分析"
           value={visualAnalysis}
         />
@@ -403,10 +443,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <div className="card p-4"><EmptyPanel title="尚未完成視覺分析" description="系統會先抽取影格，再分析畫面、字幕、構圖與分鏡節奏。" /></div>
       );
     }
-    if (activeStep === 6) {
+    if (activeStep === 5) {
       return project.analysis ? (
         <ResultCard
-          index="6"
+          index="5"
           title="影片分析"
           value={analysis}
         />
@@ -414,10 +454,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <div className="card p-4"><EmptyPanel title="尚未完成分析" description="系統會先抽取影格、理解畫面，再整合逐字稿與視覺洞察。" /></div>
       );
     }
-    if (activeStep === 7) {
+    if (activeStep === 6) {
       return project.structure ? (
         <ResultCard
-          index="7"
+          index="6"
           title="結構分析"
           value={structure}
         />
@@ -425,10 +465,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <div className="card p-4"><EmptyPanel title="尚未結構分析" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
       );
     }
-    if (activeStep === 8) {
+    if (activeStep === 7) {
       return project.adaptedScript ? (
         <StepCard
-          index="8"
+          index="7"
           title="改編腳本"
           value={script}
           onChange={setScript}
@@ -437,7 +477,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <div className="card p-4"><EmptyPanel title="尚未改編腳本" description="完成結構拆解後，會改寫成新的短影音腳本。" /></div>
       );
     }
-    if (activeStep === 9) return storyboardPanel;
+    if (activeStep === 8) return storyboardPanel;
     return sourcePanel;
   })();
 
