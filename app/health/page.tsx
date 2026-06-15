@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
 
 type CheckStatus = "ok" | "warn" | "error";
@@ -28,28 +28,57 @@ function statusLabel(status: CheckStatus) {
 export default function HealthPage() {
   const [checks, setChecks] = useState<Check[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cleaning, setCleaning] = useState(false);
   const [error, setError] = useState("");
   const [checkedAt, setCheckedAt] = useState("");
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 2500);
+  }, []);
+
+  const load = useCallback(
+    async (withToast = false) => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch("/api/health/status", { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "讀取健康狀態失敗");
+        setChecks(data.checks || []);
+        setCheckedAt(data.checkedAt || "");
+        if (withToast) showToast("已重新檢查");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "讀取健康狀態失敗");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [showToast]
+  );
+
+  const cleanFailed = useCallback(async () => {
+    setCleaning(true);
     setError("");
     try {
-      const res = await fetch("/api/health/status", { cache: "no-store" });
+      const res = await fetch("/api/health/clean-failed", { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "讀取健康狀態失敗");
-      setChecks(data.checks || []);
-      setCheckedAt(data.checkedAt || "");
+      if (!res.ok) throw new Error(data.error || "清除失敗");
+      showToast("已清除失敗紀錄");
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "讀取健康狀態失敗");
+      setError(err instanceof Error ? err.message : "清除失敗");
     } finally {
-      setLoading(false);
+      setCleaning(false);
     }
-  }, []);
+  }, [load, showToast]);
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 15000);
+    const timer = setInterval(() => load(), 15000);
     return () => clearInterval(timer);
   }, [load]);
 
@@ -58,11 +87,23 @@ export default function HealthPage() {
       <div className="min-h-screen bg-[var(--warm-white)]">
         <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] bg-white px-6">
           <h1 className="text-base">系統健康檢查</h1>
-          <button className="btn btn-primary" disabled={loading} onClick={load} type="button">
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-            重新檢查
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="btn btn-ghost" disabled={cleaning || loading} onClick={cleanFailed} type="button">
+              {cleaning ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              清除失敗紀錄
+            </button>
+            <button className="btn btn-primary" disabled={loading} onClick={() => load(true)} type="button">
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+              重新檢查
+            </button>
+          </div>
         </div>
+
+        {toast && (
+          <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[var(--black)] px-4 py-2 text-sm text-white shadow-lg">
+            {toast}
+          </div>
+        )}
 
         <div className="mx-auto max-w-4xl space-y-4 p-4 lg:p-6">
           {error && <div className="rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}

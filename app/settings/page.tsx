@@ -43,8 +43,8 @@ const groups: SettingGroup[] = [
     requiredKeys: ["ARK_API_KEY", "SEEDANCE_MODEL"]
   },
   {
-    title: "S3 物件儲存（相容 Cloudflare R2）",
-    description: "儲存分鏡圖、影片片段與 final.mp4，並提供前台播放網址。建議用 Cloudflare R2，bucket 需開公開讀取。",
+    title: "R2 物件儲存（Cloudflare）",
+    description: "儲存分鏡圖、影片片段與 final.mp4，並提供前台播放網址。bucket 需開公開讀取。",
     keys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL", "S3_FORCE_PATH_STYLE"],
     requiredKeys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL"]
   }

@@ -27,7 +27,11 @@ export function createProjectQueue() {
 export async function enqueueProjectJob(projectId: string, action: ProjectAction, opts?: JobsOptions) {
   const queue = createProjectQueue();
   try {
-    await queue.add(`${action}-${projectId}`, { projectId, action }, opts ?? { attempts: 1 });
+    await queue.add(
+      `${action}-${projectId}`,
+      { projectId, action },
+      { removeOnComplete: true, removeOnFail: 50, attempts: 1, ...(opts ?? {}) }
+    );
   } finally {
     await queue.close();
   }
