@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-lurevid is a public multi-user short-video analysis and adaptation app. Users register/login, paste an Instagram Reels or TikTok URL, and the system analyzes not only transcript text, but also video frames, captions/on-screen text, shot composition, editing rhythm, and visual storytelling.
+lurevid is a public multi-user short-video analysis and adaptation app. Users register/login, paste an Instagram Reels, TikTok, or Douyin URL, and the system analyzes not only transcript text, but also video frames, captions/on-screen text, shot composition, editing rhythm, and visual storytelling.
 
 ## Runtime Setup
 
@@ -77,7 +77,14 @@ Why it matters:
 - Web and worker services do not share local disk in cloud deployment.
 - Final videos must be playable/downloadable by the frontend.
 
-Supported providers include Cloudflare R2, AWS S3, Zeabur Object Storage, or any S3-compatible bucket.
+Supported providers include Cloudflare R2 (recommended; the `/settings` labels are R2-oriented), AWS S3, Zeabur Object Storage, or any S3-compatible bucket. The env var keys stay `S3_*`; only the UI labels say R2. The bucket must allow public reads (R2: enable the r2.dev public URL or a custom domain) so Seedance and the frontend can fetch by URL.
+
+## Monitoring & Queue Health
+
+- `/health` is an admin-only dashboard: PostgreSQL, Redis, worker liveness, queue depth, and OpenAI/Seedance/R2 config. Checks are timeout-bounded so the endpoint never hangs.
+- Worker liveness is detected via a Redis heartbeat (`WORKER_HEARTBEAT_KEY`, EX 60, written every 15s in `scripts/worker.ts`).
+- `/api/health/clean-failed` (admin) clears accumulated failed/completed job records; jobs are enqueued with `removeOnComplete` + `removeOnFail: 50` to cap accumulation.
+- Platform downloads: yt-dlp comes from the **nightly** channel in Docker (`YTDLP_CHANNEL`); Instagram 429 from datacenter IPs is IP blocking (not a bug).
 
 ## Local Tools
 

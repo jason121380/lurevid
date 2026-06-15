@@ -113,7 +113,7 @@ export async function GET() {
     const s3Ready = !isMissing(settings.S3_ACCESS_KEY_ID) && !isMissing(settings.S3_SECRET_ACCESS_KEY) && Boolean(settings.S3_BUCKET) && Boolean(settings.S3_PUBLIC_URL);
     configChecks.push({
       key: "s3",
-      label: "S3 / R2 物件儲存",
+      label: "R2 物件儲存",
       status: s3Ready ? "ok" : "warn",
       detail: s3Ready ? "已設定" : "尚未完成（分鏡圖與成品影片需要）"
     });
