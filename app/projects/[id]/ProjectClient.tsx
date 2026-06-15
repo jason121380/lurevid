@@ -451,21 +451,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const storyboardPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm">8 · 產生分鏡</h2>
-          {project.scenes.length > 0 && Boolean(project.adaptedScript) && (
-            <button
-              className="btn btn-ghost h-8 px-3 text-xs"
-              disabled={busy || submitting}
-              onClick={() => post("/storyboard", { adaptedScript: script }, "已開始產生分鏡")}
-              type="button"
-              title="重新產生全部 9 張分鏡圖"
-            >
-              <RotateCcw size={13} />
-              重新產生分鏡
-            </button>
-          )}
-        </div>
+        <h2 className="text-sm">7 · 產生分鏡</h2>
         {project.status === "STORYBOARD_READY" && (
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={ratio} onChange={(event) => setRatio(event.target.value)}>
