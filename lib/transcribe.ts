@@ -57,7 +57,7 @@ function formatTimestampedTranscript(result: {
 /**
  * 用 yt-dlp 下載影片音訊，再用 OpenAI 轉成逐字稿。
  * 優先下載原始音訊格式，避免本機分析階段依賴 ffmpeg。
- * 機房 IP 常被 IG/TikTok 阻擋，失敗時拋錯，呼叫端應退回「手動貼逐字稿」。
+ * 機房 IP 常被 IG/TikTok 阻擋，失敗時拋錯，由 worker 顯示重試或換公開連結。
  */
 export async function fetchTranscript(url: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "lurevid-"));

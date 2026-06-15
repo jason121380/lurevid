@@ -102,6 +102,10 @@ function sourceEmbedUrl(url?: string) {
   if (/instagram\.com\/(?:reels?|p)\//i.test(url)) {
     return `${url.split("?")[0].replace(/\/+$/, "").replace(/\/reels\//i, "/reel/")}/embed`;
   }
+  const tiktokVideoId = url.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/i)?.[1];
+  if (tiktokVideoId) {
+    return `https://www.tiktok.com/embed/v2/${tiktokVideoId}`;
+  }
   return url;
 }
 
