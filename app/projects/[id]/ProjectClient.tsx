@@ -258,6 +258,12 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             下載 MP4
           </a>
         </div>
+      ) : project.analysis || project.sourceTranscript ? (
+        <div className="rounded-xl border border-[var(--orange-border)] bg-orange-bg p-3 text-sm leading-6 text-[var(--gray-500)] md:p-4">
+          <p className="font-medium text-[var(--black)]">沒有取得可下載的 MP4</p>
+          <p className="mt-1">影片下載失敗，但系統已用可取得的音訊/內容完成後續分析。若一定要 MP4，請按左側第 2 步重新下載，或換一支可公開下載的影片。</p>
+          {project.error && <p className="mt-2 text-[var(--red)]">{project.error}</p>}
+        </div>
       ) : (
         <EmptyPanel title="尚未下載影片" description="按工作清單第 2 步的 play，worker 會用 yt-dlp 下載並存成 MP4。" />
       )}

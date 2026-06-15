@@ -122,7 +122,7 @@ async function runAnalyze(projectId: string) {
       transcript = await fetchTranscript(project.sourceUrl);
     } catch (error) {
       const reason = error instanceof Error ? error.message : "未知錯誤";
-      throw new Error(`無法自動抓取影片逐字稿（${transcriptError || reason}）。請改用手動貼上逐字稿後重試。`);
+      throw new Error(`無法下載或轉錄這支影片（${transcriptError || reason}）。請確認影片為公開連結，或稍後在第 2 步重新下載。`);
     }
     await prisma.project.update({ where: { id: projectId }, data: { sourceTranscript: transcript } });
   }
@@ -367,6 +367,11 @@ const worker = new Worker(
       else if (action === "storyboard") await generateStoryboard(projectId);
       else await generateVideo(projectId);
     } catch (error) {
+      const exists = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
+      if (!exists) {
+        console.warn(`skip stale job ${job.id}: project ${projectId} no longer exists`);
+        return;
+      }
       await prisma.project.update({
         where: { id: projectId },
         data: {

@@ -10,7 +10,7 @@ export function createRedisConnection() {
   if (!redisUrl) throw new Error("缺少 REDIS_URL");
   return new IORedis(redisUrl, {
     connectTimeout: 5000,
-    enableOfflineQueue: false,
+    enableOfflineQueue: true,
     keepAlive: 10000,
     retryStrategy: (times) => Math.min(times * 1000, 10000),
     maxRetriesPerRequest: null
