@@ -500,7 +500,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={scene.imageUrl} alt={scene.title} className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-xs text-[var(--gray-500)]">分鏡圖生成中</span>
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 size={22} className="animate-spin text-orange" />
+                    <span className="text-sm tabular-nums font-medium text-orange">{sceneProgress(scene.status).pct}%</span>
+                    <span className="text-xs text-[var(--gray-500)]">分鏡圖生成中</span>
+                  </div>
                 )}
               </div>
               <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">{scene.visualGoal}</p>
