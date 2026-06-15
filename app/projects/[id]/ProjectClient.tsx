@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Download, Eye, Loader2, Play, RotateCcw, X, XCircle } from "lucide-react";
+import { CheckCircle2, Download, Loader2, Play, RotateCcw, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/Shell";
 
@@ -244,31 +244,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
 
   const busy = BUSY.includes(project.status) || submitting;
   const previewScale = previewWidth ? previewWidth / 540 : 1;
-  const statusPanel = (
-    <div className="card p-3 md:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
-          {project.sourceUrl && (
-            <a className="mt-1 block break-all text-sm text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
-              {project.sourceUrl}
-            </a>
-          )}
-        </div>
-        {project.sourceUrl && (
-          <a className="btn btn-ghost w-full shrink-0 sm:w-auto" href="#video-preview-modal" onClick={() => { window.location.hash = "video-preview-modal"; }}>
-            <Eye size={16} />
-            影片預覽
-          </a>
-        )}
-      </div>
-      <p className="mt-2 flex items-center gap-2 text-sm text-[var(--gray-500)]">
-        {busy && <Loader2 size={14} className="animate-spin text-orange" />}
-        {project.message}
-      </p>
-      {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-sm text-[var(--red)]">{project.error}</p>}
-    </div>
-  );
   const downloadPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -290,6 +265,19 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   );
   const previewPanel = (
     <div className="w-full max-w-[360px]">
+      <div className="mb-3 rounded-xl bg-white p-3 text-sm">
+        <p className="text-[11px] uppercase text-orange">Source · {project.sourcePlatform || "影片"}</p>
+        {project.sourceUrl && (
+          <a className="mt-1 block break-all text-xs text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
+            {project.sourceUrl}
+          </a>
+        )}
+        <p className="mt-2 flex items-center gap-2 text-xs text-[var(--gray-500)]">
+          {busy && <Loader2 size={13} className="animate-spin text-orange" />}
+          {project.message}
+        </p>
+        {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
+      </div>
       <div className="card overflow-hidden">
         <div className="flex items-center gap-2 p-3 md:p-4">
           {project.status === "COMPLETED" && <CheckCircle2 className="text-[var(--green)]" />}
@@ -420,7 +408,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const selectedPanel = (() => {
-    if (activeStep === 1) return statusPanel;
+    if (activeStep === 1) return previewPanel;
     if (activeStep === 2) return downloadPanel;
     if (activeStep === 3) return transcriptPanel;
     if (activeStep === 4) return framePanel;
@@ -474,30 +462,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             {selectedPanel}
           </section>
         </div>
-        {project.sourceUrl && (
-          <div id="video-preview-modal" className="fixed inset-0 z-50 hidden overflow-y-auto bg-black/45 px-4 py-8 target:grid target:items-start" role="dialog" aria-modal="true">
-            <div className="mx-auto w-full max-w-[380px] rounded-2xl bg-white p-3 shadow-xl md:p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-lg">影片預覽</h2>
-                <a className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange" href="#" title="關閉">
-                  <X size={18} />
-                </a>
-              </div>
-              <div className="relative grid max-h-[72vh] w-full aspect-[9/16] place-items-center overflow-hidden rounded-xl bg-[#111] text-sm text-white">
-                <iframe
-                  className="h-full w-full border-0 bg-white"
-                  src={sourceEmbedUrl(project.sourceUrl)}
-                  title="來源影片預覽"
-                  loading="lazy"
-                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                />
-              </div>
-              <a className="btn btn-ghost mt-4 w-full" href={project.sourceUrl} target="_blank" rel="noreferrer">
-                開啟原始影片
-              </a>
-            </div>
-          </div>
-        )}
       </div>
     </Shell>
   );
