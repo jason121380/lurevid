@@ -22,6 +22,7 @@ type Project = {
   id: string;
   sourceUrl?: string;
   sourcePlatform?: string;
+  sourceVideoUrl?: string;
   sourceTranscript?: string;
   analysis?: string;
   structure?: string;
@@ -60,7 +61,7 @@ function buildProcessSteps(project: Project): Array<{ title: string; description
 
   return [
     step("建立專案", "儲存來源連結並排入 Redis queue", project.progress >= 0.03, project.status === "QUEUED"),
-    step("下載影片", "worker 用 yt-dlp 取得 IG/TikTok 影片", project.progress >= 0.1 || Boolean(project.sourceTranscript), project.status === "ANALYZING" && activeMessage.includes("下載")),
+    step("下載影片", "worker 用 yt-dlp 取得 IG/TikTok 影片", Boolean(project.sourceVideoUrl), project.status === "ANALYZING" && activeMessage.includes("下載")),
     step("轉錄音訊", "把影片聲音轉成逐字稿", Boolean(project.sourceTranscript), project.status === "ANALYZING" && (activeMessage.includes("轉錄") || activeMessage.includes("逐字稿") || activeMessage.includes("音訊"))),
     step("抽取影格", "用 ffmpeg 抽出代表性畫面", project.progress >= 0.17 || doneAfterAnalyze, project.status === "ANALYZING" && activeMessage.includes("抽取")),
     step("視覺分析", "AI 分析畫面、字幕、構圖與分鏡節奏", project.progress >= 0.19 || doneAfterAnalyze, project.status === "ANALYZING" && (activeMessage.includes("畫面") || activeMessage.includes("影格") || activeMessage.includes("分鏡"))),
@@ -75,7 +76,7 @@ function buildProcessSteps(project: Project): Array<{ title: string; description
 function stepCanRun(project: Project, stepNumber: number) {
   if (stepNumber === 1) return false;
   if (stepNumber === 2) return true;
-  if (stepNumber === 3) return project.progress >= 0.1 || Boolean(project.sourceTranscript);
+  if (stepNumber === 3) return Boolean(project.sourceVideoUrl) || Boolean(project.sourceTranscript);
   if (stepNumber === 4) return Boolean(project.sourceTranscript);
   if (stepNumber === 5) return project.progress >= 0.17 || Boolean(project.analysis);
   if (stepNumber === 6) return project.progress >= 0.19 || Boolean(project.analysis);
@@ -247,6 +248,25 @@ export function ProjectClient({ projectId }: { projectId: string }) {
       {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-sm text-[var(--red)]">{project.error}</p>}
     </div>
   );
+  const downloadPanel = (
+    <div className="card p-3 md:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm">2 · 下載影片</h2>
+        <span className="text-[11px] text-[var(--gray-500)]">MP4</span>
+      </div>
+      {project.sourceVideoUrl ? (
+        <div className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4">
+          <p className="text-sm font-medium text-[var(--black)]">來源影片已下載</p>
+          <a className="btn btn-primary mt-3 w-full sm:w-auto" href={project.sourceVideoUrl} download target="_blank" rel="noreferrer">
+            <Download size={16} />
+            下載 MP4
+          </a>
+        </div>
+      ) : (
+        <EmptyPanel title="尚未下載影片" description="按工作清單第 2 步的 play，worker 會用 yt-dlp 下載並存成 MP4。" />
+      )}
+    </div>
+  );
   const previewPanel = (
     <div className="w-full max-w-[360px]">
       <div className="card overflow-hidden">
@@ -355,7 +375,7 @@ export function ProjectClient({ projectId }: { projectId: string }) {
   );
   const selectedPanel = (() => {
     if (activeStep === 1) return statusPanel;
-    if (activeStep === 2) return previewPanel;
+    if (activeStep === 2) return downloadPanel;
     if (activeStep === 3) return transcriptPanel;
     if ([4, 5, 6].includes(activeStep)) {
       return project.analysis ? (

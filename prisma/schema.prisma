@@ -41,6 +41,7 @@ model Project {
   idea             String        @default("")
   sourceUrl        String?
   sourcePlatform   String?
+  sourceVideoUrl   String?
   sourceTranscript String?       @db.Text
   analysis         String?       @db.Text
   structure        String?       @db.Text

@@ -48,6 +48,18 @@ async function runAnalyze(projectId: string) {
 
   try {
     await withDownloadedVideo(project.sourceUrl, async (videoPath, dir) => {
+      if (!project.sourceVideoUrl) {
+        const sourceVideoUrl = await uploadObject(
+          `projects/${projectId}/source.mp4`,
+          await readFile(videoPath),
+          "video/mp4"
+        );
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { sourceVideoUrl, message: "來源影片已下載，可下載 MP4", progress: 0.08 }
+        });
+      }
+
       if (!transcript) {
         try {
           await prisma.project.update({
