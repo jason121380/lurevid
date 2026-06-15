@@ -1,6 +1,6 @@
 # lurevid
 
-短影音分析創作平台：使用者貼上一支 IG Reels / TikTok 連結，系統會下載影片、抽取影格分析畫面分鏡，
+短影音分析創作平台：使用者貼上一支 IG Reels / TikTok / 抖音連結，系統會下載影片、抽取影格分析畫面分鏡，
 並把音訊轉成逐字稿。接著依序做「分析 → 拆解結構 → 改編腳本」（每步都可編輯後再繼續），
 產生 9 格分鏡與分鏡圖，最後送進 Seedance 2.0 變成影片片段並用 ffmpeg 合成。
 
@@ -8,7 +8,7 @@
 
 - Next.js App Router + TypeScript
 - Tailwind CSS，視覺參考 `jason121380/luredash`
-- yt-dlp 下載影片與音訊
+- yt-dlp 下載影片與音訊（Docker 內預設用 nightly 版，跟得上 IG/TikTok/抖音改版）
 - ffmpeg-static 抽取影片影格，做畫面／字幕／分鏡節奏分析
 - OpenAI 轉錄（`OPENAI_TRANSCRIBE_MODEL`）
 - OpenAI Responses API：`OPENAI_STORY_MODEL` + `OPENAI_PROMPT_MODEL`（視覺分析／內容分析／結構／改編／分鏡）
@@ -17,10 +17,19 @@
 - PostgreSQL + Prisma
 - Redis + BullMQ worker
 - ffmpeg 合成影片
-- S3 相容物件儲存（分鏡圖與成品影片）
+- S3 相容物件儲存（分鏡圖與成品影片），建議用 Cloudflare R2
 - NextAuth（Email + 密碼登入）：多使用者，每個專案綁定建立者
-- 設定頁：**僅管理員**可在左側選單「設定」填入 OpenAI、Seedance、S3 等 API key，設定存入 PostgreSQL
+- 設定頁：**僅管理員**可在左側選單「設定」填入 OpenAI、Seedance、R2 等 API key，設定存入 PostgreSQL
+- `/health`：**僅管理員**的系統健康頁（DB / Redis / Worker / 佇列 / 金鑰狀態）
 - Zeabur 部署（Web 與 Worker 兩個服務共用同一個 Docker image）
+
+## 支援平台與監控
+
+- 支援來源：Instagram Reels、TikTok、抖音（`lib/transcribe.ts` 以 allowlist 驗證）。
+- yt-dlp 在 Docker 預設用 nightly 頻道（build arg `YTDLP_CHANNEL=nightly|stable|<版本>`）。
+- 從機房 IP（Zeabur）抓 IG 常被擋 429，這是平台 IP 封鎖、非程式問題；可改用手動貼逐字稿或代理。
+- Worker 每 15 秒寫一次 Redis 心跳，`/health` 用它判斷 worker 是否存活；該頁也能一鍵清除累積的失敗任務紀錄。
+- 物件儲存設定頁文案是 R2 導向，但環境變數鍵名仍為 `S3_*`（沿用 S3 SDK，相容 R2）。
 
 ## 帳號與權限
 

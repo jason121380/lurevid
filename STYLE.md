@@ -17,6 +17,9 @@ lurevid 的程式與介面風格規範。新程式碼請比照既有檔案的慣
 - 用 `zod` 驗證所有外部輸入；使用者可編輯的文字欄位要有長度上限（見 `lib/limits.ts`）。
 - 命名用具描述性的 camelCase；常數用 UPPER_SNAKE_CASE。
 - 沿用既有的 Tailwind 設計 token（`var(--orange)`、`var(--warm-white)`、`.card`、`.btn` 等），不要硬寫色碼。
+- 狀態用色一致：正常=綠（`var(--green)`）、注意=橘（`orange`）、異常=紅（`var(--red)`）；完成的步驟徽章用實心橘。
+- 動作要有回饋：成功/失敗給 toast 或就地訊息，不要讓使用者「按了沒反應」。
+- 管理員專屬頁（`/settings`、`/health`）的入口在側欄只對 admin 顯示，且對應 API 用 `requireAdmin` 把關。
 
 ## 安全
 

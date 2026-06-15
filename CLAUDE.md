@@ -2,7 +2,7 @@
 
 ## Project
 
-`lurevid` is a Next.js + TypeScript app for analyzing and adapting short-form videos from Instagram Reels and TikTok.
+`lurevid` is a Next.js + TypeScript app for analyzing and adapting short-form videos from Instagram Reels, TikTok, and Douyin.
 
 The expected user experience:
 
@@ -26,6 +26,18 @@ The worker should analyze:
 - Scene function in the short-video structure
 
 Manual transcript input is only a fallback when platform download or transcription fails.
+
+## Platforms & Downloads
+
+- Supported source hosts: `instagram.com`, `tiktok.com`, `douyin.com`/`iesdouyin.com` (allowlist + `new URL` validation in `lib/transcribe.ts`).
+- yt-dlp is installed in the Docker image from the **nightly** channel by default (`YTDLP_CHANNEL=nightly|stable|<tag>`); platforms change often and nightly tracks extractor fixes.
+- Datacenter IPs (e.g. Zeabur) are frequently rate-limited/blocked by Instagram (HTTP 429). That is IP blocking, not a code bug; the manual-transcript fallback or a proxy/cookies is the workaround.
+
+## Monitoring
+
+- `/health` (admin-only page) shows status of PostgreSQL, Redis, the worker, the job queue, and OpenAI/Seedance/R2 configuration. Auto-refreshes; has a "clear failed records" action.
+- The worker writes a Redis heartbeat (`WORKER_HEARTBEAT_KEY` in `lib/queue.ts`, EX 60) every 15s so `/api/health/status` can detect worker liveness.
+- Jobs are enqueued with `removeOnComplete` + `removeOnFail: 50` so failed/completed records don't accumulate.
 
 ## Authentication
 
@@ -73,6 +85,8 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `app/settings/page.tsx`: admin settings UI.
 - `app/api/settings/route.ts`: settings API (admin-only).
 - `app/api/auth/[...nextauth]/route.ts`, `app/api/register/route.ts`: auth endpoints.
+- `app/health/page.tsx`, `app/api/health/status/route.ts`, `app/api/health/clean-failed/route.ts`: admin health dashboard + checks.
+- `app/api/health/route.ts`: public liveness probe (`{ ok: true }`).
 - `lib/auth.ts` / `lib/auth.config.ts`: NextAuth setup (node) / edge-safe base config.
 - `lib/authz.ts`, `lib/project-access.ts`: session + ownership helpers for API routes.
 - `lib/settings.ts`: setting definitions, DB access, and TTL cache.
@@ -82,8 +96,9 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `lib/video.ts` / `lib/ffmpeg.ts`: clip download + ffmpeg merge / shared ffmpeg path.
 - `lib/safe-fetch.ts`: SSRF guard for fetching upstream URLs.
 - `lib/rate-limit.ts`: Redis-backed rate limiting.
-- `middleware.ts`: protects page routes.
-- `scripts/worker.ts`: BullMQ job processor.
+- `lib/queue.ts`: BullMQ queue, Redis connection, `WORKER_HEARTBEAT_KEY`, job-retention opts.
+- `middleware.ts`: protects page routes (`/`, `/projects/*`, `/settings/*`, `/health`).
+- `scripts/worker.ts`: BullMQ job processor + Redis heartbeat.
 - `prisma/schema.prisma`: includes `User`, `Project`, `Scene`, and `AppSetting`.
 
 ## Commands
