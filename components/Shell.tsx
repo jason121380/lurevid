@@ -16,6 +16,12 @@ type ProjectListItem = {
   updatedAt: string;
 };
 
+function projectDisplayTitle(project: Pick<ProjectListItem, "title">) {
+  const title = project.title?.trim();
+  if (!title || title === "AI 分析中") return "未命名專案";
+  return title;
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -51,7 +57,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   function beginEdit(project: ProjectListItem) {
     setEditingId(project.id);
-    setDraftTitle(project.title || "未命名專案");
+    setDraftTitle(projectDisplayTitle(project));
   }
 
   function closeMobileMenu() {
@@ -78,7 +84,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }
 
   async function deleteProject(project: ProjectListItem) {
-    if (!window.confirm(`刪除「${project.title || "未命名專案"}」？這會移除分析、分鏡與影片紀錄。`)) return;
+    if (!window.confirm(`刪除「${projectDisplayTitle(project)}」？這會移除分析、分鏡與影片紀錄。`)) return;
 
     setSavingId(project.id);
     try {
@@ -162,7 +168,7 @@ export function Shell({ children }: { children: ReactNode }) {
                     ) : (
                       <div className="flex items-center gap-1">
                         <Link className="block min-w-0 flex-1 py-1" href={`/projects/${project.id}`} onClick={closeMobileMenu}>
-                          <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{project.title || "未命名專案"}</div>
+                          <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{projectDisplayTitle(project)}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
                           <button className="grid h-6 w-6 place-items-center text-[var(--gray-400)] hover:text-[var(--gray-600)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
