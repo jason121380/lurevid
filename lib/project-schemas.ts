@@ -1,10 +1,8 @@
 import { z } from "zod";
-import { MAX_TRANSCRIPT_LENGTH } from "@/lib/limits";
 
 export const createProjectSchema = z.object({
   title: z.string().trim().max(80, "專案名稱太長").optional(),
   sourceUrl: z.string().url(),
-  transcript: z.string().max(MAX_TRANSCRIPT_LENGTH, "逐字稿太長").optional(),
   settings: z
     .object({
       ratio: z.enum(["9:16", "16:9", "1:1"]).default("9:16"),
@@ -28,4 +26,3 @@ export function parseVideoSettings(input: unknown, fallback: z.infer<typeof vide
     duration: "duration" in body && Number.isInteger(body.duration) ? body.duration : fallback.duration
   });
 }
-

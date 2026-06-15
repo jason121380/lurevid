@@ -7,7 +7,7 @@ import type { Uploadable } from "openai";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 
-const ALLOWED_HOSTS = ["tiktok.com", "instagram.com", "douyin.com", "iesdouyin.com"];
+const ALLOWED_HOSTS = ["tiktok.com"];
 
 function parseAllowedUrl(url: string): URL | null {
   let parsed: URL;
@@ -27,17 +27,21 @@ export function detectPlatform(url: string) {
   if (!parsed) return "Unknown";
   const host = parsed.hostname.toLowerCase();
   if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return "TikTok";
-  if (host === "instagram.com" || host.endsWith(".instagram.com")) return "Instagram";
-  if (host.endsWith("douyin.com") || host.endsWith("iesdouyin.com")) return "抖音";
   return "Unknown";
 }
 
 /**
- * 只接受 http(s) 的 TikTok / Instagram 連結。
+ * 只接受 http(s) 的 TikTok 連結。
  * 用 URL 解析（而非寬鬆 regex）以擋掉內網 SSRF 與 yt-dlp 參數注入（例如 `-` 開頭）。
  */
 export function isSupportedSourceUrl(url: string) {
   return parseAllowedUrl(url) !== null && detectPlatform(url) !== "Unknown";
+}
+
+export function normalizeSourceUrl(url: string) {
+  const parsed = parseAllowedUrl(url);
+  if (!parsed) return url;
+  return parsed.toString();
 }
 
 function run(command: string, args: string[]) {
@@ -81,10 +85,11 @@ function formatTimestampedTranscript(result: {
 /**
  * 用 yt-dlp 下載影片音訊，再用 OpenAI 轉成逐字稿。
  * 優先下載原始音訊格式，避免本機分析階段依賴 ffmpeg。
- * 機房 IP 常被 IG/TikTok 阻擋，失敗時拋錯，由 worker 顯示重試或換公開連結。
+ * 下載失敗時拋錯，由 worker 顯示重試或換公開連結。
  */
 export async function fetchTranscript(url: string): Promise<string> {
   if (!isSupportedSourceUrl(url)) throw new Error("不支援的來源影片連結");
+  const normalizedUrl = normalizeSourceUrl(url);
   const dir = await mkdtemp(join(tmpdir(), "lurevid-"));
   try {
     await run("yt-dlp", [
@@ -95,7 +100,7 @@ export async function fetchTranscript(url: string): Promise<string> {
       "-o",
       join(dir, "source.%(ext)s"),
       "--",
-      url
+      normalizedUrl
     ]);
 
     const files = await readdir(dir);

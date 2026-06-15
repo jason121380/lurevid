@@ -33,16 +33,15 @@ describe("project schemas", () => {
   it("caps create project settings to the same public choices", () => {
     expect(
       createProjectSchema.parse({
-        sourceUrl: "https://www.instagram.com/reel/abc/",
+        sourceUrl: "https://www.tiktok.com/@user/video/1234567890",
         settings: { ratio: "1:1", resolution: "480p", duration: 4 }
       }).settings
     ).toEqual({ ratio: "1:1", resolution: "480p", duration: 4 });
     expect(() =>
       createProjectSchema.parse({
-        sourceUrl: "https://www.instagram.com/reel/abc/",
+        sourceUrl: "https://www.tiktok.com/@user/video/1234567890",
         settings: { ratio: "1:1", resolution: "720p", duration: 2 }
       })
     ).toThrow();
   });
 });
-

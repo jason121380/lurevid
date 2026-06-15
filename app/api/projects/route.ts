@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { enqueueProjectJob } from "@/lib/queue";
-import { detectPlatform, isSupportedSourceUrl } from "@/lib/transcribe";
+import { detectPlatform, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
 import { currentUser } from "@/lib/authz";
 import { rateLimit } from "@/lib/rate-limit";
 import { createProjectSchema } from "@/lib/project-schemas";
@@ -13,7 +13,7 @@ function toCreateProjectError(error: unknown) {
   if (error instanceof z.ZodError) {
     const first = error.issues[0];
     return {
-      message: first?.path[0] === "title" ? first.message : "請貼上有效的 Instagram Reels、TikTok 或抖音連結",
+      message: first?.path[0] === "title" ? first.message : "請貼上有效的 TikTok 連結",
       status: 400
     };
   }
@@ -56,16 +56,16 @@ export async function POST(request: Request) {
   try {
     const body = createProjectSchema.parse(await request.json());
     if (!isSupportedSourceUrl(body.sourceUrl)) {
-      return NextResponse.json({ error: "目前支援 Instagram Reels、TikTok 與抖音連結" }, { status: 400 });
+      return NextResponse.json({ error: "目前只支援 TikTok 連結" }, { status: 400 });
     }
+    const sourceUrl = normalizeSourceUrl(body.sourceUrl);
 
     const project = await prisma.project.create({
       data: {
         userId: user.id,
         title: body.title || undefined,
-        sourceUrl: body.sourceUrl,
-        sourcePlatform: detectPlatform(body.sourceUrl),
-        sourceTranscript: body.transcript?.trim() || null,
+        sourceUrl,
+        sourcePlatform: detectPlatform(sourceUrl),
         ratio: body.settings.ratio,
         resolution: body.settings.resolution,
         duration: body.settings.duration,

@@ -9,7 +9,6 @@ import { useToast } from "@/components/Toast";
 export default function HomePage() {
   const router = useRouter();
   const toast = useToast();
-  const [projectTitle, setProjectTitle] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -23,7 +22,6 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: projectTitle.trim() || undefined,
           sourceUrl: sourceUrl.trim()
         })
       });
@@ -52,18 +50,12 @@ export default function HomePage() {
               今天想分析哪支影片呢 👀
             </h2>
             <div className="rounded-full border border-[var(--border-strong)] bg-white px-3 py-2 transition focus-within:border-orange">
-              <div className="grid min-h-10 gap-2 md:grid-cols-[minmax(0,1fr)_132px_auto] md:items-center">
+              <div className="grid min-h-10 gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                 <input
                   className="min-w-0 border-0 bg-transparent px-1 py-1 text-xs outline-none placeholder:text-[var(--gray-300)] md:text-sm"
-                  placeholder="貼上 IG Reel、TikTok 或抖音影片連結"
+                  placeholder="貼上 TikTok 影片連結"
                   value={sourceUrl}
                   onChange={(event) => setSourceUrl(event.target.value)}
-                />
-                <input
-                  className="min-w-0 rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-[11px] outline-none placeholder:text-[var(--gray-300)] focus:border-orange"
-                  placeholder="命名專案名稱"
-                  value={projectTitle}
-                  onChange={(event) => setProjectTitle(event.target.value)}
                 />
                 <button
                   className="grid h-8 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-9 md:w-9"
@@ -77,7 +69,7 @@ export default function HomePage() {
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-[var(--gray-500)]">
               <span>支援平台</span>
-              {["Instagram", "TikTok", "抖音"].map((name) => (
+              {["TikTok"].map((name) => (
                 <span key={name} className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[var(--gray-500)]">
                   {name}
                 </span>

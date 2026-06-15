@@ -4,7 +4,7 @@ import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
   title: "lurevid | 短影音分析創作平台",
-  description: "貼上 IG Reels / TikTok 連結，自動分析、改編、分鏡並生成影片。"
+  description: "貼上 TikTok 連結，自動分析、改編、分鏡並生成影片。"
 };
 
 export const viewport = {

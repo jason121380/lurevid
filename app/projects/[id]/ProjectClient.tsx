@@ -123,8 +123,6 @@ function sceneProgress(status: string): { pct: number; color: string } {
   switch (status) {
     case "IMAGE_GENERATING":
       return { pct: 30, color: "bg-orange" };
-    case "IMAGE_READY":
-      return { pct: 50, color: "bg-orange" };
     case "QUEUED":
       return { pct: 60, color: "bg-orange" };
     case "GENERATING":
@@ -138,10 +136,37 @@ function sceneProgress(status: string): { pct: number; color: string } {
   }
 }
 
+function shouldShowSceneProgress(status: string) {
+  return ["IMAGE_GENERATING", "QUEUED", "GENERATING"].includes(status);
+}
+
 function statusClass(status: string) {
-  if (status === "COMPLETED" || status === "SUCCEEDED") return "badge-active";
+  if (["COMPLETED", "SUCCEEDED", "IMAGE_READY"].includes(status)) return "badge-active";
   if (status === "FAILED") return "badge-error";
   return "badge-warn";
+}
+
+function sceneStatusLabel(status: string) {
+  switch (status) {
+    case "DRAFT":
+      return "待處理";
+    case "PROMPT_READY":
+      return "提示完成";
+    case "IMAGE_GENERATING":
+      return "產圖中";
+    case "IMAGE_READY":
+      return "完成";
+    case "QUEUED":
+      return "排隊中";
+    case "GENERATING":
+      return "生成中";
+    case "SUCCEEDED":
+      return "完成";
+    case "FAILED":
+      return "失敗";
+    default:
+      return "處理中";
+  }
 }
 
 function sourceEmbedUrl(url?: string) {
@@ -155,11 +180,6 @@ function sourceEmbedUrl(url?: string) {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
   const host = parsed.hostname.toLowerCase();
 
-  if (host === "instagram.com" || host.endsWith(".instagram.com")) {
-    if (!/\/(?:reels?|p)\//i.test(parsed.pathname)) return "";
-    const path = parsed.pathname.replace(/\/+$/, "").replace(/\/reels\//i, "/reel/");
-    return `https://www.instagram.com${path}/embed`;
-  }
   if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
     const tiktokVideoId = parsed.pathname.match(/\/@[^/]+\/video\/(\d+)/i)?.[1];
     return tiktokVideoId ? `https://www.tiktok.com/embed/v2/${tiktokVideoId}` : "";
@@ -482,11 +502,13 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             <article key={scene.id} className="card p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
-                <span className={`badge ${statusClass(scene.status)}`}>{scene.status}</span>
+                <span className={`badge ${statusClass(scene.status)}`}>{sceneStatusLabel(scene.status)}</span>
               </div>
-              <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
-                <div className={`h-full transition-all duration-500 ${sceneProgress(scene.status).color}`} style={{ width: `${sceneProgress(scene.status).pct}%` }} />
-              </div>
+              {shouldShowSceneProgress(scene.status) && (
+                <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
+                  <div className={`h-full transition-all duration-500 ${sceneProgress(scene.status).color}`} style={{ width: `${sceneProgress(scene.status).pct}%` }} />
+                </div>
+              )}
               <h3 className="text-sm font-bold">{scene.title}</h3>
               <div className="mt-3 grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
                 {scene.videoUrl ? (

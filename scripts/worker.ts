@@ -86,7 +86,7 @@ async function computeAnalysis(projectId: string) {
   const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
   const platform = project.sourcePlatform || detectPlatform(project.sourceUrl || "");
   const transcript = project.sourceTranscript?.trim() || "";
-  if (!transcript) throw new Error("尚未取得逐字稿，請先完成轉錄或手動貼逐字稿");
+  if (!transcript) throw new Error("尚未取得逐字稿，請先完成轉錄");
 
   let visualAnalysis = project.visualAnalysis || "";
   const frameUrls = Array.isArray(project.sourceFrameUrls) ? (project.sourceFrameUrls as string[]) : [];
@@ -218,7 +218,7 @@ async function runFull(projectId: string) {
     } catch (error) {
       const reason = transcriptError || (error instanceof Error ? error.message : "未知錯誤");
       await markStepFailed(projectId, "transcribe", reason);
-      throw new Error(`無法下載或轉錄這支影片（${reason}）。請確認影片為公開連結，或在第 2 步手動貼逐字稿。`);
+      throw new Error(`無法下載或轉錄這支影片（${reason}）。請確認影片為公開連結，或稍後重試轉錄。`);
     }
   }
 
