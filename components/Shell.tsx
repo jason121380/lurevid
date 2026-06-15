@@ -173,10 +173,10 @@ export function Shell({ children }: { children: ReactNode }) {
                           <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{projectDisplayTitle(project)}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
-                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-400)] hover:text-[var(--gray-600)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
+                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
                             <Pencil size={11} />
                           </button>
-                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-400)] hover:text-[var(--gray-600)]" disabled={savingId === project.id} onClick={() => deleteProject(project)} title="刪除專案">
+                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => deleteProject(project)} title="刪除專案">
                             <X size={12} />
                           </button>
                         </div>

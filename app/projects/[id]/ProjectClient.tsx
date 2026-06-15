@@ -41,7 +41,7 @@ function stepStateClass(state: StepState) {
   if (state === "done") return "border-[var(--green)] bg-[var(--green-bg)] text-[var(--green)]";
   if (state === "active") return "border-orange bg-orange-bg text-orange";
   if (state === "failed") return "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]";
-  return "border-[var(--border-strong)] bg-white text-[var(--gray-300)]";
+  return "border-[var(--gray-200)] bg-white text-[var(--gray-300)]";
 }
 
 function buildProcessSteps(project: Project): Array<{ title: string; description: string; state: StepState }> {
