@@ -36,9 +36,21 @@ export class SeedanceApiError extends Error {
 
 function seedanceError(data: unknown, fallback: string) {
   if (typeof data === "object" && data !== null) {
-    const maybe = data as { error?: unknown; message?: unknown };
+    const maybe = data as { error?: unknown; message?: unknown; code?: unknown };
     if (typeof maybe.error === "string") return maybe.error;
     if (typeof maybe.message === "string") return maybe.message;
+    if (typeof maybe.error === "object" && maybe.error !== null) {
+      const nested = maybe.error as { code?: unknown; message?: unknown };
+      const code = typeof nested.code === "string" ? nested.code : "";
+      const message = typeof nested.message === "string" ? nested.message : "";
+      if (code || message) return [code, message].filter(Boolean).join("：");
+    }
+    if (typeof maybe.code === "string") return maybe.code;
+    try {
+      return `${fallback}：${JSON.stringify(data).slice(0, 500)}`;
+    } catch {
+      return fallback;
+    }
   }
   return fallback;
 }

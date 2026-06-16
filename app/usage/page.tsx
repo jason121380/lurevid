@@ -53,8 +53,11 @@ type UsageData = {
   };
 };
 
-function usd(value: number) {
-  return `$${value.toFixed(value >= 1 ? 2 : 4)}`;
+const USD_TO_TWD = 31.57;
+
+function twd(valueUsd: number) {
+  const amount = Math.round(valueUsd * USD_TO_TWD);
+  return `約 NT$${new Intl.NumberFormat("zh-TW").format(amount)}`;
 }
 
 function compactNumber(value: number) {
@@ -131,20 +134,20 @@ export default function UsagePage() {
         ) : data ? (
           <>
             <div className="rounded-xl border border-orange bg-orange-bg p-3 text-xs leading-5 text-orange">
-              {data.note}
+              {data.note} 金額以台幣呈現，匯率暫以 1 USD ≈ NT${USD_TO_TWD} 估算。
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <MetricCard label="預估總花費" value={usd(data.totals.estimatedCostUsd)} sub={`${data.totals.projects} 個專案，${data.totals.completedProjects} 個已完成`} />
-              <MetricCard label="OpenAI 預估" value={usd(data.openai.estimatedCostUsd)} sub="分析、轉錄、分鏡圖" />
-              <MetricCard label="Seedance 預估" value={usd(data.seedance.estimatedCostUsd)} sub="影片生成任務" />
+              <MetricCard label="預估總花費" value={twd(data.totals.estimatedCostUsd)} sub={`${data.totals.projects} 個專案，${data.totals.completedProjects} 個已完成`} />
+              <MetricCard label="OpenAI 預估" value={twd(data.openai.estimatedCostUsd)} sub="分析、轉錄、分鏡圖" />
+              <MetricCard label="Seedance 預估" value={twd(data.seedance.estimatedCostUsd)} sub="影片生成任務" />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <section className="card p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h2 className="text-sm">OpenAI 用量</h2>
-                  <span className="rounded-full bg-orange-bg px-2.5 py-1 text-xs text-orange">{usd(data.openai.estimatedCostUsd)}</span>
+                  <span className="rounded-full bg-orange-bg px-2.5 py-1 text-xs text-orange">{twd(data.openai.estimatedCostUsd)}</span>
                 </div>
                 <div>
                   <Row label="轉錄次數" value={`${data.openai.jobs.transcribe}`} />
@@ -158,21 +161,21 @@ export default function UsagePage() {
                   <Row label="圖像 output tokens" value={compactNumber(data.openai.usage.imageOutputTokens)} />
                 </div>
                 <div className="mt-3 rounded-lg bg-[var(--warm-white)] p-3 text-xs leading-5 text-[var(--gray-500)]">
-                  文字 {usd(data.openai.breakdown.textUsd)} · 轉錄 {usd(data.openai.breakdown.transcribeUsd)} · 圖像 {usd(data.openai.breakdown.imageUsd)}
+                  文字 {twd(data.openai.breakdown.textUsd)} · 轉錄 {twd(data.openai.breakdown.transcribeUsd)} · 圖像 {twd(data.openai.breakdown.imageUsd)}
                 </div>
               </section>
 
               <section className="card p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h2 className="text-sm">Seedance 用量</h2>
-                  <span className="rounded-full bg-orange-bg px-2.5 py-1 text-xs text-orange">{usd(data.seedance.estimatedCostUsd)}</span>
+                  <span className="rounded-full bg-orange-bg px-2.5 py-1 text-xs text-orange">{twd(data.seedance.estimatedCostUsd)}</span>
                 </div>
                 <div>
                   <Row label="完成影片" value={`${data.seedance.jobs.completedVideos} 支`} />
                   <Row label="輸出秒數" value={`${data.seedance.usage.outputSeconds} 秒`} />
                 </div>
                 <div className="mt-3 rounded-lg bg-[var(--warm-white)] p-3 text-xs leading-5 text-[var(--gray-500)]">
-                  {data.pricing.seedance}
+                  {data.pricing.seedance}，頁面換算台幣顯示。
                 </div>
               </section>
             </div>
@@ -180,10 +183,10 @@ export default function UsagePage() {
             <section className="card p-4">
               <h2 className="mb-3 text-sm">估算單價</h2>
               <div className="grid gap-2 text-xs leading-5 text-[var(--gray-500)] md:grid-cols-2">
-                <div className="rounded-lg bg-[var(--warm-white)] p-3">{data.pricing.openai.text}</div>
-                <div className="rounded-lg bg-[var(--warm-white)] p-3">{data.pricing.openai.image}</div>
-                <div className="rounded-lg bg-[var(--warm-white)] p-3">{data.pricing.openai.transcribe}</div>
-                <div className="rounded-lg bg-[var(--warm-white)] p-3">{data.pricing.seedance}</div>
+                <div className="rounded-lg bg-[var(--warm-white)] p-3">{data.pricing.openai.text}，台幣約按 31.57 倍換算</div>
+                <div className="rounded-lg bg-[var(--warm-white)] p-3">{data.pricing.openai.image}，台幣約按 31.57 倍換算</div>
+                <div className="rounded-lg bg-[var(--warm-white)] p-3">{data.pricing.openai.transcribe}，台幣約按 31.57 倍換算</div>
+                <div className="rounded-lg bg-[var(--warm-white)] p-3">{data.pricing.seedance}，台幣約按 31.57 倍換算</div>
               </div>
               <p className="mt-3 text-xs text-[var(--gray-500)]">
                 最後計算：{new Date(data.generatedAt).toLocaleString("zh-TW")}

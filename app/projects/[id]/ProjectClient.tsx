@@ -735,17 +735,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                   <h3 className="text-sm">送出給 Seedance 的 9 張參考圖</h3>
                   <p className="mt-1 text-xs text-[var(--gray-500)]">這 9 張圖會和同一組合併 prompt 一起送出，生成一支影片。</p>
                 </div>
-                {project.status !== "FAILED" && (
-                  <span className={`badge ${["COMPLETED", "STORYBOARD_READY"].includes(project.status) ? "badge-active" : "badge-warn"}`}>
-                    {project.finalVideoUrl ? "已完成" : ["GENERATING", "MERGING"].includes(project.status) ? "Seedance 生成中" : project.status === "STORYBOARD_READY" ? "待送出" : "準備中"}
-                  </span>
-                )}
               </div>
-              {["GENERATING", "MERGING"].includes(project.status) && (
-                <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
-                  <div className="process-bar h-full w-full bg-orange" style={{ transform: `scaleX(${Math.max(0.52, Math.min(0.95, project.progress || 0.52))})` }} />
-                </div>
-              )}
               <div className="grid grid-cols-3 gap-2">
                 {project.scenes.map((scene) => (
                   <article key={scene.id} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
