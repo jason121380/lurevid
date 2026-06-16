@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Download, Loader2, Play, RotateCcw, X } from "lucide-react";
+import { Check, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, Play, RotateCcw, Sparkles, Video, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 
@@ -43,8 +43,25 @@ export type Project = {
 
 const BUSY = ["QUEUED", "ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING", "GENERATING", "MERGING"];
 type StepState = "done" | "active" | "waiting" | "failed";
+type ActivePanel = "project" | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 type StepInfo = { title: string; description: string; state: StepState; progress: number; errorMessage?: string };
+type StepMeta = {
+  icon: typeof Film;
+  group: "影片處理" | "影片分析" | "影片生成";
+  dependency: string;
+  output: string;
+};
+
+const STEP_META: Record<number, StepMeta> = {
+  1: { icon: Download, group: "影片處理", dependency: "來源連結", output: "來源 MP4" },
+  2: { icon: FileText, group: "影片處理", dependency: "來源連結", output: "逐字稿" },
+  3: { icon: ImageIcon, group: "影片處理", dependency: "來源連結", output: "影片影格" },
+  4: { icon: Sparkles, group: "影片分析", dependency: "逐字稿 + 影格", output: "影片洞察" },
+  5: { icon: Layers3, group: "影片生成", dependency: "影片分析", output: "改編腳本" },
+  6: { icon: Clapperboard, group: "影片生成", dependency: "改編腳本", output: "9 張分鏡圖" },
+  7: { icon: Video, group: "影片生成", dependency: "9 張分鏡圖", output: "最終影片" }
+};
 
 function buildProcessSteps(project: Project): StepInfo[] {
   const steps = (project.steps || {}) as Record<string, { status?: string; progress?: number; message?: string }>;
@@ -63,7 +80,7 @@ function buildProcessSteps(project: Project): StepInfo[] {
     if (state === "active") return steps[key]?.progress ?? 0.3;
     return 0;
   };
-  // 步驟 5-8（再行銷）：用整體 status + 產物判斷。
+  // 步驟 5-7（影片生成）：用整體 status + 產物判斷。
   const phase = (done: boolean, active: boolean): StepState =>
     project.status === "FAILED" && active ? "failed" : done ? "done" : active ? "active" : "waiting";
 
@@ -81,14 +98,13 @@ function buildProcessSteps(project: Project): StepInfo[] {
   const s4 = sub("analyze", Boolean(project.analysis));
 
   return [
-    mk("source", "基本資料", "來源連結與下載 MP4", s1, subProgress("source", s1)),
+    mk("source", "影片下載", "下載來源 MP4", s1, subProgress("source", s1)),
     mk("transcribe", "轉錄音訊", "把影片聲音轉成逐字稿", s2, subProgress("transcribe", s2)),
     mk("frames", "抽取影格", "用 ffmpeg 抽出代表性畫面", s3, subProgress("frames", s3)),
-    mk("analyze", "影片分析", "整合畫面與逐字稿產出洞察", s4, subProgress("analyze", s4)),
-    mk("structure", "結構分析", "拆 hook、鋪陳、賣點與 CTA", phase(Boolean(project.structure), project.status === "STRUCTURING")),
-    mk("adapt", "改編腳本", "改寫成全新原創短影音腳本", phase(Boolean(project.adaptedScript), project.status === "ADAPTING")),
-    mk("storyboard", "產生分鏡", "拆 9 鏡並產生分鏡圖", phase(storyboardDone, project.status === "STORYBOARDING")),
-    mk("video", "生成影片", "送 Seedance 產片段並合成 final.mp4", phase(project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["GENERATING", "MERGING"].includes(project.status)))
+    mk("analyze", "逐字稿 + 影格分析", "依據逐字稿與影格產出洞察", s4, subProgress("analyze", s4)),
+    mk("adapt", "改編腳本", "內部拆解結構並改寫成新腳本", phase(Boolean(project.adaptedScript), ["STRUCTURING", "ADAPTING"].includes(project.status))),
+    mk("storyboard", "產生分鏡", "確認腳本後產生 9 張分鏡圖", phase(storyboardDone, project.status === "STORYBOARDING")),
+    mk("video", "生成影片", "送 Seedance 產片段並合成 final.mp4", phase(project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["QUEUED", "GENERATING", "MERGING"].includes(project.status)))
   ];
 }
 
@@ -96,16 +112,37 @@ function stepCanRun(project: Project, stepNumber: number) {
   if (stepNumber === 1) return Boolean(project.sourceUrl);
   if (stepNumber === 2) return Boolean(project.sourceUrl);
   if (stepNumber === 3) return Boolean(project.sourceUrl);
-  if (stepNumber === 4) return Boolean(project.sourceTranscript);
+  if (stepNumber === 4) return Boolean(project.sourceTranscript && project.sourceFrameUrls?.length);
   if (stepNumber === 5) return Boolean(project.analysis);
-  if (stepNumber === 6) return Boolean(project.structure);
-  if (stepNumber === 7) return Boolean(project.adaptedScript);
-  if (stepNumber === 8) return hasNineStoryboardImages(project);
+  if (stepNumber === 6) return Boolean(project.adaptedScript);
+  if (stepNumber === 7) return hasNineStoryboardImages(project);
   return false;
 }
 
 function hasNineStoryboardImages(project: Project) {
   return project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
+}
+
+function stepBlockedReason(project: Project, stepNumber: number, busy = false) {
+  if (busy) return "目前有任務執行中";
+  if (stepNumber >= 1 && stepNumber <= 3 && !project.sourceUrl) return "缺少來源連結";
+  if (stepNumber === 4) {
+    if (!project.sourceTranscript && !project.sourceFrameUrls?.length) return "請先完成轉錄音訊與抽取影格";
+    if (!project.sourceTranscript) return "請先完成轉錄音訊";
+    if (!project.sourceFrameUrls?.length) return "請先完成抽取影格";
+  }
+  if (stepNumber === 5 && !project.analysis) return "請先完成影片分析";
+  if (stepNumber === 6 && !project.adaptedScript) return "請先完成改編腳本";
+  if (stepNumber === 7 && !hasNineStoryboardImages(project)) return "請先產生 9 張分鏡圖";
+  return "";
+}
+
+function stepActionLabel(project: Project, stepNumber: number) {
+  const step = buildProcessSteps(project)[stepNumber - 1];
+  if (!step) return "執行";
+  if (step.state === "done" || step.state === "failed") return "重新執行";
+  if (step.state === "active") return "執行中";
+  return "開始執行";
 }
 
 function activeStepError(project: Project, stepNumber: number) {
@@ -170,6 +207,41 @@ function sceneStatusLabel(status: string) {
   }
 }
 
+function projectStatusLabel(status: string) {
+  switch (status) {
+    case "DRAFT":
+      return "草稿";
+    case "QUEUED":
+      return "排隊中";
+    case "ANALYZING":
+      return "分析中";
+    case "ANALYSIS_READY":
+      return "分析完成";
+    case "STRUCTURING":
+      return "拆解結構中";
+    case "STRUCTURE_READY":
+      return "結構完成";
+    case "ADAPTING":
+      return "改編中";
+    case "ADAPT_READY":
+      return "腳本完成";
+    case "STORYBOARDING":
+      return "產生分鏡中";
+    case "STORYBOARD_READY":
+      return "分鏡完成";
+    case "GENERATING":
+      return "生成中";
+    case "MERGING":
+      return "合成中";
+    case "COMPLETED":
+      return "已完成";
+    case "FAILED":
+      return "失敗";
+    default:
+      return "處理中";
+  }
+}
+
 function buildSeedancePreviewPrompt(scenes: Scene[]) {
   const sequence = scenes
     .map(
@@ -218,7 +290,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [ratio, setRatio] = useState(initialProject?.ratio || "9:16");
   const [resolution, setResolution] = useState(initialProject?.resolution || "720p");
   const [duration, setDuration] = useState(initialProject?.duration || 5);
-  const [activeStep, setActiveStep] = useState(1);
+  const [activeStep, setActiveStep] = useState<ActivePanel>("project");
   const [progressToastDismissed, setProgressToastDismissed] = useState(false);
   const settingsInit = useRef(Boolean(initialProject));
   const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({
@@ -360,21 +432,34 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
 
   function runStep(stepNumber: number) {
     if (!project) return;
-    setActiveStep(stepNumber);
+    setActiveStep(stepNumber as ActivePanel);
     if (stepNumber === 1) return void post("/source", undefined, "已開始重新下載來源");
     if (stepNumber === 2) return void post("/transcribe", undefined, "已開始轉錄");
     if (stepNumber === 3) return void post("/frames", undefined, "已開始抽取影格");
     if (stepNumber === 4) return void post("/analyze", undefined, "已開始影片分析");
-    if (stepNumber === 5) return void post("/structure", { analysis: project.analysis || analysis }, "已開始結構分析");
-    if (stepNumber === 6) return void post("/adapt", { structure }, "已開始改編腳本");
-    if (stepNumber === 7) return void post("/storyboard", { adaptedScript: script }, "已開始產生分鏡");
-    if (stepNumber === 8) return void post("/video", { ratio, resolution, duration }, "已開始生成影片");
+    if (stepNumber === 5) return void post("/adapt", { analysis: project.analysis || analysis, structure }, "已開始改編腳本");
+    if (stepNumber === 6) return void post("/storyboard", { adaptedScript: script }, "已開始產生分鏡");
+    if (stepNumber === 7) return void post("/video", { ratio, resolution, duration }, "已開始生成影片");
   }
 
   if (error && !project) return <div className="p-6 text-[var(--red)]">{error}</div>;
   if (!project) return <div className="grid min-h-screen place-items-center"><Loader2 className="animate-spin text-orange" /></div>;
 
   const busy = BUSY.includes(project.status) || submitting;
+  const processSteps = buildProcessSteps(project);
+  const doneSteps = processSteps.filter((step) => step.state === "done").length;
+  const currentStep = typeof activeStep === "number" ? processSteps[activeStep - 1] : undefined;
+  const currentMeta = typeof activeStep === "number" ? STEP_META[activeStep] : undefined;
+  const currentBlockedReason = typeof activeStep === "number" ? stepBlockedReason(project, activeStep, busy) : "";
+  const currentCanRun = typeof activeStep === "number" && !currentBlockedReason && stepCanRun(project, activeStep);
+  const currentPanelTitle = activeStep === "project" ? "專案資料" : currentStep?.title || "專案資料";
+  const currentPanelDescription = activeStep === "project"
+    ? "管理來源連結、專案名稱與目前處理狀態。"
+    : currentStep?.description || "";
+  const projectBadgeClass = project.status === "FAILED" ? "badge-error" : project.status === "COMPLETED" ? "badge-active" : "badge-warn";
+  const seedanceScenes = project.scenes.filter((scene) => scene.imageUrl);
+  const canGenerateVideo = hasNineStoryboardImages(project);
+  const seedancePrompt = buildSeedancePreviewPrompt(project.scenes);
   const downloadButton = project.sourceVideoUrl ? (
     <a className="btn btn-primary w-full sm:w-auto" href={project.sourceVideoUrl} download target="_blank" rel="noreferrer">
       <Download size={16} />
@@ -386,11 +471,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </button>
   );
   const namePanel = (
-    <div className="rounded-xl bg-white p-3 text-sm md:p-4">
-      <p className="mb-2 text-[11px] uppercase text-orange">專案命名</p>
+    <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
+      <p className="mb-2 text-[11px] font-semibold uppercase text-orange">專案命名</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
-          className="min-w-0 flex-1 rounded-full border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
+          className="min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
           value={projectTitle}
           onChange={(event) => setProjectTitle(event.target.value)}
           onBlur={saveProjectTitle}
@@ -405,46 +490,79 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       </div>
     </div>
   );
-  const sourcePanel = (
+  const projectDataPanel = (
     <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricCard label="流程進度" value={`${doneSteps}/7`} />
+        <MetricCard label="影格" value={`${project.sourceFrameUrls?.length || 0} 張`} />
+        <MetricCard label="分鏡" value={`${seedanceScenes.length}/9`} />
+      </div>
       {namePanel}
-      <div className="rounded-xl bg-white p-3 text-sm md:p-4">
-        <p className="text-[11px] text-orange">來源 · {project.sourcePlatform || "影片"}</p>
+      <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-[11px] font-semibold uppercase text-orange">來源 · {project.sourcePlatform || "影片"}</p>
+          <span className={`badge ${projectBadgeClass}`}>{projectStatusLabel(project.status)}</span>
+        </div>
         {project.sourceUrl && (
-          <a className="mt-1 block break-all text-xs text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
+          <a className="flex items-start gap-2 break-all rounded-lg border border-[var(--border)] bg-[var(--warm-white)] p-3 text-xs leading-5 text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
+            <Link2 className="mt-0.5 shrink-0" size={14} />
             {project.sourceUrl}
           </a>
         )}
-        <p className="mt-2 flex items-center gap-2 text-xs text-[var(--gray-500)]">
+        <p className="mt-3 flex items-center gap-2 text-xs text-[var(--gray-500)]">
           {busy && <Loader2 size={13} className="animate-spin text-orange" />}
           {project.message}
         </p>
         {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
       </div>
-      <div className="rounded-xl bg-white p-3 md:p-4">
+    </div>
+  );
+  const downloadPanel = (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] font-semibold uppercase text-orange">影片下載</p>
+          <span className={`badge ${project.sourceVideoUrl ? "badge-active" : busy ? "badge-warn" : "badge-warn"}`}>
+            {project.sourceVideoUrl ? "已取得 MP4" : busy ? "處理中" : "尚未取得"}
+          </span>
+        </div>
+        <p className="mt-3 flex items-center gap-2 text-xs text-[var(--gray-500)]">
+          {busy && <Loader2 size={13} className="animate-spin text-orange" />}
+          {project.message}
+        </p>
+        {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
+      </div>
+      <div className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4">
         {downloadButton}
         {!project.sourceVideoUrl && (project.analysis || project.sourceTranscript) && (
-          <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">影片下載失敗，但已用可取得的音訊/內容完成後續分析。若需要 MP4，請重跑「基本資料」或換一支公開影片。</p>
+          <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">影片下載失敗，但已用可取得的音訊/內容完成後續分析。若需要 MP4，請重跑「影片下載」或換一支公開影片。</p>
         )}
       </div>
     </div>
   );
+  const sourcePreview = sourceEmbedUrl(project.sourceUrl);
   const previewPanel = (
-    <div className="w-full">
-      <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-xl bg-transparent text-sm text-[var(--gray-500)]">
-        <div className="relative h-full w-full overflow-hidden bg-transparent">
+    <div className="w-full rounded-xl border border-[var(--border)] bg-white p-2">
+      <div className="mb-2 flex items-center justify-between px-1">
+        <span className="text-[11px] font-semibold uppercase text-[var(--gray-500)]">影片預覽</span>
+        <span className="text-[11px] text-orange">{project.finalVideoUrl ? "最終影片" : project.sourceVideoUrl ? "來源 MP4" : "來源嵌入"}</span>
+      </div>
+      <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-lg bg-[var(--warm-white)] text-sm text-[var(--gray-500)]">
+        <div className="relative h-full w-full overflow-hidden">
           {project.finalVideoUrl ? (
             <video src={project.finalVideoUrl} controls playsInline className="h-full w-full object-contain" />
-          ) : project.sourceUrl ? (
+          ) : project.sourceVideoUrl ? (
+            <video src={project.sourceVideoUrl} controls playsInline className="h-full w-full object-contain" />
+          ) : sourcePreview ? (
             <iframe
               className="h-full w-full border-0 bg-transparent"
-              src={sourceEmbedUrl(project.sourceUrl)}
+              src={sourcePreview}
               title="來源影片預覽"
               loading="lazy"
               allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
             />
           ) : (
-            "尚未取得來源影片"
+            <div className="grid h-full place-items-center px-4 text-center text-xs leading-5">尚未取得可預覽的影片</div>
           )}
         </div>
       </div>
@@ -494,35 +612,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const storyboardPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-bold">{activeStep === 8 ? "生成影片" : "產生分鏡"}</h2>
-        {project.status === "STORYBOARD_READY" && (
-          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
-              <option value={3}>每段 3 秒</option>
-              <option value={4}>每段 4 秒</option>
-              <option value={5}>每段 5 秒</option>
-            </select>
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={ratio} onChange={(event) => setRatio(event.target.value)}>
-              <option>9:16</option>
-              <option>16:9</option>
-              <option>1:1</option>
-            </select>
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={resolution} onChange={(event) => setResolution(event.target.value)}>
-              <option>720p</option>
-              <option>1080p</option>
-              <option>480p</option>
-            </select>
-            <button
-              className="btn btn-primary"
-              disabled={busy || submitting}
-              onClick={() => post("/video", { ratio, resolution, duration }, "已開始生成影片")}
-              type="button"
-            >
-              <Play size={14} />
-              生成影片
-            </button>
-          </div>
-        )}
+        <h2 className="text-sm font-bold">產生分鏡</h2>
       </div>
       {project.scenes.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -561,9 +651,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       )}
     </div>
   );
-  const seedanceScenes = project.scenes.filter((scene) => scene.imageUrl);
-  const canGenerateVideo = hasNineStoryboardImages(project);
-  const seedancePrompt = buildSeedancePreviewPrompt(project.scenes);
   const videoPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -691,7 +778,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const selectedPanel = (() => {
-    if (activeStep === 1) return sourcePanel;
+    if (activeStep === "project") return projectDataPanel;
+    if (activeStep === 1) return downloadPanel;
     if (activeStep === 2) return transcriptPanel;
     if (activeStep === 3) return framePanel;
     if (activeStep === 4) {
@@ -702,34 +790,59 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       );
     }
     if (activeStep === 5) {
-      return project.structure ? (
-        <ResultCard title="結構分析" value={structure} />
-      ) : (
-        <div className="card p-4"><EmptyPanel title="尚未結構分析" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
-      );
-    }
-    if (activeStep === 6) {
       return project.adaptedScript ? (
         <StepCard title="改編腳本" value={script} onChange={setScript} />
       ) : (
-        <div className="card p-4"><EmptyPanel title="尚未改編腳本" description="完成結構拆解後，會改寫成新的短影音腳本。" /></div>
+        <div className="card p-4"><EmptyPanel title="尚未改編腳本" description="完成影片分析後，系統會先拆解結構，再改寫成新的短影音腳本。" /></div>
       );
     }
-    if (activeStep === 7) return storyboardPanel;
-    if (activeStep === 8) return videoPanel;
-    return sourcePanel;
+    if (activeStep === 6) return storyboardPanel;
+    if (activeStep === 7) return videoPanel;
+    return projectDataPanel;
   })();
-  const currentStepError = activeStepError(project, activeStep);
+  const currentStepError = typeof activeStep === "number" ? activeStepError(project, activeStep) : "";
 
   return (
     <div className="min-h-screen bg-[var(--warm-white)]">
-      <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[325px_minmax(0,1fr)] md:gap-4 md:p-6">
+      <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[340px_minmax(0,1fr)] md:gap-4 md:p-6">
         <aside className="space-y-4 md:sticky md:top-6 md:h-fit">
           <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
           {previewPanel}
         </aside>
 
-        <section className="min-w-0">
+        <section className="min-w-0 space-y-3">
+          <div className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-[0_14px_40px_rgb(26_26_26/0.03)]">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className={`badge ${projectBadgeClass}`}>{projectStatusLabel(project.status)}</span>
+                  {currentMeta && <span className="rounded-full bg-[var(--warm-white)] px-2.5 py-1 text-[11px] text-[var(--gray-500)]">{currentMeta.group}</span>}
+                </div>
+                <h1 className="text-xl font-bold tracking-normal text-[var(--black)]">{currentPanelTitle}</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--gray-500)]">{currentPanelDescription}</p>
+              </div>
+              {typeof activeStep === "number" && (
+                <button
+                  className="btn btn-primary h-10 w-full shrink-0 lg:w-auto"
+                  disabled={!currentCanRun}
+                  onClick={() => runStep(activeStep)}
+                  title={currentBlockedReason || stepActionLabel(project, activeStep)}
+                  type="button"
+                >
+                  {currentStep?.state === "active" ? <Loader2 size={15} className="animate-spin" /> : currentStep?.state === "done" || currentStep?.state === "failed" ? <RotateCcw size={15} /> : <Play size={15} fill="currentColor" />}
+                  {stepActionLabel(project, activeStep)}
+                </button>
+              )}
+            </div>
+
+            {currentMeta && (
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <RequirementCard label="依賴" value={currentMeta.dependency} />
+                <RequirementCard label="產出" value={currentMeta.output} />
+                <RequirementCard label={currentBlockedReason ? "尚不能執行" : "狀態"} value={currentBlockedReason || (currentStep?.state === "done" ? "可重跑" : currentStep?.state === "active" ? "執行中" : "可執行")} tone={currentBlockedReason ? "warn" : currentStep?.state === "done" ? "ok" : "default"} />
+              </div>
+            )}
+          </div>
           {currentStepError && (
             <div className="mb-3 rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm leading-6 text-[var(--red)]">
               {currentStepError}
@@ -791,56 +904,78 @@ function ProcessTimeline({
   onRunStep
 }: {
   project: Project;
-  activeStep: number;
+  activeStep: ActivePanel;
   busy: boolean;
-  onSelectStep: (step: number) => void;
+  onSelectStep: (step: ActivePanel) => void;
   onRunStep: (step: number) => void;
 }) {
   const steps = buildProcessSteps(project);
 
   return (
-    <div className="process-card rounded-xl bg-white p-2 md:p-3">
-      <div className="mb-2 flex items-center justify-between gap-3 px-1">
-        <h2 className="text-sm font-bold">功能選單</h2>
+    <div className="process-card rounded-xl border border-[var(--border)] bg-white p-2 md:p-3">
+      <div className="mb-3 flex items-center justify-between gap-3 px-1">
+        <div>
+          <h2 className="text-sm font-bold">功能選單</h2>
+          <p className="mt-0.5 text-[11px] text-[var(--gray-500)]">每步可獨立檢視，符合依賴後才能執行。</p>
+        </div>
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
+      <div className="flex gap-2 overflow-x-auto pb-1 md:block md:space-y-2 md:overflow-visible md:pb-0">
+        <div
+          className={`process-step min-w-[240px] rounded-lg border px-3 py-2 md:min-w-0 ${
+            activeStep === "project" ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"
+          } ${activeStep === "project" ? "border-[var(--orange-border)]" : "border-transparent"}`}
+          data-active={activeStep === "project"}
+        >
+          <button className="process-tab flex w-full min-w-0 items-center gap-2.5 rounded-md py-1 text-left" onClick={() => onSelectStep("project")} type="button">
+            <span className="process-status grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange bg-orange text-white" title="專案資料">
+              <Link2 size={15} />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold leading-5">專案資料</span>
+              <span className="block truncate text-[11px] leading-4 text-[var(--gray-500)]">來源、命名與狀態</span>
+            </span>
+          </button>
+        </div>
         {steps.map((step, index) => {
           const stepNumber = index + 1;
           const canRun = stepCanRun(project, stepNumber) && !busy;
+          const blockedReason = stepBlockedReason(project, stepNumber, busy);
           const isDone = step.state === "done";
           const isActive = step.state === "active";
           const isFailed = step.state === "failed";
-          const sectionLabel = stepNumber === 1 ? "分析" : stepNumber === 6 ? "再行銷" : null;
+          const sectionLabel = stepNumber === 1 ? "影片處理" : stepNumber === 4 ? "影片分析" : stepNumber === 5 ? "影片生成" : null;
           const selected = activeStep === stepNumber;
           const stateLabel = isFailed ? "失敗" : isActive ? "進行中" : isDone ? "完成" : "待處理";
+          const meta = STEP_META[stepNumber];
+          const Icon = meta.icon;
 
           return (
             <div className="contents" key={step.title}>
               {sectionLabel && (
-                <div className={`px-2 pt-2 text-[11px] uppercase tracking-wide text-[var(--gray-500)] ${stepNumber === 6 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
+                <div className={`px-2 pt-2 text-[11px] uppercase tracking-wide text-[var(--gray-500)] ${stepNumber !== 1 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
                   {sectionLabel}
                 </div>
               )}
               <div
-                className={`process-step min-w-[220px] rounded-lg px-2 py-1.5 md:min-w-0 ${
+                className={`process-step min-w-[260px] rounded-lg border px-3 py-2 md:min-w-0 ${
                   selected
                     ? "bg-orange-bg text-orange"
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
-                }`}
+                } ${selected ? "border-[var(--orange-border)]" : "border-transparent"}`}
                 data-active={selected}
                 data-running={isActive}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <button
-                    className={`process-tab flex min-w-0 flex-1 items-center gap-2.5 rounded-md py-1 text-left`}
-                    onClick={() => onSelectStep(stepNumber)}
+                    className="process-tab flex min-w-0 flex-1 items-start gap-2.5 rounded-md py-1 text-left"
+                    onClick={() => onSelectStep(stepNumber as ActivePanel)}
                     type="button"
                   >
                     <span
-                      className={`process-status grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
+                      className={`process-status grid h-8 w-8 shrink-0 place-items-center rounded-lg border ${
                         isFailed
                           ? "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]"
-                          : isDone
+                        : isDone
                             ? "border-orange bg-orange text-white"
                             : isActive
                               ? "border-orange bg-orange-bg text-orange"
@@ -848,23 +983,28 @@ function ProcessTimeline({
                       }`}
                       title={stateLabel}
                     >
-                      {isActive ? <Loader2 size={11} className="animate-spin" /> : isFailed ? <X size={11} /> : isDone ? <Check size={11} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                      {isActive ? <Loader2 size={14} className="animate-spin" /> : isFailed ? <X size={14} /> : isDone ? <Check size={14} /> : <Icon size={14} />}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-xs font-medium leading-5">{step.title}</span>
+                      <span className="block truncate text-sm font-semibold leading-5">{stepNumber}. {step.title}</span>
+                      <span className="block truncate text-[11px] leading-4 text-[var(--gray-500)]">需要：{meta.dependency}</span>
+                      <span className="block truncate text-[11px] leading-4 text-[var(--gray-500)]">產出：{meta.output}</span>
                       {isFailed && step.errorMessage && (
                         <span className="mt-0.5 block truncate text-[11px] leading-4 text-[var(--red)]">{step.errorMessage}</span>
+                      )}
+                      {!canRun && !isActive && blockedReason && (
+                        <span className="mt-0.5 block truncate text-[11px] leading-4 text-[var(--gray-400)]">{blockedReason}</span>
                       )}
                     </span>
                   </button>
                   <button
-                    className={`process-action grid h-6 w-6 shrink-0 place-items-center rounded-full border ${canRun ? "border-[var(--border-strong)] text-orange hover:bg-orange hover:text-white" : "border-[var(--border)] text-[var(--gray-300)]"}`}
+                    className={`process-action mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-lg border ${canRun ? "border-[var(--border-strong)] text-orange hover:bg-orange hover:text-white" : "border-[var(--border)] text-[var(--gray-300)]"}`}
                     disabled={!canRun}
                     onClick={(event) => {
                       event.stopPropagation();
                       onRunStep(stepNumber);
                     }}
-                    title={canRun ? (isDone || isFailed ? "重新執行" : "開始執行") : "尚不能執行"}
+                    title={canRun ? (isDone || isFailed ? "重新執行" : "開始執行") : blockedReason || "尚不能執行"}
                     type="button"
                   >
                     {isActive ? <Loader2 size={13} className="animate-spin" /> : isDone || isFailed ? <RotateCcw size={12} /> : <Play size={11} fill="currentColor" />}
@@ -875,6 +1015,26 @@ function ProcessTimeline({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-white p-3">
+      <span className="block text-[11px] text-[var(--gray-500)]">{label}</span>
+      <strong className="mt-1 block text-lg font-bold text-[var(--black)]">{value}</strong>
+    </div>
+  );
+}
+
+function RequirementCard({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "ok" | "warn" }) {
+  const toneClass = tone === "ok" ? "border-[var(--green-bg)] bg-[var(--green-bg)] text-[var(--green)]" : tone === "warn" ? "border-[#fff3e0] bg-[#fff8ec] text-[#9f4a00]" : "border-[var(--border)] bg-[var(--warm-white)] text-[var(--black)]";
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+      <span className="block text-[11px] opacity-75">{label}</span>
+      <strong className="mt-0.5 block text-sm font-semibold">{value}</strong>
     </div>
   );
 }

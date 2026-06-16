@@ -6,8 +6,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense, useState } from "react";
+import { useToast } from "@/components/Toast";
 
 function LoginForm() {
+  const toast = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
@@ -27,13 +29,18 @@ function LoginForm() {
         redirect: false
       });
       if (res?.error) {
-        setError("Email 或密碼不正確");
+        const message = "Email 或密碼不正確";
+        setError(message);
+        toast(message, "error");
         return;
       }
+      toast("登入成功");
       router.push(callbackUrl);
       router.refresh();
     } catch {
-      setError("登入失敗，請稍後再試");
+      const message = "登入失敗，請稍後再試";
+      setError(message);
+      toast(message, "error");
     } finally {
       setLoading(false);
     }

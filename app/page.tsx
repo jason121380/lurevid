@@ -5,15 +5,35 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 
+function isTikTokUrl(value: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+  const host = parsed.hostname.toLowerCase();
+  return host === "tiktok.com" || host.endsWith(".tiktok.com");
+}
+
 export default function HomePage() {
   const router = useRouter();
   const toast = useToast();
   const [sourceUrl, setSourceUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const trimmedSourceUrl = sourceUrl.trim();
+  const canSubmit = Boolean(trimmedSourceUrl) && !loading;
 
   async function start() {
-    if (!sourceUrl.trim()) return;
+    if (!trimmedSourceUrl) return;
+    if (!isTikTokUrl(trimmedSourceUrl)) {
+      const message = "目前只接受 TikTok 影片連結";
+      setError(message);
+      toast(message, "error");
+      return;
+    }
     setError("");
     setLoading(true);
     try {
@@ -21,7 +41,7 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sourceUrl: sourceUrl.trim()
+          sourceUrl: trimmedSourceUrl
         })
       });
       const data = await res.json();
@@ -54,11 +74,17 @@ export default function HomePage() {
                 className="min-w-0 border-0 bg-transparent px-1 py-1 text-xs outline-none placeholder:text-[var(--gray-300)] md:text-sm"
                 placeholder="貼上 TikTok 影片連結"
                 value={sourceUrl}
-                onChange={(event) => setSourceUrl(event.target.value)}
+                onChange={(event) => {
+                  setSourceUrl(event.target.value);
+                  if (error) setError("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") start();
+                }}
               />
               <button
                 className="grid h-8 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-9 md:w-9"
-                disabled={!sourceUrl.trim() || loading}
+                disabled={!canSubmit}
                 onClick={start}
                 title={loading ? "建立中" : "開始分析"}
               >

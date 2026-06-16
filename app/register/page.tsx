@@ -6,8 +6,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { useToast } from "@/components/Toast";
 
 export default function RegisterPage() {
+  const toast = useToast();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,7 +19,9 @@ export default function RegisterPage() {
 
   async function submit() {
     if (!email.trim() || password.length < 8) {
-      setError("請輸入 Email，密碼至少 8 個字元");
+      const message = "請輸入 Email，密碼至少 8 個字元";
+      setError(message);
+      toast(message, "error");
       return;
     }
     setError("");
@@ -30,18 +34,24 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "註冊失敗");
+        const message = data.error || "註冊失敗";
+        setError(message);
+        toast(message, "error");
         return;
       }
       const signInResult = await signIn("credentials", { email: email.trim(), password, redirect: false });
       if (signInResult?.error) {
+        toast("註冊成功，請登入");
         router.push("/login");
         return;
       }
+      toast("註冊成功");
       router.push("/");
       router.refresh();
     } catch {
-      setError("註冊失敗，請稍後再試");
+      const message = "註冊失敗，請稍後再試";
+      setError(message);
+      toast(message, "error");
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,7 @@
 
 import { ChevronDown, Eye, EyeOff, Save } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
 
 type SettingField = {
@@ -63,7 +63,7 @@ export default function SettingsPage() {
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  async function loadSettings() {
+  const loadSettings = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -88,15 +88,17 @@ export default function SettingsPage() {
         return next;
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "讀取設定失敗");
+      const msg = err instanceof Error ? err.message : "讀取設定失敗";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [loadSettings]);
 
   async function save() {
     setSaving(true);

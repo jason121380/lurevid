@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, X } from "lucide-react";
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 
 type ToastType = "success" | "error";
@@ -24,14 +25,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={show}>
       {children}
-      <div className="pointer-events-none fixed bottom-6 left-1/2 z-[100] flex max-w-[90vw] -translate-x-1/2 flex-col items-center gap-2">
+      <div className="pointer-events-none fixed bottom-5 right-5 z-[100] flex w-[min(380px,calc(100vw-32px))] flex-col items-stretch gap-2">
         {items.map((item) => (
           <div
             key={item.id}
-            className={`pointer-events-auto rounded-full px-4 py-2 text-sm text-white shadow-lg ${item.type === "error" ? "bg-[var(--red)]" : "bg-[var(--black)]"}`}
+            className={`pointer-events-auto flex items-start gap-3 rounded-xl border bg-white p-3 text-sm shadow-[0_18px_60px_rgb(26_26_26/0.16)] ${
+              item.type === "error" ? "border-[var(--red)] text-[var(--red)]" : "border-[var(--orange-border)] text-[var(--black)]"
+            }`}
             role="status"
           >
-            {item.message}
+            <span
+              className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg ${
+                item.type === "error" ? "bg-[var(--red-bg)] text-[var(--red)]" : "bg-orange-bg text-orange"
+              }`}
+            >
+              {item.type === "error" ? <X size={14} /> : <Check size={14} />}
+            </span>
+            <span className="min-w-0 flex-1 leading-6">{item.message}</span>
           </div>
         ))}
       </div>

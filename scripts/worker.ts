@@ -90,16 +90,12 @@ async function computeAnalysis(projectId: string) {
 
   let visualAnalysis = project.visualAnalysis || "";
   const frameUrls = Array.isArray(project.sourceFrameUrls) ? (project.sourceFrameUrls as string[]) : [];
+  if (!frameUrls.length) throw new Error("尚未取得影格，請先完成抽取影格");
   const httpFrames = frameUrls.filter((url) => typeof url === "string" && /^https?:\/\//i.test(url));
-  if (httpFrames.length) {
-    try {
-      visualAnalysis = await analyzeVideoFrames(httpFrames, transcript, platform);
-      await prisma.project.update({ where: { id: projectId }, data: { visualAnalysis } });
-    } catch {
-      /* 視覺分析失敗就退回純文字分析 */
-    }
-  }
-  const analysis = await analyzeVideo(transcript, platform, visualAnalysis || "未取得視覺分析");
+  if (!httpFrames.length) throw new Error("影格網址不可用，請重新抽取影格");
+  visualAnalysis = await analyzeVideoFrames(httpFrames, transcript, platform);
+  await prisma.project.update({ where: { id: projectId }, data: { visualAnalysis } });
+  const analysis = await analyzeVideo(transcript, platform, visualAnalysis);
   await prisma.project.update({ where: { id: projectId }, data: { analysis } });
 }
 
@@ -224,8 +220,13 @@ async function runFull(projectId: string) {
 
   await markStepRunning(projectId, "analyze", 0.4);
   await prisma.project.update({ where: { id: projectId }, data: { message: "正在整合分析", progress: 0.18 } });
-  await computeAnalysis(projectId);
-  await markStepDone(projectId, "analyze");
+  try {
+    await computeAnalysis(projectId);
+    await markStepDone(projectId, "analyze");
+  } catch (error) {
+    await markStepFailed(projectId, "analyze", error instanceof Error ? error.message : "未知錯誤");
+    throw error;
+  }
   await prisma.project.update({ where: { id: projectId }, data: { status: "ANALYSIS_READY", message: "分析完成，可調整後繼續", progress: 0.2 } });
 }
 
@@ -250,14 +251,22 @@ async function runStructure(projectId: string) {
 async function runAdapt(projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new Error(`找不到專案：${projectId}`);
-  if (!project.analysis || !project.structure) throw new Error("尚未完成結構拆解");
+  if (!project.analysis) throw new Error("尚未完成影片分析");
 
   await prisma.project.update({
     where: { id: projectId },
     data: { status: "ADAPTING", message: "正在改編成新腳本", progress: 0.36 }
   });
 
-  const adaptedScript = await adaptScript(project.analysis, project.structure);
+  const structure = project.structure || await analyzeStructure(project.sourceTranscript || "", project.analysis);
+  if (!project.structure) {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { structure, message: "結構拆解完成，正在改編成新腳本", progress: 0.34 }
+    });
+  }
+
+  const adaptedScript = await adaptScript(project.analysis, structure);
 
   await prisma.project.update({
     where: { id: projectId },

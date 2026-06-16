@@ -1,7 +1,8 @@
 "use client";
 
 import { Loader2, RotateCcw, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useToast } from "@/components/Toast";
 
 type CheckStatus = "ok" | "warn" | "error";
 type Check = { key: string; label: string; status: CheckStatus; detail: string };
@@ -25,19 +26,12 @@ function statusLabel(status: CheckStatus) {
 }
 
 export default function HealthPage() {
+  const toast = useToast();
   const [checks, setChecks] = useState<Check[]>([]);
   const [loading, setLoading] = useState(true);
   const [cleaning, setCleaning] = useState(false);
   const [error, setError] = useState("");
   const [checkedAt, setCheckedAt] = useState("");
-  const [toast, setToast] = useState("");
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(""), 2500);
-  }, []);
 
   const load = useCallback(
     async (withToast = false) => {
@@ -49,14 +43,16 @@ export default function HealthPage() {
         if (!res.ok) throw new Error(data.error || "讀取健康狀態失敗");
         setChecks(data.checks || []);
         setCheckedAt(data.checkedAt || "");
-        if (withToast) showToast("已重新檢查");
+        if (withToast) toast("已重新檢查");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "讀取健康狀態失敗");
+        const message = err instanceof Error ? err.message : "讀取健康狀態失敗";
+        setError(message);
+        if (withToast) toast(message, "error");
       } finally {
         setLoading(false);
       }
     },
-    [showToast]
+    [toast]
   );
 
   const cleanFailed = useCallback(async () => {
@@ -66,14 +62,16 @@ export default function HealthPage() {
       const res = await fetch("/api/health/clean-failed", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "清除失敗");
-      showToast("已清除失敗紀錄");
+      toast("已清除失敗紀錄");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "清除失敗");
+      const message = err instanceof Error ? err.message : "清除失敗";
+      setError(message);
+      toast(message, "error");
     } finally {
       setCleaning(false);
     }
-  }, [load, showToast]);
+  }, [load, toast]);
 
   useEffect(() => {
     load();
@@ -96,12 +94,6 @@ export default function HealthPage() {
             </button>
           </div>
         </div>
-
-        {toast && (
-          <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[var(--black)] px-4 py-2 text-sm text-white shadow-lg">
-            {toast}
-          </div>
-        )}
 
         <div className="mx-auto max-w-4xl space-y-4 p-4 lg:p-6">
           {error && <div className="rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}

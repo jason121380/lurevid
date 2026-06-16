@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { useToast } from "@/components/Toast";
 
 type ProjectListItem = {
   id: string;
@@ -29,6 +30,7 @@ function projectDisplayTitle(project: Pick<ProjectListItem, "title">) {
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const toast = useToast();
   const { data: session } = useSession();
   const isAdmin = Boolean(session?.user?.isAdmin);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
@@ -40,10 +42,15 @@ export function Shell({ children }: { children: ReactNode }) {
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] || "";
 
   const loadProjects = useCallback(async () => {
-    const res = await fetch("/api/projects");
-    const data = await res.json();
-    if (res.ok) setProjects(data.projects || []);
-  }, []);
+    try {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+      if (res.ok) setProjects(data.projects || []);
+      else toast(data.error || "讀取專案列表失敗", "error");
+    } catch {
+      toast("讀取專案列表失敗", "error");
+    }
+  }, [toast]);
 
   useEffect(() => {
     loadProjects();
@@ -82,7 +89,13 @@ export function Shell({ children }: { children: ReactNode }) {
       if (res.ok) {
         setEditingId("");
         await loadProjects();
+        toast("專案名稱已更新");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast(data.error || "儲存名稱失敗", "error");
       }
+    } catch {
+      toast("儲存名稱失敗", "error");
     } finally {
       setSavingId("");
     }
@@ -97,7 +110,13 @@ export function Shell({ children }: { children: ReactNode }) {
       if (res.ok) {
         if (activeProjectId === project.id) router.push("/");
         await loadProjects();
+        toast("專案已刪除");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast(data.error || "刪除專案失敗", "error");
       }
+    } catch {
+      toast("刪除專案失敗", "error");
     } finally {
       setSavingId("");
     }
