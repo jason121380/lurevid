@@ -21,6 +21,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     data: {
       adaptedScript,
       idea: adaptedScript,
+      storyboardImageUrl: null,
+      finalVideoUrl: null,
       status: "STORYBOARDING",
       message: "正在產生分鏡圖",
       progress: 0.45,

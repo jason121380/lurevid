@@ -8,6 +8,7 @@ export type StepKey =
   | "structure"
   | "adapt"
   | "storyboard"
+  | "mergeStoryboard"
   | "video";
 
 export type StepStatus = "idle" | "running" | "done" | "failed";

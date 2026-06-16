@@ -13,6 +13,7 @@ export type ProjectAction =
   | "structure"
   | "adapt"
   | "storyboard"
+  | "mergeStoryboard"
   | "video";
 
 export function redisConnectionOptions() {

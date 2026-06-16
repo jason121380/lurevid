@@ -30,13 +30,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (project.scenes.length !== 9 || project.scenes.some((scene) => !scene.imageUrl)) {
     return NextResponse.json({ error: "需要 9 張分鏡圖才能變成影片" }, { status: 400 });
   }
+  if (!project.storyboardImageUrl) {
+    return NextResponse.json({ error: "請先完成第 7 步合併分鏡" }, { status: 400 });
+  }
 
-  let settings: { ratio: "9:16" | "16:9" | "1:1"; resolution: "480p" | "720p" | "1080p"; duration: 3 | 4 | 5 };
+  let settings: { ratio: "9:16"; resolution: "720p"; duration: 8 | 15 };
   try {
     settings = parseVideoSettings(await request.json().catch(() => ({})), {
-      ratio: project.ratio as "9:16" | "16:9" | "1:1",
-      resolution: project.resolution as "480p" | "720p" | "1080p",
-      duration: project.duration as 3 | 4 | 5
+      ratio: "9:16",
+      resolution: "720p",
+      duration: project.duration === 15 ? 15 : 8
     });
   } catch {
     return NextResponse.json({ error: "影片設定格式錯誤" }, { status: 400 });
@@ -44,7 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await prisma.project.update({
     where: { id },
-    data: { ...settings, status: "QUEUED", message: "已排入影片生成佇列，等待 worker 接手", progress: 0.5 }
+    data: { ...settings, status: "QUEUED", message: "已排入影片生成佇列，等待 worker 接手", progress: 0.62 }
   });
 
   await enqueueProjectJob(id, "video", { attempts: 1 });

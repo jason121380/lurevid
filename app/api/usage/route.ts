@@ -110,7 +110,7 @@ export async function GET() {
     imageOutputTokens += generatedImages * IMAGE_OUTPUT_TOKEN_ESTIMATE;
 
     if (project.finalVideoUrl) {
-      const duration = project.duration || 5;
+      const duration = project.duration || 8;
       seedanceVideos += 1;
       seedanceSeconds += duration;
       seedanceCost += seedanceCostForDuration(duration);

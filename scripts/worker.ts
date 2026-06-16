@@ -296,7 +296,7 @@ async function generateStoryboard(projectId: string) {
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "STORYBOARDING", message: "正在產生分鏡與 9 張分鏡圖", progress: 0.45, error: null }
+    data: { status: "STORYBOARDING", message: "正在產生分鏡與 9 張分鏡圖", progress: 0.45, error: null, storyboardImageUrl: null, finalVideoUrl: null }
   });
 
   const storyboard = await generateStoryboardWithTwoModels(project.adaptedScript || project.idea);
@@ -358,35 +358,24 @@ async function generateStoryboard(projectId: string) {
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "STORYBOARD_READY", message: "分鏡圖完成，可以變成影片", progress: 0.5 }
+    data: { status: "STORYBOARD_READY", message: "分鏡圖完成，可以合併成單張分鏡圖", progress: 0.5, storyboardImageUrl: null }
   });
 }
 
-async function generateVideo(projectId: string) {
+async function mergeStoryboard(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: { scenes: { orderBy: { sceneNumber: "asc" } } }
   });
   if (!project) throw new Error(`找不到專案：${projectId}`);
-  if (project.scenes.length !== 9) throw new Error("需要 9 張分鏡圖才能生成影片");
-  if (project.scenes.some((scene) => !scene.imageUrl)) throw new Error("需要 9 張分鏡圖才能生成影片");
+  if (project.scenes.length !== 9) throw new Error("需要 9 張分鏡圖才能合併分鏡");
+  if (project.scenes.some((scene) => !scene.imageUrl)) throw new Error("需要 9 張分鏡圖才能合併分鏡");
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "GENERATING", message: "正在建立 Seedance 影片任務", progress: 0.52, error: null }
+    data: { status: "STORYBOARDING", message: "正在把 9 張分鏡合成單張分鏡圖", progress: 0.52, error: null }
   });
-  await markStepRunning(projectId, "video", 0.52);
-
-  await prisma.scene.updateMany({
-    where: { projectId },
-    data: { seedanceTaskId: null, videoUrl: null, localPath: null, error: null }
-  });
-
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { message: "正在把 9 張分鏡合成 Seedance 單張參考圖", progress: 0.56 }
-  });
-  await markStepRunning(projectId, "video", 0.56);
+  await markStepRunning(projectId, "mergeStoryboard", 0.35);
 
   const sourceBuffers = await Promise.all(project.scenes.map((scene) => fetchToBuffer(scene.imageUrl!)));
   const referenceImage = await generateSeedanceReferenceImage(project.scenes, sourceBuffers, project.ratio);
@@ -403,9 +392,31 @@ async function generateVideo(projectId: string) {
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { storyboardImageUrl, message: "Seedance 單張參考圖已產生，正在建立影片任務", progress: 0.6 }
+    data: { status: "STORYBOARD_READY", storyboardImageUrl, message: "單張分鏡圖完成，可以送給 Seedance", progress: 0.6 }
   });
-  await markStepRunning(projectId, "video", 0.6);
+  await markStepDone(projectId, "mergeStoryboard");
+}
+
+async function generateVideo(projectId: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { scenes: { orderBy: { sceneNumber: "asc" } } }
+  });
+  if (!project) throw new Error(`找不到專案：${projectId}`);
+  if (project.scenes.length !== 9) throw new Error("需要 9 張分鏡圖才能生成影片");
+  if (project.scenes.some((scene) => !scene.imageUrl)) throw new Error("需要 9 張分鏡圖才能生成影片");
+  if (!project.storyboardImageUrl) throw new Error("請先完成合併分鏡，產生 Seedance 單張參考圖");
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { status: "GENERATING", message: "正在建立 Seedance 影片任務", progress: 0.62, error: null }
+  });
+  await markStepRunning(projectId, "video", 0.62);
+
+  await prisma.scene.updateMany({
+    where: { projectId },
+    data: { seedanceTaskId: null, videoUrl: null, localPath: null, error: null }
+  });
 
   let task;
   try {
@@ -416,7 +427,7 @@ async function generateVideo(projectId: string) {
         resolution: project.resolution,
         duration: project.duration
       },
-      storyboardImageUrl
+      project.storyboardImageUrl
     );
   } catch (error) {
     if (isSeedancePrivacyImageError(error)) {
@@ -471,7 +482,7 @@ async function generateVideo(projectId: string) {
       where: { id: projectId },
       data: {
         progress: upstreamStatus === "succeeded" && videoUrl ? 0.9 : 0.7,
-        message: "Seedance 正在根據 9 張分鏡圖生成影片"
+        message: "Seedance 正在根據單張分鏡圖生成影片"
       }
     });
     await markStepRunning(projectId, "video", upstreamStatus === "succeeded" && videoUrl ? 0.9 : 0.7);
@@ -523,6 +534,7 @@ const worker = new Worker(
       else if (action === "structure") await runStructure(projectId);
       else if (action === "adapt") await runAdapt(projectId);
       else if (action === "storyboard") await generateStoryboard(projectId);
+      else if (action === "mergeStoryboard") await mergeStoryboard(projectId);
       else await generateVideo(projectId);
     } catch (error) {
       const exists = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
@@ -530,7 +542,7 @@ const worker = new Worker(
         console.warn(`skip stale job ${job.id}: project ${projectId} no longer exists`);
         return;
       }
-      if (["source", "transcribe", "frames", "analyze", "structure", "adapt", "storyboard", "video"].includes(action)) {
+      if (["source", "transcribe", "frames", "analyze", "structure", "adapt", "storyboard", "mergeStoryboard", "video"].includes(action)) {
         await markStepFailed(projectId, action as StepKey, error instanceof Error ? error.message : "未知錯誤");
       }
       await prisma.project.update({

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Check, LogOut, Menu, Pencil, Plus, Settings, X } from "lucide-react";
+import { Activity, BarChart3, Check, Loader2, LogOut, Menu, Pencil, Plus, Settings, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -37,9 +37,11 @@ export function Shell({ children }: { children: ReactNode }) {
   const [editingId, setEditingId] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
   const [savingId, setSavingId] = useState("");
+  const [switchingProjectId, setSwitchingProjectId] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingDeleteProject, setPendingDeleteProject] = useState<ProjectListItem | null>(null);
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] || "";
+  const switchingProject = switchingProjectId && switchingProjectId !== activeProjectId;
 
   const loadProjects = useCallback(async () => {
     try {
@@ -59,6 +61,16 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [loadProjects]);
 
   useEffect(() => {
+    setSwitchingProjectId("");
+  }, [pathname]);
+
+  useEffect(() => {
+    projects.slice(0, 12).forEach((project) => {
+      router.prefetch(`/projects/${project.id}`);
+    });
+  }, [projects, router]);
+
+  useEffect(() => {
     if (!pendingDeleteProject) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setPendingDeleteProject(null);
@@ -74,6 +86,12 @@ export function Shell({ children }: { children: ReactNode }) {
 
   function closeMobileMenu() {
     setMobileOpen(false);
+  }
+
+  function startProjectSwitch(projectId: string) {
+    if (projectId !== activeProjectId) setSwitchingProjectId(projectId);
+    closeMobileMenu();
+    router.prefetch(`/projects/${projectId}`);
   }
 
   async function saveTitle(projectId: string) {
@@ -124,7 +142,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--border)] bg-white px-3 md:hidden">
+      <div className="sticky inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between border-b border-[var(--border)] bg-white px-3 pt-[env(safe-area-inset-top)] md:hidden">
         <button className="grid h-10 w-10 place-items-center rounded-xl text-[var(--gray-500)]" onClick={() => setMobileOpen(true)} title="開啟選單">
           <Menu size={19} />
         </button>
@@ -164,9 +182,10 @@ export function Shell({ children }: { children: ReactNode }) {
               {projects.map((project) => {
                 const active = activeProjectId === project.id;
                 const editing = editingId === project.id;
+                const switching = switchingProjectId === project.id && !active;
 
                 return (
-                  <div className={`rounded-lg px-2 py-0.5 ${active ? "bg-orange-bg" : "hover:bg-[var(--warm-white)]"}`} key={project.id}>
+                  <div className={`rounded-lg px-2 py-0.5 ${active || switching ? "bg-orange-bg" : "hover:bg-[var(--warm-white)]"}`} key={project.id} aria-busy={switching}>
                     {editing ? (
                       <div className="flex items-start gap-1">
                         <input
@@ -188,8 +207,14 @@ export function Shell({ children }: { children: ReactNode }) {
                       </div>
                     ) : (
                       <div className="flex items-center gap-1">
-                        <Link className="block min-w-0 flex-1 py-1" href={`/projects/${project.id}`} onClick={closeMobileMenu}>
-                          <div className={`truncate text-xs leading-4 ${active ? "text-orange" : "text-[var(--black)]"}`}>{projectDisplayTitle(project)}</div>
+                        <Link
+                          className="flex min-w-0 flex-1 items-center gap-1.5 py-1"
+                          href={`/projects/${project.id}`}
+                          onClick={() => startProjectSwitch(project.id)}
+                          onMouseEnter={() => router.prefetch(`/projects/${project.id}`)}
+                        >
+                          {switching && <Loader2 size={12} className="shrink-0 animate-spin text-orange" />}
+                          <div className={`truncate text-xs leading-4 ${active || switching ? "text-orange" : "text-[var(--black)]"}`}>{projectDisplayTitle(project)}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
                           <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
@@ -283,7 +308,17 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
-      <main className="pt-14 md:ml-[var(--sidebar-w)] md:pt-0">{children}</main>
+      <main className="relative md:ml-[var(--sidebar-w)]">
+        {switchingProject && (
+          <div className="pointer-events-none fixed inset-x-0 top-14 z-[70] flex justify-center md:left-[var(--sidebar-w)] md:top-0">
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--orange-border)] bg-white/95 px-3 py-2 text-xs text-orange shadow-[0_12px_40px_rgb(26_26_26/0.10)] backdrop-blur">
+              <Loader2 size={14} className="animate-spin" />
+              切換專案中
+            </div>
+          </div>
+        )}
+        <div className={switchingProject ? "opacity-75 transition-opacity" : "transition-opacity"}>{children}</div>
+      </main>
     </div>
   );
 }

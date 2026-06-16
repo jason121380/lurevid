@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, Pencil, Play, RotateCcw, Save, Sparkles, Video, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, Pencil, Play, RotateCcw, Save, Sparkles, Video, X } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 
 export type Scene = {
@@ -43,8 +43,10 @@ export type Project = {
 };
 
 const BUSY = ["QUEUED", "ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING", "GENERATING", "MERGING"];
+const FIXED_VIDEO_RATIO = "9:16";
+const FIXED_VIDEO_RESOLUTION = "720p";
 type StepState = "done" | "active" | "waiting" | "failed";
-type ActivePanel = "project" | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+type ActivePanel = "project" | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 type StepInfo = { title: string; description: string; state: StepState; progress: number; errorMessage?: string };
 type StepMeta = {
@@ -61,12 +63,14 @@ const STEP_META: Record<number, StepMeta> = {
   4: { icon: Sparkles, group: "影片分析", dependency: "逐字稿 + 影格", output: "影片洞察" },
   5: { icon: Layers3, group: "影片生成", dependency: "影片分析", output: "改編腳本" },
   6: { icon: Clapperboard, group: "影片生成", dependency: "改編腳本", output: "9 張分鏡圖" },
-  7: { icon: Video, group: "影片生成", dependency: "9 張分鏡圖", output: "最終影片" }
+  7: { icon: ImageIcon, group: "影片生成", dependency: "9 張分鏡圖", output: "單張分鏡圖" },
+  8: { icon: Video, group: "影片生成", dependency: "單張分鏡圖", output: "最終影片" }
 };
 
 function buildProcessSteps(project: Project): StepInfo[] {
   const steps = (project.steps || {}) as Record<string, { status?: string; progress?: number; message?: string }>;
   const storyboardDone = project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
+  const mergeDone = Boolean(project.storyboardImageUrl);
 
   // 步驟 1-4（分析子步驟）：用 project.steps 的狀態 + 既有產物判斷。
   const sub = (key: string, done: boolean): StepState => {
@@ -81,7 +85,7 @@ function buildProcessSteps(project: Project): StepInfo[] {
     if (state === "active") return steps[key]?.progress ?? 0.3;
     return 0;
   };
-  // 步驟 5-7（影片生成）：用整體 status + 產物判斷。
+  // 步驟 5-8（影片生成）：用整體 status + 產物判斷。
   const phase = (done: boolean, active: boolean): StepState =>
     project.status === "FAILED" && active ? "failed" : done ? "done" : active ? "active" : "waiting";
   const generatedPhase = (key: string, done: boolean, active: boolean): StepState => {
@@ -111,8 +115,9 @@ function buildProcessSteps(project: Project): StepInfo[] {
     mk("frames", "抽取影格", "用 ffmpeg 抽出代表性畫面", s3, subProgress("frames", s3)),
     mk("analyze", "影片分析", "依據逐字稿與影格產出洞察", s4, subProgress("analyze", s4)),
     mk("adapt", "改編腳本", "內部拆解結構並改寫成新腳本", generatedPhase("adapt", Boolean(project.adaptedScript), ["STRUCTURING", "ADAPTING"].includes(project.status)), steps.adapt?.progress),
-    mk("storyboard", "產生分鏡", "確認腳本後產生 9 張分鏡圖", generatedPhase("storyboard", storyboardDone, project.status === "STORYBOARDING"), steps.storyboard?.progress),
-    mk("video", "生成影片", "送 Seedance 產片段並合成 final.mp4", generatedPhase("video", project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["QUEUED", "GENERATING", "MERGING"].includes(project.status)), steps.video?.progress)
+    mk("storyboard", "產生分鏡", "確認腳本後產生 9 張分鏡圖", generatedPhase("storyboard", storyboardDone, project.status === "STORYBOARDING" && !storyboardDone), steps.storyboard?.progress),
+    mk("mergeStoryboard", "合併分鏡", "把 9 張分鏡圖合成單張分鏡圖", generatedPhase("mergeStoryboard", mergeDone, project.status === "STORYBOARDING" && storyboardDone), steps.mergeStoryboard?.progress),
+    mk("video", "生成影片", "把單張分鏡圖送給 Seedance 生成影片", generatedPhase("video", project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["QUEUED", "GENERATING", "MERGING"].includes(project.status)), steps.video?.progress)
   ];
 }
 
@@ -124,6 +129,7 @@ function stepCanRun(project: Project, stepNumber: number) {
   if (stepNumber === 5) return Boolean(project.analysis);
   if (stepNumber === 6) return Boolean(project.adaptedScript);
   if (stepNumber === 7) return hasNineStoryboardImages(project);
+  if (stepNumber === 8) return Boolean(project.storyboardImageUrl);
   return false;
 }
 
@@ -142,6 +148,7 @@ function stepBlockedReason(project: Project, stepNumber: number, busy = false) {
   if (stepNumber === 5 && !project.analysis) return "請先完成影片分析";
   if (stepNumber === 6 && !project.adaptedScript) return "請先完成改編腳本";
   if (stepNumber === 7 && !hasNineStoryboardImages(project)) return "請先產生 9 張分鏡圖";
+  if (stepNumber === 8 && !project.storyboardImageUrl) return "請先完成合併分鏡";
   return "";
 }
 
@@ -163,8 +170,9 @@ function activeStepError(project: Project, stepNumber: number) {
 }
 
 function failedProjectStep(project: Project) {
-  if (project.error?.toLowerCase().includes("seedance")) return 7;
-  if (hasNineStoryboardImages(project) && !project.finalVideoUrl) return 7;
+  if (project.error?.toLowerCase().includes("seedance")) return 8;
+  if (project.storyboardImageUrl && !project.finalVideoUrl) return 8;
+  if (hasNineStoryboardImages(project) && !project.storyboardImageUrl) return 7;
   if (project.scenes.length > 0 && !hasNineStoryboardImages(project)) return 6;
   if (project.adaptedScript) return 6;
   if (project.analysis) return 5;
@@ -243,12 +251,17 @@ function buildSeedancePreviewPrompt(scenes: Scene[]) {
     .join("\n\n");
 
   return [
-    "Create one continuous short-form vertical video using the 9 reference images in order as a storyboard.",
-    "Use each reference image as the visual anchor for its matching numbered scene. Preserve character identity, style, setting continuity, and the narrative order from scene 1 to scene 9.",
+    "Create one continuous short-form vertical video using the single reference image as a compressed visual storyboard for the full sequence.",
+    "The reference image was created from 9 storyboard frames. Preserve fictional character design, wardrobe, style, setting continuity, and the narrative order from scene 1 to scene 9.",
+    "Do not reproduce or imply any real person's identity, face, biometric details, private information, or celebrity likeness.",
     "Do not add subtitles, captions, logos, watermarks, or readable on-screen text. Use smooth cinematic transitions between storyboard beats.",
     "Storyboard sequence:",
     sequence
   ].join("\n\n");
+}
+
+function supportedDuration(value?: number) {
+  return value === 15 ? 15 : 8;
 }
 
 function sourceEmbedUrl(url?: string) {
@@ -279,9 +292,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
   const [structure, setStructure] = useState(initialProject?.structure || "");
   const [script, setScript] = useState(initialProject?.adaptedScript || "");
-  const [ratio, setRatio] = useState(initialProject?.ratio || "9:16");
-  const [resolution, setResolution] = useState(initialProject?.resolution || "720p");
-  const [duration, setDuration] = useState(initialProject?.duration || 5);
+  const [ratio, setRatio] = useState(FIXED_VIDEO_RATIO);
+  const [resolution, setResolution] = useState(FIXED_VIDEO_RESOLUTION);
+  const [duration, setDuration] = useState(supportedDuration(initialProject?.duration));
   const [activeStep, setActiveStep] = useState<ActivePanel>("project");
   const [taskToastProject, setTaskToastProject] = useState<Project | null>(BUSY.includes(initialProject?.status || "") ? initialProject || null : null);
   const [taskToastDismissed, setTaskToastDismissed] = useState(false);
@@ -305,9 +318,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     setAnalysis(initialProject.analysis || "");
     setStructure(initialProject.structure || "");
     setScript(initialProject.adaptedScript || "");
-    setRatio(initialProject.ratio || "9:16");
-    setResolution(initialProject.resolution || "720p");
-    setDuration(initialProject.duration || 5);
+    setRatio(FIXED_VIDEO_RATIO);
+    setResolution(FIXED_VIDEO_RESOLUTION);
+    setDuration(supportedDuration(initialProject.duration));
     lastServer.current = {
       analysis: initialProject.analysis,
       structure: initialProject.structure,
@@ -346,9 +359,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         if (data.adaptedScript !== lastServer.current.adaptedScript) setScript(data.adaptedScript || "");
         lastServer.current = { analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
         if (!settingsInit.current) {
-          if (data.ratio) setRatio(data.ratio);
-          if (data.resolution) setResolution(data.resolution);
-          if (data.duration) setDuration(data.duration);
+          setRatio(FIXED_VIDEO_RATIO);
+          setResolution(FIXED_VIDEO_RESOLUTION);
+          if (data.duration) setDuration(supportedDuration(data.duration));
           settingsInit.current = true;
         }
 
@@ -472,7 +485,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (stepNumber === 4) return void post("/analyze");
     if (stepNumber === 5) return void post("/adapt", { analysis: project.analysis || analysis, structure });
     if (stepNumber === 6) return void post("/storyboard", { adaptedScript: script });
-    if (stepNumber === 7) return void post("/video", { ratio, resolution, duration });
+    if (stepNumber === 7) return void post("/merge-storyboard");
+    if (stepNumber === 8) return void post("/video", { ratio: FIXED_VIDEO_RATIO, resolution: FIXED_VIDEO_RESOLUTION, duration });
   }
 
   if (error && !project) return <div className="p-6 text-[var(--red)]">{error}</div>;
@@ -493,7 +507,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const projectBadgeClass = project.status === "COMPLETED" ? "badge-active" : "badge-warn";
   const projectStatusBadge = shouldShowProjectStatusBadge ? <span className={`badge ${projectBadgeClass}`}>{projectStatusLabel(project.status)}</span> : null;
   const seedanceScenes = project.scenes.filter((scene) => scene.imageUrl);
-  const canGenerateVideo = hasNineStoryboardImages(project);
+  const canMergeStoryboard = hasNineStoryboardImages(project);
+  const canGenerateVideo = Boolean(project.storyboardImageUrl);
   const seedancePrompt = buildSeedancePreviewPrompt(project.scenes);
   const downloadButton = project.sourceVideoUrl ? (
     <a className="btn btn-primary w-full sm:w-auto" href={project.sourceVideoUrl} download target="_blank" rel="noreferrer">
@@ -528,7 +543,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const projectDataPanel = (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard label="流程進度" value={`${doneSteps}/7`} />
+        <MetricCard label="流程進度" value={`${doneSteps}/8`} />
         <MetricCard label="影格" value={`${project.sourceFrameUrls?.length || 0} 張`} />
         <MetricCard label="分鏡" value={`${seedanceScenes.length}/9`} />
       </div>
@@ -568,7 +583,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   );
   const sourcePreview = sourceEmbedUrl(project.sourceUrl);
   const previewPanel = (
-    <div className="w-full rounded-xl border border-[var(--border)] bg-white p-2">
+    <div className="w-full rounded-lg border border-[var(--border)] bg-white p-2">
       <div className="mb-2 flex items-center justify-between px-1">
         <span className="text-[11px] uppercase text-[var(--gray-500)]">影片預覽</span>
         <span className="text-[11px] text-orange">{project.finalVideoUrl ? "最終影片" : project.sourceVideoUrl ? "來源 MP4" : "來源嵌入"}</span>
@@ -671,34 +686,74 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       )}
     </div>
   );
+  const mergeStoryboardPanel = (
+    <div className="p-1 md:p-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm">合併分鏡</h2>
+          <p className="mt-1 text-xs text-[var(--gray-500)]">把第 6 步的 9 張圖合併成同一張分鏡圖，作為 Seedance 的單張參考圖。</p>
+        </div>
+        {canMergeStoryboard && (
+          <button className="btn btn-primary" disabled={busy || submitting} onClick={() => post("/merge-storyboard")} type="button">
+            <Play size={14} />
+            {project.storyboardImageUrl ? "重新合併" : "開始合併"}
+          </button>
+        )}
+      </div>
+
+      <div className="mb-3 grid gap-2 rounded-xl border border-[var(--border)] bg-white p-3 text-xs text-[var(--gray-500)] sm:grid-cols-3">
+        <div>
+          <span className="block text-[var(--gray-400)]">輸入分鏡</span>
+          <strong className="text-sm text-[var(--black)]">{seedanceScenes.length}/9</strong>
+        </div>
+        <div>
+          <span className="block text-[var(--gray-400)]">比例</span>
+          <strong className="text-sm text-[var(--black)]">{ratio}</strong>
+        </div>
+        <div>
+          <span className="block text-[var(--gray-400)]">輸出</span>
+          <strong className="text-sm text-[var(--black)]">{project.storyboardImageUrl ? "已完成" : "待合併"}</strong>
+        </div>
+      </div>
+
+      {project.scenes.length > 0 ? (
+        <div className="grid aspect-[9/16] w-full max-w-[520px] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
+          {project.storyboardImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={project.storyboardImageUrl} alt="Seedance 單張腳本分鏡圖" className="h-full w-full object-contain" />
+          ) : project.status === "STORYBOARDING" && project.steps?.mergeStoryboard?.status === "running" ? (
+            <div className="px-4 text-center text-sm leading-6 text-[var(--gray-500)]">
+              <Loader2 className="mx-auto mb-2 animate-spin text-orange" size={24} />
+              正在合成單張分鏡圖
+            </div>
+          ) : (
+            <span className="px-4 text-center text-sm text-[var(--gray-500)]">完成第 6 步後，按下開始合併會在這裡顯示單張分鏡圖</span>
+          )}
+        </div>
+      ) : (
+        <EmptyPanel title="尚未產生分鏡圖" description="第 7 步會把第 6 步的 9 張分鏡圖合併成單張參考圖。" />
+      )}
+    </div>
+  );
   const videoPanel = (
     <div className="p-1 md:p-2">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm">生成影片</h2>
-          <p className="mt-1 text-xs text-[var(--gray-500)]">先把 9 張分鏡合成單張參考圖，再送給 Seedance。</p>
+          <p className="mt-1 text-xs text-[var(--gray-500)]">把第 7 步的單張分鏡圖送給 Seedance。</p>
         </div>
         {canGenerateVideo && (
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
-              <option value={3}>每段 3 秒</option>
-              <option value={4}>每段 4 秒</option>
-              <option value={5}>每段 5 秒</option>
+              <option value={8}>每段 8 秒</option>
+              <option value={15}>每段 15 秒</option>
             </select>
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={ratio} onChange={(event) => setRatio(event.target.value)}>
-              <option>9:16</option>
-              <option>16:9</option>
-              <option>1:1</option>
-            </select>
-            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={resolution} onChange={(event) => setResolution(event.target.value)}>
-              <option>720p</option>
-              <option>1080p</option>
-              <option>480p</option>
-            </select>
+            <span className="rounded-full border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--gray-500)] sm:py-1">9:16</span>
+            <span className="rounded-full border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--gray-500)] sm:py-1">720p</span>
             <button
               className="btn btn-primary"
               disabled={busy || submitting}
-              onClick={() => post("/video", { ratio, resolution, duration })}
+              onClick={() => post("/video", { ratio: FIXED_VIDEO_RATIO, resolution: FIXED_VIDEO_RESOLUTION, duration })}
               type="button"
             >
               <Play size={14} />
@@ -710,8 +765,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
 
       <div className="mb-3 grid gap-2 rounded-xl border border-[var(--border)] bg-white p-3 text-xs text-[var(--gray-500)] sm:grid-cols-4">
         <div>
-          <span className="block text-[var(--gray-400)]">參考圖</span>
-          <strong className="text-sm text-[var(--black)]">{seedanceScenes.length}/9</strong>
+          <span className="block text-[var(--gray-400)]">單張分鏡圖</span>
+          <strong className="text-sm text-[var(--black)]">{project.storyboardImageUrl ? "已完成" : "尚未完成"}</strong>
         </div>
         <div>
           <span className="block text-[var(--gray-400)]">比例</span>
@@ -727,28 +782,19 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         </div>
       </div>
 
-      {project.scenes.length > 0 ? (
+      {project.storyboardImageUrl ? (
         <div className="space-y-3">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="p-1 md:p-2">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="text-sm">Seedance 單張腳本分鏡圖</h3>
-                  <p className="mt-1 text-xs text-[var(--gray-500)]">生成影片時會先由 9 張分鏡合成這張參考圖，再搭配 prompt 送出。</p>
+                  <p className="mt-1 text-xs text-[var(--gray-500)]">這張圖會搭配 prompt 一起送給 Seedance。</p>
                 </div>
               </div>
               <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
-                {project.storyboardImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={project.storyboardImageUrl} alt="Seedance 單張腳本分鏡圖" className="h-full w-full object-contain" />
-                ) : ["QUEUED", "GENERATING", "MERGING"].includes(project.status) ? (
-                  <div className="px-4 text-center text-sm leading-6 text-[var(--gray-500)]">
-                    <Loader2 className="mx-auto mb-2 animate-spin text-orange" size={24} />
-                    正在合成 Seedance 單張參考圖
-                  </div>
-                ) : (
-                  <span className="px-4 text-center text-sm text-[var(--gray-500)]">送出生成後會在這裡顯示合成後的單張參考圖</span>
-                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={project.storyboardImageUrl} alt="Seedance 單張腳本分鏡圖" className="h-full w-full object-contain" />
               </div>
             </div>
 
@@ -764,7 +810,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                   ) : ["GENERATING", "MERGING"].includes(project.status) ? (
                     <div className="px-4 text-center text-sm leading-6 text-[var(--gray-500)]">
                       <Loader2 className="mx-auto mb-2 animate-spin text-orange" size={24} />
-                      正在用 9 張圖與一組 prompt 生成影片
+                      正在用單張分鏡圖與 prompt 生成影片
                     </div>
                   ) : (
                     <span className="px-4 text-center text-sm text-[var(--gray-500)]">送出後會在這裡顯示最終影片</span>
@@ -780,7 +826,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           </div>
         </div>
       ) : (
-        <EmptyPanel title="尚未產生分鏡圖" description="第 8 步會呈現送給 Seedance 的 9 張分鏡圖；請先完成第 7 步。" />
+        <EmptyPanel title="尚未合併分鏡" description="第 8 步會把第 7 步的單張分鏡圖送給 Seedance；請先完成第 7 步。" />
       )}
     </div>
   );
@@ -804,7 +850,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       );
     }
     if (activeStep === 6) return storyboardPanel;
-    if (activeStep === 7) return videoPanel;
+    if (activeStep === 7) return mergeStoryboardPanel;
+    if (activeStep === 8) return videoPanel;
     return projectDataPanel;
   })();
   const currentStepError = typeof activeStep === "number" ? activeStepError(project, activeStep) : "";
@@ -813,8 +860,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     <div className="min-h-screen bg-[var(--warm-white)]">
       <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[340px_minmax(0,1fr)] md:gap-4 md:p-6">
         <aside className="space-y-4 md:sticky md:top-6 md:h-fit">
-          <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} />
-          <div className="hidden md:block">{previewPanel}</div>
+          <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} previewPanel={previewPanel} />
         </aside>
 
         <section className="min-w-0 space-y-3">
@@ -897,13 +943,16 @@ function ProjectProgressToast({ project, running, onClose }: { project: Project;
 function ProcessTimeline({
   project,
   activeStep,
-  onSelectStep
+  onSelectStep,
+  previewPanel
 }: {
   project: Project;
   activeStep: ActivePanel;
   onSelectStep: (step: ActivePanel) => void;
+  previewPanel: ReactNode;
 }) {
   const steps = buildProcessSteps(project);
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   return (
     <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5 md:p-2">
@@ -913,20 +962,33 @@ function ProcessTimeline({
         </div>
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
-        <div
-          className={`process-step min-w-[160px] rounded-lg border px-2 py-1.5 md:min-w-0 md:px-2 md:py-1.5 ${
-            activeStep === "project" ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"
-          } ${activeStep === "project" ? "border-[var(--orange-border)]" : "border-transparent"}`}
-          data-active={activeStep === "project"}
-        >
-          <button className="process-tab flex w-full min-w-0 items-center gap-2 rounded-md py-0.5 text-left" onClick={() => onSelectStep("project")} type="button">
-            <span className="process-status grid h-6 w-6 shrink-0 place-items-center rounded-full border border-orange bg-orange text-white" title="專案資料">
-              <Link2 size={13} />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-xs leading-4 md:text-sm md:leading-5">專案資料</span>
-            </span>
-          </button>
+        <div className="min-w-[220px] md:min-w-0">
+          <div
+            className={`process-step rounded-lg border px-2 py-1.5 md:px-2 md:py-1.5 ${
+              activeStep === "project" ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"
+            } ${activeStep === "project" ? "border-[var(--orange-border)]" : "border-transparent"}`}
+            data-active={activeStep === "project"}
+          >
+            <div className="flex min-w-0 items-center gap-1">
+              <button className="process-tab flex min-w-0 flex-1 items-center gap-2 rounded-md py-0.5 text-left" onClick={() => onSelectStep("project")} type="button">
+                <span className="process-status grid h-6 w-6 shrink-0 place-items-center rounded-full border border-orange bg-orange text-white" title="專案資料">
+                  <Link2 size={13} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-xs leading-4 md:text-sm md:leading-5">專案資料</span>
+                </span>
+              </button>
+              <button
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-orange hover:bg-white/70"
+                onClick={() => setPreviewOpen((open) => !open)}
+                title={previewOpen ? "收合影片預覽" : "展開影片預覽"}
+                type="button"
+              >
+                <ChevronDown className={`transition-transform ${previewOpen ? "rotate-180" : ""}`} size={15} />
+              </button>
+            </div>
+          </div>
+          {previewOpen && <div className="mt-2 hidden md:block">{previewPanel}</div>}
         </div>
         {steps.map((step, index) => {
           const stepNumber = index + 1;
