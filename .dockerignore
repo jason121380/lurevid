@@ -1,0 +1,16 @@
+.git
+.next
+node_modules
+.env
+.env.*
+storage/generated
+public/generated
+outputs
+*.log
+tsconfig.tsbuildinfo
+README.md
+CLAUDE.md
+AGENTS.md
+MEMORY.md
+STYLE.md
+
