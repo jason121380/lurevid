@@ -322,12 +322,17 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [duration, setDuration] = useState(initialProject?.duration || 5);
   const [activeStep, setActiveStep] = useState<ActivePanel>("project");
   const [progressToastDismissed, setProgressToastDismissed] = useState(false);
+  const [pollVersion, setPollVersion] = useState(0);
   const settingsInit = useRef(Boolean(initialProject));
   const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({
     analysis: initialProject?.analysis,
     structure: initialProject?.structure,
     adaptedScript: initialProject?.adaptedScript
   });
+
+  function notifyProjectsChanged() {
+    window.dispatchEvent(new Event("lurevid:projects-changed"));
+  }
 
   useEffect(() => {
     if (!initialProject) return;
@@ -384,6 +389,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         }
 
         setProject(data);
+        notifyProjectsChanged();
         // 終態（完成/失敗）就停止輪詢；其餘狀態繼續輪詢（有任務在跑時更頻繁）。
         if (!["COMPLETED", "FAILED"].includes(data.status)) schedule(data.status);
       } catch {
@@ -397,7 +403,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       stopped = true;
       if (timer) clearTimeout(timer);
     };
-  }, [projectId]);
+  }, [projectId, pollVersion]);
 
   const projectBusy = project ? BUSY.includes(project.status) : false;
 
@@ -421,6 +427,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         return;
       }
       setProject(data);
+      notifyProjectsChanged();
+      setProgressToastDismissed(false);
+      setPollVersion((version) => version + 1);
       toast(successMessage);
     } catch {
       setError("API 沒有回應");
@@ -852,10 +861,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           <div className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-[0_14px_40px_rgb(26_26_26/0.03)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  {projectStatusBadge}
-                  {currentMeta && <span className="rounded-full bg-[var(--warm-white)] px-2.5 py-1 text-[11px] text-[var(--gray-500)]">{currentMeta.group}</span>}
-                </div>
                 <h1 className="text-lg font-bold tracking-normal text-[var(--black)] md:text-xl">{currentPanelTitle}</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--gray-500)]">{currentPanelDescription}</p>
               </div>
@@ -896,16 +901,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   );
 }
 
-function normalizeProgress(value: number) {
-  if (!Number.isFinite(value)) return 0;
-  if (value > 1) return Math.max(0, Math.min(100, value));
-  return Math.max(0, Math.min(100, value * 100));
-}
-
 function ProjectProgressToast({ project, onClose }: { project: Project; onClose: () => void }) {
   const steps = buildProcessSteps(project);
   const activeStep = steps.find((step) => step.state === "active");
-  const pct = Math.round(normalizeProgress(project.progress || activeStep?.progress || 0));
   const title = activeStep?.title || "任務執行中";
   const message = project.message || activeStep?.description || "正在處理專案";
 
@@ -923,13 +921,6 @@ function ProjectProgressToast({ project, onClose }: { project: Project; onClose:
           <X size={15} />
         </button>
       </div>
-      <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--gray-500)]">
-        <span>進度</span>
-        <span className="tabular-nums text-orange">{pct}%</span>
-      </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--gray-200)]">
-        <div className="process-bar h-full w-full bg-orange" style={{ transform: `scaleX(${pct / 100})` }} />
-      </div>
     </div>
   );
 }
@@ -946,22 +937,22 @@ function ProcessTimeline({
   const steps = buildProcessSteps(project);
 
   return (
-    <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5 md:p-3">
-      <div className="mb-2 flex items-center justify-between gap-3 px-1 md:mb-3">
+    <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5 md:p-2">
+      <div className="mb-1.5 flex items-center justify-between gap-3 px-1 md:mb-2">
         <div>
           <h2 className="text-xs font-bold md:text-sm">功能選單</h2>
         </div>
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-2 md:overflow-visible md:pb-0">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
         <div
-          className={`process-step min-w-[160px] rounded-lg border px-2 py-1.5 md:min-w-0 md:px-2.5 md:py-2 ${
+          className={`process-step min-w-[160px] rounded-lg border px-2 py-1.5 md:min-w-0 md:px-2 md:py-1.5 ${
             activeStep === "project" ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"
           } ${activeStep === "project" ? "border-[var(--orange-border)]" : "border-transparent"}`}
           data-active={activeStep === "project"}
         >
-          <button className="process-tab flex w-full min-w-0 items-center gap-2 rounded-md py-0.5 text-left md:gap-2.5 md:py-1" onClick={() => onSelectStep("project")} type="button">
-            <span className="process-status grid h-6 w-6 shrink-0 place-items-center rounded-md border border-orange bg-orange text-white md:h-8 md:w-8 md:rounded-lg" title="專案資料">
-              <Link2 size={13} className="md:size-[15px]" />
+          <button className="process-tab flex w-full min-w-0 items-center gap-2 rounded-md py-0.5 text-left" onClick={() => onSelectStep("project")} type="button">
+            <span className="process-status grid h-6 w-6 shrink-0 place-items-center rounded-full border border-orange bg-orange text-white" title="專案資料">
+              <Link2 size={13} />
             </span>
             <span className="min-w-0">
               <span className="block truncate text-xs font-semibold leading-4 md:text-sm md:leading-5">專案資料</span>
@@ -982,12 +973,12 @@ function ProcessTimeline({
           return (
             <div className="contents" key={step.title}>
               {sectionLabel && (
-                <div className={`px-1.5 pt-1 text-[10px] uppercase tracking-wide text-[var(--gray-500)] md:px-2 md:pt-1.5 md:text-[11px] ${stepNumber !== 1 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
+                <div className={`px-1.5 pt-1 text-[10px] uppercase tracking-wide text-[var(--gray-500)] md:px-2 md:pt-1 md:text-[11px] ${stepNumber !== 1 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
                   {sectionLabel}
                 </div>
               )}
               <div
-                className={`process-step min-w-[170px] rounded-lg border px-2 py-1.5 md:min-w-0 md:px-2.5 md:py-2 ${
+                className={`process-step min-w-[170px] rounded-lg border px-2 py-1.5 md:min-w-0 md:px-2 md:py-1.5 ${
                   selected
                     ? "bg-orange-bg text-orange"
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
@@ -997,12 +988,12 @@ function ProcessTimeline({
               >
                 <div className="flex items-start">
                   <button
-                    className="process-tab flex min-w-0 flex-1 items-start gap-2 rounded-md py-0.5 text-left md:gap-2.5 md:py-1"
+                    className="process-tab flex min-w-0 flex-1 items-center gap-2 rounded-md py-0.5 text-left"
                     onClick={() => onSelectStep(stepNumber as ActivePanel)}
                     type="button"
                   >
                     <span
-                      className={`process-status grid h-6 w-6 shrink-0 place-items-center rounded-md border md:h-8 md:w-8 md:rounded-lg ${
+                      className={`process-status grid h-6 w-6 shrink-0 place-items-center rounded-full border ${
                         isFailed
                           ? "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]"
                         : isDone
@@ -1013,7 +1004,7 @@ function ProcessTimeline({
                       }`}
                       title={stateLabel}
                     >
-                      {isActive ? <Loader2 size={13} className="animate-spin md:size-[14px]" /> : isFailed ? <X size={13} className="md:size-[14px]" /> : isDone ? <Check size={13} className="md:size-[14px]" /> : <Icon size={13} className="md:size-[14px]" />}
+                      {isActive ? <Loader2 size={13} className="animate-spin" /> : isFailed ? <X size={13} /> : isDone ? <Check size={13} /> : <Icon size={13} />}
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-xs font-semibold leading-4 md:text-sm md:leading-5">{stepNumber}. {step.title}</span>

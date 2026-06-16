@@ -29,8 +29,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {items.map((item) => (
           <div
             key={item.id}
-            className={`pointer-events-auto flex items-start gap-3 rounded-xl border bg-white p-3 text-sm shadow-[0_18px_60px_rgb(26_26_26/0.16)] ${
-              item.type === "error" ? "border-[var(--red)] text-[var(--red)]" : "border-[var(--orange-border)] text-[var(--black)]"
+            className={`pointer-events-auto flex items-start gap-3 rounded-xl bg-white p-3 text-sm shadow-[0_18px_60px_rgb(26_26_26/0.16)] ${
+              item.type === "error" ? "text-[var(--red)]" : "text-[var(--black)]"
             }`}
             role="status"
           >
