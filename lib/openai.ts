@@ -444,8 +444,7 @@ export async function generateSeedanceReferenceImage(
     ].join("\n\n"),
     size,
     n: 1,
-    output_format: "png",
-    quality: "standard"
+    output_format: "png"
   });
   const image = response.data?.[0] as { b64_json?: string; url?: string } | undefined;
   if (!image?.b64_json && !image?.url) throw new Error("OpenAI 沒有回傳 Seedance 單張參考圖");
