@@ -58,11 +58,14 @@ function combinedSeedancePrompt(scenes: Array<{ sceneNumber: number; title: stri
     .join("\n\n");
 
   return [
-    "Create one continuous short-form vertical video using the single reference image as a compressed visual storyboard for the full sequence.",
-    "The reference image was created from 9 storyboard frames. Preserve fictional character design, wardrobe, style, setting continuity, and the narrative order from scene 1 to scene 9.",
-    "Do not reproduce or imply any real person's identity, face, biometric details, private information, or celebrity likeness.",
-    "Do not add subtitles, captions, logos, watermarks, or readable on-screen text. Use smooth cinematic transitions between storyboard beats.",
-    "Storyboard sequence:",
+    "Create one continuous short-form vertical video by following the attached single reference image exactly as a 3x3 storyboard.",
+    "Read the storyboard panels in normal order: top-left to top-right, middle-left to middle-right, bottom-left to bottom-right. Treat them as scene 1 through scene 9.",
+    "Preserve the main model's face, identity, hairstyle, hair length, wardrobe, body type, and overall appearance from the reference image. Do not replace the model, do not change facial features, and do not redesign the character.",
+    "Use each storyboard panel as the visual anchor for its matching scene. Follow the composition, camera angle, pose, salon environment, hair details, lighting, and progression shown in that panel.",
+    "Use the scene descriptions below as the motion/story guidance from step 6. The reference image is the source of visual truth; the text is only to clarify movement and sequence.",
+    "Do not add subtitles, captions, logos, watermarks, UI, labels, frame numbers, or readable on-screen text.",
+    "Make transitions smooth and cinematic while keeping the sequence faithful to the 9 panels.",
+    "Step 6 storyboard sequence:",
     sequence
   ].join("\n\n");
 }
@@ -70,8 +73,8 @@ function combinedSeedancePrompt(scenes: Array<{ sceneNumber: number; title: stri
 function promptOnlySeedancePrompt(scenes: Array<{ sceneNumber: number; title: string; visualGoal: string; seedancePrompt: string }>) {
   return [
     combinedSeedancePrompt(scenes),
-    "No reference image is attached because the image provider rejected the visual reference for privacy safety. Generate from the storyboard text only.",
-    "Use a fictional commercial model or non-identifiable character. Avoid realistic identifiable faces and avoid recreating any real person."
+    "No reference image is attached because the provider rejected the visual reference for safety. Generate from the step 6 storyboard text only.",
+    "Keep one consistent fictional commercial model across all scenes. Preserve the same face, hairstyle, wardrobe category, and character identity from scene to scene."
   ].join("\n\n");
 }
 
