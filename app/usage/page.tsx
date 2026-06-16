@@ -95,9 +95,20 @@ export default function UsagePage() {
       setError("");
       try {
         const res = await fetch("/api/usage", { cache: "no-store" });
-        const next = await res.json();
-        if (!res.ok) throw new Error(next.error || "讀取用量失敗");
-        setData(next);
+        const raw = await res.text();
+        let parsed: (UsageData & { error?: string }) | null = null;
+        if (raw) {
+          try {
+            parsed = JSON.parse(raw);
+          } catch {
+            parsed = null;
+          }
+        }
+        if (!res.ok) {
+          throw new Error(parsed?.error || (res.status >= 500 ? "伺服器計算用量時發生錯誤，請稍後再試" : "讀取用量失敗"));
+        }
+        if (!parsed) throw new Error("讀取用量失敗");
+        setData(parsed);
         if (withToast) toast("已更新用量");
       } catch (err) {
         const message = err instanceof Error ? err.message : "讀取用量失敗";
