@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Uploadable } from "openai";
 import { openaiClient } from "@/lib/openai";
+import { ffmpegPath } from "@/lib/ffmpeg";
 import { getAppSettings } from "@/lib/settings";
 
 const ALLOWED_HOSTS = ["tiktok.com"];
@@ -97,6 +98,8 @@ export async function fetchTranscript(url: string): Promise<string> {
       "bestaudio/best",
       "--no-playlist",
       "--no-warnings",
+      "--ffmpeg-location",
+      ffmpegPath(),
       "-o",
       join(dir, "source.%(ext)s"),
       "--",

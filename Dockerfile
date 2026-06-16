@@ -1,5 +1,5 @@
 # 單一 image 同時供 Web（npm run start）與 Worker（npm run worker）兩個服務使用。
-# Worker 需要 tsx、lib/ 原始碼、tsconfig 與 ffmpeg，因此 runner 帶上完整相依與原始碼。
+# Worker 需要 tsx、lib/ 原始碼、tsconfig 與 ffmpeg-static，因此 runner 帶上完整相依與原始碼。
 FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -17,7 +17,7 @@ ENV NODE_ENV=production
 # yt-dlp 頻道：nightly（預設，最能跟上 IG/TikTok 改版）、stable，或指定版本 tag。
 ARG YTDLP_CHANNEL=nightly
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl \
+  && apt-get install -y --no-install-recommends ca-certificates curl \
   && rm -rf /var/lib/apt/lists/* \
   && if [ "$YTDLP_CHANNEL" = "nightly" ]; then \
        YTDLP_URL="https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux"; \

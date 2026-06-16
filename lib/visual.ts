@@ -35,6 +35,8 @@ export async function downloadSourceVideo(url: string) {
     "mp4",
     "--no-playlist",
     "--no-warnings",
+    "--ffmpeg-location",
+    ffmpegPath(),
     "-o",
     output,
     "--",
