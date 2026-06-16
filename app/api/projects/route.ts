@@ -100,6 +100,7 @@ export async function GET() {
       sourcePlatform: true,
       status: true,
       progress: true,
+      steps: true,
       updatedAt: true,
       createdAt: true
     }

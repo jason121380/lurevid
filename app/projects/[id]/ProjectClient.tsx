@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, Pencil, Play, RotateCcw, Save, Sparkles, Video, X } from "lucide-react";
+import { Check, ChevronDown, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, Pencil, Play, RotateCcw, Save, Sparkles, Trash2, Video, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 
@@ -290,6 +290,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [project, setProject] = useState<Project | null>(initialProject || null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
 
   const [projectTitle, setProjectTitle] = useState(initialProject?.title || "");
   const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
@@ -470,6 +472,29 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       return false;
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function deleteProject() {
+    if (!project) return;
+    setDeletingProject(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "刪除專案失敗");
+        toast(data.error || "刪除專案失敗", "error");
+        return;
+      }
+      notifyProjectsChanged();
+      toast("已刪除專案");
+      window.location.assign("/");
+    } catch {
+      setError("API 沒有回應");
+      toast("API 沒有回應", "error");
+    } finally {
+      setDeletingProject(false);
     }
   }
 
@@ -722,16 +747,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   );
   const videoPanel = (
     <div className="p-1 md:p-2">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm">生成影片</h2>
-          <p className="mt-1 text-xs text-[var(--gray-500)]">把第 7 步的單張分鏡圖送給 Seedance。</p>
-        </div>
-      </div>
-
       {project.storyboardImageUrl ? (
         <div className="space-y-3">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid gap-3 xl:grid-cols-2">
             <div className="p-1 md:p-2">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
@@ -817,7 +835,17 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                 <h1 className="text-lg tracking-normal text-[var(--black)] md:text-xl">{currentPanelTitle}</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--gray-500)]">{currentPanelDescription}</p>
               </div>
-              {activeStep === 8 && videoControls ? (
+              {activeStep === "project" ? (
+                <button
+                  className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--border)] bg-white px-4 text-sm text-[var(--gray-400)] transition hover:border-[var(--border-strong)] hover:bg-[var(--warm-white)] hover:text-[var(--gray-500)] disabled:opacity-60 lg:w-auto"
+                  disabled={deletingProject}
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  type="button"
+                >
+                  {deletingProject ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                  刪除專案
+                </button>
+              ) : activeStep === 8 && videoControls ? (
                 <div className="w-full shrink-0 lg:w-auto">{videoControls}</div>
               ) : typeof activeStep === "number" && (
                 <button
@@ -851,6 +879,40 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       </div>
       {taskToastProject && !taskToastDismissed && (
         <ProjectProgressToast project={taskToastProject} running={BUSY.includes(taskToastProject.status)} onClose={() => setTaskToastDismissed(true)} />
+      )}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/20 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[0_22px_70px_rgb(26_26_26/0.18)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base text-[var(--black)]">刪除專案</h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--gray-500)]">確定要刪除「{project.title || "未命名專案"}」嗎？這個動作無法復原。</p>
+              </div>
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--gray-400)] hover:bg-[var(--warm-white)] hover:text-[var(--gray-500)]" onClick={() => setDeleteConfirmOpen(false)} type="button">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                className="h-10 rounded-full border border-[var(--border)] bg-white px-4 text-sm text-[var(--gray-500)] hover:border-[var(--border-strong)] hover:bg-[var(--warm-white)] hover:text-[var(--gray-500)]"
+                disabled={deletingProject}
+                onClick={() => setDeleteConfirmOpen(false)}
+                type="button"
+              >
+                取消
+              </button>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--warm-white)] px-4 text-sm text-[var(--gray-500)] hover:border-[var(--border-strong)] hover:bg-[var(--warm-white)] hover:text-[var(--gray-500)] disabled:opacity-60"
+                disabled={deletingProject}
+                onClick={deleteProject}
+                type="button"
+              >
+                {deletingProject ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                確認刪除
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

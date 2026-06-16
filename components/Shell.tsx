@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Check, Loader2, LogOut, Menu, Pencil, Plus, Settings, X } from "lucide-react";
+import { Activity, BarChart3, Loader2, LogOut, Menu, Plus, Settings, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -16,8 +16,21 @@ type ProjectListItem = {
   sourcePlatform?: string;
   status: string;
   progress: number;
+  steps?: Record<string, { status?: string; progress?: number; message?: string }>;
   updatedAt: string;
 };
+
+const PROJECT_BUSY_STATUSES = ["QUEUED", "ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING", "GENERATING", "MERGING"];
+const PROJECT_STEP_LABELS: Array<[string, string]> = [
+  ["source", "影片下載"],
+  ["transcribe", "轉錄音訊"],
+  ["frames", "抽取影格"],
+  ["analyze", "影片分析"],
+  ["adapt", "改編腳本"],
+  ["storyboard", "產生分鏡"],
+  ["mergeStoryboard", "合併分鏡"],
+  ["video", "生成影片"]
+];
 
 function projectDisplayTitle(project: Pick<ProjectListItem, "title">) {
   const title = project.title?.trim();
@@ -27,6 +40,28 @@ function projectDisplayTitle(project: Pick<ProjectListItem, "title">) {
   return title;
 }
 
+function runningProjectLabel(project: ProjectListItem) {
+  const runningStep = PROJECT_STEP_LABELS.find(([key]) => project.steps?.[key]?.status === "running");
+  if (runningStep) return runningStep[1];
+
+  switch (project.status) {
+    case "QUEUED":
+      return "排隊中";
+    case "ANALYZING":
+      return "影片分析";
+    case "STRUCTURING":
+    case "ADAPTING":
+      return "改編腳本";
+    case "STORYBOARDING":
+      return "產生分鏡";
+    case "GENERATING":
+    case "MERGING":
+      return "生成影片";
+    default:
+      return "";
+  }
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -34,12 +69,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
   const isAdmin = Boolean(session?.user?.isAdmin);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
-  const [editingId, setEditingId] = useState("");
-  const [draftTitle, setDraftTitle] = useState("");
-  const [savingId, setSavingId] = useState("");
   const [switchingProjectId, setSwitchingProjectId] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [pendingDeleteProject, setPendingDeleteProject] = useState<ProjectListItem | null>(null);
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] || "";
   const switchingProject = switchingProjectId && switchingProjectId !== activeProjectId;
 
@@ -70,20 +101,6 @@ export function Shell({ children }: { children: ReactNode }) {
     });
   }, [projects, router]);
 
-  useEffect(() => {
-    if (!pendingDeleteProject) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setPendingDeleteProject(null);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [pendingDeleteProject]);
-
-  function beginEdit(project: ProjectListItem) {
-    setEditingId(project.id);
-    setDraftTitle(projectDisplayTitle(project));
-  }
-
   function closeMobileMenu() {
     setMobileOpen(false);
   }
@@ -92,52 +109,6 @@ export function Shell({ children }: { children: ReactNode }) {
     if (projectId !== activeProjectId) setSwitchingProjectId(projectId);
     closeMobileMenu();
     router.prefetch(`/projects/${projectId}`);
-  }
-
-  async function saveTitle(projectId: string) {
-    const title = draftTitle.trim();
-    if (!title) return;
-    setSavingId(projectId);
-    try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title })
-      });
-      if (res.ok) {
-        setEditingId("");
-        await loadProjects();
-        toast("專案名稱已更新");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast(data.error || "儲存名稱失敗", "error");
-      }
-    } catch {
-      toast("儲存名稱失敗", "error");
-    } finally {
-      setSavingId("");
-    }
-  }
-
-  async function deleteProject(project: ProjectListItem) {
-    setPendingDeleteProject(null);
-
-    setSavingId(project.id);
-    try {
-      const res = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
-      if (res.ok) {
-        if (activeProjectId === project.id) router.push("/");
-        await loadProjects();
-        toast("專案已刪除");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast(data.error || "刪除專案失敗", "error");
-      }
-    } catch {
-      toast("刪除專案失敗", "error");
-    } finally {
-      setSavingId("");
-    }
   }
 
   return (
@@ -181,51 +152,25 @@ export function Shell({ children }: { children: ReactNode }) {
               {projects.length === 0 && <div className="rounded-lg bg-[var(--warm-white)] px-3 py-2 text-xs leading-5 text-[var(--gray-500)]">開始分析後，專案會自動存到這裡。</div>}
               {projects.map((project) => {
                 const active = activeProjectId === project.id;
-                const editing = editingId === project.id;
                 const switching = switchingProjectId === project.id && !active;
+                const runningLabel = PROJECT_BUSY_STATUSES.includes(project.status) ? runningProjectLabel(project) : "";
 
                 return (
                   <div className={`rounded-lg px-2 py-0.5 ${active || switching ? "bg-orange-bg" : "hover:bg-[var(--warm-white)]"}`} key={project.id} aria-busy={switching}>
-                    {editing ? (
-                      <div className="flex items-start gap-1">
-                        <input
-                          className="min-w-0 flex-1 rounded-md border border-[var(--border-strong)] bg-white px-2 py-1 text-xs outline-none focus:border-orange"
-                          value={draftTitle}
-                          onChange={(event) => setDraftTitle(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") saveTitle(project.id);
-                            if (event.key === "Escape") setEditingId("");
-                          }}
-                          autoFocus
-                        />
-                        <button className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-orange text-white" disabled={savingId === project.id} onClick={() => saveTitle(project.id)} title="儲存名稱">
-                          <Check size={13} />
-                        </button>
-                        <button className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-[var(--border-strong)] bg-white text-[var(--gray-500)]" onClick={() => setEditingId("")} title="取消">
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <Link
-                          className="flex min-w-0 flex-1 items-center gap-1.5 py-1"
-                          href={`/projects/${project.id}`}
-                          onClick={() => startProjectSwitch(project.id)}
-                          onMouseEnter={() => router.prefetch(`/projects/${project.id}`)}
-                        >
-                          {switching && <Loader2 size={12} className="shrink-0 animate-spin text-orange" />}
-                          <div className={`truncate text-xs leading-4 ${active || switching ? "text-orange" : "text-[var(--black)]"}`}>{projectDisplayTitle(project)}</div>
-                        </Link>
-                        <div className="flex shrink-0 gap-1">
-                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
-                            <Pencil size={11} />
-                          </button>
-                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => setPendingDeleteProject(project)} title="刪除專案">
-                            <X size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <Link
+                      className="flex min-w-0 items-center gap-2 py-1"
+                      href={`/projects/${project.id}`}
+                      onClick={() => startProjectSwitch(project.id)}
+                      onMouseEnter={() => router.prefetch(`/projects/${project.id}`)}
+                    >
+                      <div className={`min-w-0 flex-1 truncate text-xs leading-4 ${active || switching ? "text-orange" : "text-[var(--black)]"}`}>{projectDisplayTitle(project)}</div>
+                      {(switching || runningLabel) && (
+                        <span className={`inline-flex max-w-[96px] shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] leading-4 ${active || switching ? "bg-white/70 text-orange" : "bg-[var(--warm-white)] text-[var(--gray-500)]"}`}>
+                          <Loader2 size={10} className="shrink-0 animate-spin" />
+                          <span className="truncate">{switching ? "切換中" : runningLabel}</span>
+                        </span>
+                      )}
+                    </Link>
                   </div>
                 );
               })}
@@ -277,37 +222,6 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </nav>
       </aside>
-      {pendingDeleteProject && (
-        <div className="fixed inset-0 z-[80] grid place-items-center bg-black/35 px-4" onClick={() => setPendingDeleteProject(null)}>
-          <div
-            className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-4 shadow-[0_24px_80px_rgb(26_26_26/0.18)]"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-project-title"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base" id="delete-project-title">刪除專案</h2>
-                <p className="mt-2 text-sm leading-6 text-[var(--gray-500)]">
-                  確定要刪除「{projectDisplayTitle(pendingDeleteProject)}」？這會移除分析、分鏡與影片紀錄。
-                </p>
-              </div>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--gray-400)] hover:bg-[var(--warm-white)] hover:text-[var(--black)]" onClick={() => setPendingDeleteProject(null)} title="關閉" type="button">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button className="btn btn-ghost" disabled={savingId === pendingDeleteProject.id} onClick={() => setPendingDeleteProject(null)} type="button">
-                取消
-              </button>
-              <button className="btn bg-[var(--red)] text-white hover:bg-[#a91f1f]" disabled={savingId === pendingDeleteProject.id} onClick={() => deleteProject(pendingDeleteProject)} type="button">
-                {savingId === pendingDeleteProject.id ? "刪除中" : "刪除"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <main className="relative md:ml-[var(--sidebar-w)]">
         {switchingProject && (
           <div className="pointer-events-none fixed inset-x-0 top-14 z-[70] flex justify-center md:left-[var(--sidebar-w)] md:top-0">
