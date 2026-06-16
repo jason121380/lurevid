@@ -954,6 +954,49 @@ function MarkdownResult({ value }: { value: string }) {
   );
 }
 
+function parseStructuredResult(value: string) {
+  try {
+    const parsed = JSON.parse(value) as {
+      sections?: Array<{ title?: string; bullets?: string[] }>;
+    };
+    const sections = parsed.sections || [];
+    if (!sections.length) return null;
+    return sections
+      .map((section) => ({
+        title: section.title?.trim() || "",
+        bullets: Array.isArray(section.bullets) ? section.bullets.filter(Boolean) : []
+      }))
+      .filter((section) => section.title && section.bullets.length);
+  } catch {
+    return null;
+  }
+}
+
+function StructuredResult({ value }: { value: string }) {
+  const sections = useMemo(() => parseStructuredResult(value), [value]);
+  if (!sections) return <MarkdownResult value={value} />;
+
+  return (
+    <div className="h-full overflow-y-auto pr-1">
+      <div className="grid gap-3 lg:grid-cols-2">
+        {sections.map((section) => (
+          <section className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4" key={section.title}>
+            <h3 className="text-sm font-bold text-[var(--black)]">{section.title}</h3>
+            <div className="mt-3 space-y-2">
+              {section.bullets.map((bullet, index) => (
+                <div className="flex gap-2 text-sm leading-6 text-[var(--black)]" key={`${section.title}-${index}`}>
+                  <span className="mt-[0.72em] h-1.5 w-1.5 shrink-0 rounded-full bg-orange" />
+                  <p>{bullet}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TranscriptResult({ value }: { value: string }) {
   const rows = value
     .split(/\r?\n/)
@@ -1015,7 +1058,7 @@ function ResultCard({
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
       </div>
       <div className="min-h-0 flex-1">
-        <MarkdownResult value={value} />
+        <StructuredResult value={value} />
       </div>
     </div>
   );

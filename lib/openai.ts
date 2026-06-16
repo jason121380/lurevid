@@ -29,6 +29,17 @@ const storyboardBeatSchema = z.object({
     .length(9)
 });
 
+const structuredResultSchema = z.object({
+  sections: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        bullets: z.array(z.string().min(1)).min(1)
+      })
+    )
+    .min(1)
+});
+
 function isMissingApiKey(value: string) {
   return !value || value === "sk-..." || value.startsWith("replace-with");
 }
@@ -53,36 +64,125 @@ export async function openaiClient() {
   return client();
 }
 
-async function generateText(model: string, system: string, user: string) {
-  const openai = await client();
-  const response = await openai.responses.create({
-    model,
-    input: [
-      { role: "system", content: system },
-      { role: "user", content: user }
-    ]
-  });
-  return response.output_text.trim();
-}
-
 const textModel = async () => (await getAppSettings()).OPENAI_STORY_MODEL || "gpt-5.4-mini";
 
 /** 第 1 步：分析這支短影音。 */
 export async function analyzeVideo(transcript: string, platform: string, visualAnalysis?: string) {
-  return generateText(
-    await textModel(),
-    "你是短影音內容策略分析師。根據逐字稿與視覺分鏡分析這支短影音，用繁體中文、條列重點，精簡有洞察。不要輸出「一句話總結」、下一步建議、可整理成模板等結尾推銷段落。",
-    `平台：${platform}\n逐字稿：\n${transcript}\n\n視覺分鏡分析：\n${visualAnalysis || "未取得"}\n\n請整合分析：主題、目標受眾、核心賣點、語氣與風格、畫面與字幕如何輔助說服、分鏡/剪輯節奏，以及它為什麼會吸引人。不要加總結段落。`
-  );
+  const openai = await client();
+  const response = await openai.responses.create({
+    model: await textModel(),
+    input: [
+      {
+        role: "system",
+        content:
+          "你是短影音內容策略分析師。根據逐字稿與視覺分鏡分析這支短影音。輸出只能是 JSON，不要 markdown，不要一句話總結、下一步建議或推銷段落。所有內容用繁體中文。"
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          platform,
+          transcript,
+          visualAnalysis: visualAnalysis || "未取得",
+          requiredSections: ["主題", "目標受眾", "核心賣點", "語氣與風格", "畫面與字幕", "分鏡與剪輯", "吸睛重點"],
+          rules: ["每個 section 至少 2 個 bullets", "bullets 要具體，不要空泛", "不要加入 requiredSections 之外的區塊"]
+        })
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "video_analysis_sections",
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["sections"],
+          properties: {
+            sections: {
+              type: "array",
+              minItems: 7,
+              maxItems: 7,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["title", "bullets"],
+                properties: {
+                  title: { type: "string" },
+                  bullets: {
+                    type: "array",
+                    minItems: 2,
+                    items: { type: "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        strict: true
+      }
+    }
+  });
+
+  const parsed = structuredResultSchema.parse(parseJsonText(response.output_text));
+  return JSON.stringify(parsed, null, 2);
 }
 
 /** 第 2 步：拆解敘事結構。 */
 export async function analyzeStructure(transcript: string, analysis: string) {
-  return generateText(
-    await textModel(),
-    "你是爆款短影音結構拆解專家。用繁體中文條列影片的敘事結構與節奏。不要輸出「一句話總結」、下一步建議、可整理成模板等結尾推銷段落。",
-    `先前分析：\n${analysis}\n\n逐字稿：\n${transcript}\n\n請拆解：開頭 hook、鋪陳、賣點呈現、CTA／結尾，每段大約時間佔比與使用的手法。不要加總結段落。`
-  );
+  const openai = await client();
+  const response = await openai.responses.create({
+    model: await textModel(),
+    input: [
+      {
+        role: "system",
+        content:
+          "你是爆款短影音結構拆解專家。用繁體中文拆解敘事結構與節奏。輸出只能是 JSON，不要 markdown，不要一句話總結、下一步建議或推銷段落。"
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          analysis,
+          transcript,
+          requiredSections: ["開頭 Hook", "鋪陳", "賣點呈現", "CTA／結尾", "節奏與剪輯手法"],
+          rules: ["每個 section 至少 2 個 bullets", "bullets 要包含時間佔比、功能、逐字稿/畫面對應或使用手法", "不要加入 requiredSections 之外的區塊"]
+        })
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "structure_analysis_sections",
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["sections"],
+          properties: {
+            sections: {
+              type: "array",
+              minItems: 5,
+              maxItems: 5,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["title", "bullets"],
+                properties: {
+                  title: { type: "string" },
+                  bullets: {
+                    type: "array",
+                    minItems: 2,
+                    items: { type: "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        strict: true
+      }
+    }
+  });
+
+  const parsed = structuredResultSchema.parse(parseJsonText(response.output_text));
+  return JSON.stringify(parsed, null, 2);
 }
 
 /** 第 3 步：改編成全新原創 9 宮格腳本（接給分鏡使用）。 */
