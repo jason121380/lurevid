@@ -8,6 +8,8 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
+const VIDEO_BUSY_STATUSES = ["QUEUED", "GENERATING", "MERGING"];
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await currentUser();
@@ -22,8 +24,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
 
   if (!project) return NextResponse.json({ error: "找不到專案" }, { status: 404 });
-  if (project.status !== "STORYBOARD_READY") {
-    return NextResponse.json({ error: "分鏡圖尚未完成，不能開始生成影片" }, { status: 400 });
+  if (VIDEO_BUSY_STATUSES.includes(project.status)) {
+    return NextResponse.json({ error: "影片正在生成中，請稍後再試" }, { status: 409 });
   }
   if (project.scenes.length !== 9 || project.scenes.some((scene) => !scene.imageUrl)) {
     return NextResponse.json({ error: "需要 9 張分鏡圖才能變成影片" }, { status: 400 });

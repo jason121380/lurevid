@@ -44,10 +44,10 @@ export type Project = {
 const BUSY = ["QUEUED", "ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING", "GENERATING", "MERGING"];
 type StepState = "done" | "active" | "waiting" | "failed";
 
-type StepInfo = { title: string; description: string; state: StepState; progress: number };
+type StepInfo = { title: string; description: string; state: StepState; progress: number; errorMessage?: string };
 
 function buildProcessSteps(project: Project): StepInfo[] {
-  const steps = (project.steps || {}) as Record<string, { status?: string; progress?: number }>;
+  const steps = (project.steps || {}) as Record<string, { status?: string; progress?: number; message?: string }>;
   const storyboardDone = project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
 
   // 步驟 1-4（分析子步驟）：用 project.steps 的狀態 + 既有產物判斷。
@@ -67,11 +67,12 @@ function buildProcessSteps(project: Project): StepInfo[] {
   const phase = (done: boolean, active: boolean): StepState =>
     project.status === "FAILED" && active ? "failed" : done ? "done" : active ? "active" : "waiting";
 
-  const mk = (title: string, description: string, state: StepState, progress?: number): StepInfo => ({
+  const mk = (key: string, title: string, description: string, state: StepState, progress?: number): StepInfo => ({
     title,
     description,
     state,
-    progress: progress ?? (state === "done" ? 1 : state === "active" ? 0.5 : 0)
+    progress: progress ?? (state === "done" ? 1 : state === "active" ? 0.5 : 0),
+    errorMessage: typeof steps[key]?.message === "string" ? steps[key]?.message : undefined
   });
 
   const s1 = sub("source", Boolean(project.sourceVideoUrl));
@@ -80,14 +81,14 @@ function buildProcessSteps(project: Project): StepInfo[] {
   const s4 = sub("analyze", Boolean(project.analysis));
 
   return [
-    mk("基本資料", "來源連結與下載 MP4", s1, subProgress("source", s1)),
-    mk("轉錄音訊", "把影片聲音轉成逐字稿", s2, subProgress("transcribe", s2)),
-    mk("抽取影格", "用 ffmpeg 抽出代表性畫面", s3, subProgress("frames", s3)),
-    mk("影片分析", "整合畫面與逐字稿產出洞察", s4, subProgress("analyze", s4)),
-    mk("結構分析", "拆 hook、鋪陳、賣點與 CTA", phase(Boolean(project.structure), project.status === "STRUCTURING")),
-    mk("改編腳本", "改寫成全新原創短影音腳本", phase(Boolean(project.adaptedScript), project.status === "ADAPTING")),
-    mk("產生分鏡", "拆 9 鏡並產生分鏡圖", phase(storyboardDone, project.status === "STORYBOARDING")),
-    mk("生成影片", "送 Seedance 產片段並合成 final.mp4", phase(project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["GENERATING", "MERGING"].includes(project.status)))
+    mk("source", "基本資料", "來源連結與下載 MP4", s1, subProgress("source", s1)),
+    mk("transcribe", "轉錄音訊", "把影片聲音轉成逐字稿", s2, subProgress("transcribe", s2)),
+    mk("frames", "抽取影格", "用 ffmpeg 抽出代表性畫面", s3, subProgress("frames", s3)),
+    mk("analyze", "影片分析", "整合畫面與逐字稿產出洞察", s4, subProgress("analyze", s4)),
+    mk("structure", "結構分析", "拆 hook、鋪陳、賣點與 CTA", phase(Boolean(project.structure), project.status === "STRUCTURING")),
+    mk("adapt", "改編腳本", "改寫成全新原創短影音腳本", phase(Boolean(project.adaptedScript), project.status === "ADAPTING")),
+    mk("storyboard", "產生分鏡", "拆 9 鏡並產生分鏡圖", phase(storyboardDone, project.status === "STORYBOARDING")),
+    mk("video", "生成影片", "送 Seedance 產片段並合成 final.mp4", phase(project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["GENERATING", "MERGING"].includes(project.status)))
   ];
 }
 
@@ -99,8 +100,16 @@ function stepCanRun(project: Project, stepNumber: number) {
   if (stepNumber === 5) return Boolean(project.analysis);
   if (stepNumber === 6) return Boolean(project.structure);
   if (stepNumber === 7) return Boolean(project.adaptedScript);
-  if (stepNumber === 8) return project.status === "STORYBOARD_READY" && project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
+  if (stepNumber === 8) return hasNineStoryboardImages(project);
   return false;
+}
+
+function hasNineStoryboardImages(project: Project) {
+  return project.scenes.length === 9 && project.scenes.every((scene) => scene.imageUrl);
+}
+
+function activeStepError(project: Project, stepNumber: number) {
+  return buildProcessSteps(project)[stepNumber - 1]?.errorMessage || "";
 }
 
 // 抽影格間隔為 3 秒（lib/visual.ts 用 fps=1/3），故第 index 張約在 index*3 秒。
@@ -210,6 +219,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [resolution, setResolution] = useState(initialProject?.resolution || "720p");
   const [duration, setDuration] = useState(initialProject?.duration || 5);
   const [activeStep, setActiveStep] = useState(1);
+  const [progressToastDismissed, setProgressToastDismissed] = useState(false);
   const settingsInit = useRef(Boolean(initialProject));
   const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({
     analysis: initialProject?.analysis,
@@ -286,6 +296,12 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       if (timer) clearTimeout(timer);
     };
   }, [projectId]);
+
+  const projectBusy = project ? BUSY.includes(project.status) : false;
+
+  useEffect(() => {
+    if (!projectBusy) setProgressToastDismissed(false);
+  }, [projectBusy, projectId]);
 
   async function post(path: string, payload?: Record<string, unknown>, successMessage = "已送出") {
     setSubmitting(true);
@@ -435,13 +451,15 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const transcriptPanel = (
-    <div className="card p-3 md:p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
+      <div className="mb-3 flex shrink-0 items-center justify-between">
         <h2 className="text-sm font-bold">轉錄音訊</h2>
         <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
       </div>
       {project.sourceTranscript ? (
-        <TranscriptResult value={project.sourceTranscript} />
+        <div className="min-h-0 flex-1">
+          <TranscriptResult value={project.sourceTranscript} />
+        </div>
       ) : (
         <EmptyPanel title="尚未取得逐字稿" description="worker 會在下載影片後自動轉錄音訊。" />
       )}
@@ -544,6 +562,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const seedanceScenes = project.scenes.filter((scene) => scene.imageUrl);
+  const canGenerateVideo = hasNineStoryboardImages(project);
   const seedancePrompt = buildSeedancePreviewPrompt(project.scenes);
   const videoPanel = (
     <div className="card p-3 md:p-4">
@@ -552,7 +571,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           <h2 className="text-sm font-bold">生成影片</h2>
           <p className="mt-1 text-xs text-[var(--gray-500)]">送給 Seedance 的 9 張參考圖與合併提示詞</p>
         </div>
-        {project.status === "STORYBOARD_READY" && (
+        {canGenerateVideo && (
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
               <option value={3}>每段 3 秒</option>
@@ -571,12 +590,12 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             </select>
             <button
               className="btn btn-primary"
-              disabled={busy || submitting || seedanceScenes.length !== 9}
+              disabled={busy || submitting}
               onClick={() => post("/video", { ratio, resolution, duration }, "已開始生成影片")}
               type="button"
             >
               <Play size={14} />
-              送出生成
+              {project.finalVideoUrl ? "重新生成" : "送出生成"}
             </button>
           </div>
         )}
@@ -700,6 +719,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (activeStep === 8) return videoPanel;
     return sourcePanel;
   })();
+  const currentStepError = activeStepError(project, activeStep);
 
   return (
     <div className="min-h-screen bg-[var(--warm-white)]">
@@ -710,8 +730,54 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         </aside>
 
         <section className="min-w-0">
+          {currentStepError && (
+            <div className="mb-3 rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm leading-6 text-[var(--red)]">
+              {currentStepError}
+            </div>
+          )}
           {selectedPanel}
         </section>
+      </div>
+      {projectBusy && !progressToastDismissed && (
+        <ProjectProgressToast project={project} onClose={() => setProgressToastDismissed(true)} />
+      )}
+    </div>
+  );
+}
+
+function normalizeProgress(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  if (value > 1) return Math.max(0, Math.min(100, value));
+  return Math.max(0, Math.min(100, value * 100));
+}
+
+function ProjectProgressToast({ project, onClose }: { project: Project; onClose: () => void }) {
+  const steps = buildProcessSteps(project);
+  const activeStep = steps.find((step) => step.state === "active");
+  const pct = Math.round(normalizeProgress(project.progress || activeStep?.progress || 0));
+  const title = activeStep?.title || "任務執行中";
+  const message = project.message || activeStep?.description || "正在處理專案";
+
+  return (
+    <div className="fixed bottom-5 right-5 z-[90] w-[min(360px,calc(100vw-32px))] rounded-2xl border border-[var(--border)] bg-white p-4 shadow-[0_18px_60px_rgb(26_26_26/0.16)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Loader2 className="shrink-0 animate-spin text-orange" size={16} />
+            <h3 className="truncate text-sm font-bold">{title}</h3>
+          </div>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--gray-500)]">{message}</p>
+        </div>
+        <button className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--gray-400)] hover:bg-[var(--warm-white)] hover:text-[var(--black)]" onClick={onClose} title="關閉進度" type="button">
+          <X size={15} />
+        </button>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--gray-500)]">
+        <span>進度</span>
+        <span className="tabular-nums text-orange">{pct}%</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--gray-200)]">
+        <div className="process-bar h-full w-full bg-orange" style={{ transform: `scaleX(${pct / 100})` }} />
       </div>
     </div>
   );
@@ -786,6 +852,9 @@ function ProcessTimeline({
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-xs font-medium leading-5">{step.title}</span>
+                      {isFailed && step.errorMessage && (
+                        <span className="mt-0.5 block truncate text-[11px] leading-4 text-[var(--red)]">{step.errorMessage}</span>
+                      )}
                     </span>
                   </button>
                   <button
@@ -896,7 +965,7 @@ function TranscriptResult({ value }: { value: string }) {
     });
 
   return (
-    <div className="max-h-[560px] overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-2 text-sm md:p-3">
+    <div className="h-full overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-2 text-sm md:p-3">
       <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 border-b border-[var(--border)] px-2 pb-2 text-xs font-semibold text-[var(--gray-500)] sm:grid-cols-[112px_minmax(0,1fr)]">
         <div>秒數</div>
         <div>逐字稿</div>
