@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type ProjectListItem = {
   id: string;
@@ -39,15 +39,17 @@ export function Shell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] || "";
 
-  async function loadProjects() {
+  const loadProjects = useCallback(async () => {
     const res = await fetch("/api/projects");
     const data = await res.json();
     if (res.ok) setProjects(data.projects || []);
-  }
+  }, []);
 
   useEffect(() => {
     loadProjects();
-  }, [pathname]);
+    window.addEventListener("lurevid:projects-changed", loadProjects);
+    return () => window.removeEventListener("lurevid:projects-changed", loadProjects);
+  }, [loadProjects]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("lurevid-sidebar-collapsed");

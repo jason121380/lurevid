@@ -2,7 +2,6 @@
 
 import { ChevronDown, Eye, EyeOff, Save } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Shell } from "@/components/Shell";
 import { useToast } from "@/components/Toast";
 
 type SettingField = {
@@ -175,8 +174,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <Shell>
-      <div className="min-h-screen bg-[var(--warm-white)]">
+    <div className="min-h-screen bg-[var(--warm-white)]">
         <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] bg-white px-6">
           <h1 className="text-base">設定</h1>
           <button className="btn btn-primary" disabled={saving || loading} onClick={save}>
@@ -259,8 +257,7 @@ export default function SettingsPage() {
             </>
           )}
         </div>
-      </div>
-    </Shell>
+    </div>
   );
 }
 

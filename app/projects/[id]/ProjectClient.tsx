@@ -2,7 +2,6 @@
 
 import { Download, Loader2, Play, RotateCcw, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Shell } from "@/components/Shell";
 import { useToast } from "@/components/Toast";
 
 export type Scene = {
@@ -340,6 +339,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       }
       setProject(data);
       setProjectTitle(data.title || "");
+      window.dispatchEvent(new Event("lurevid:projects-changed"));
       toast("已儲存專案名稱");
     } catch {
       setError("API 沒有回應");
@@ -362,8 +362,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     if (stepNumber === 8) return void post("/video", { ratio, resolution, duration }, "已開始生成影片");
   }
 
-  if (error && !project) return <Shell><div className="p-6 text-[var(--red)]">{error}</div></Shell>;
-  if (!project) return <Shell><div className="grid min-h-screen place-items-center"><Loader2 className="animate-spin text-orange" /></div></Shell>;
+  if (error && !project) return <div className="p-6 text-[var(--red)]">{error}</div>;
+  if (!project) return <div className="grid min-h-screen place-items-center"><Loader2 className="animate-spin text-orange" /></div>;
 
   const busy = BUSY.includes(project.status) || submitting;
   const downloadButton = project.sourceVideoUrl ? (
@@ -694,20 +694,18 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   })();
 
   return (
-    <Shell>
-      <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[325px_minmax(0,1fr)] md:gap-4 md:p-6">
-          <aside className="space-y-4 md:sticky md:top-6 md:h-fit">
-            <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
-            {previewPanel}
-          </aside>
+    <div className="page-soft-enter min-h-screen bg-[var(--warm-white)]">
+      <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[325px_minmax(0,1fr)] md:gap-4 md:p-6">
+        <aside className="space-y-4 md:sticky md:top-6 md:h-fit">
+          <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
+          {previewPanel}
+        </aside>
 
-          <section className="min-w-0">
-            {selectedPanel}
-          </section>
-        </div>
+        <section className="min-w-0">
+          {selectedPanel}
+        </section>
       </div>
-    </Shell>
+    </div>
   );
 }
 
@@ -727,11 +725,11 @@ function ProcessTimeline({
   const steps = buildProcessSteps(project);
 
   return (
-    <div className="rounded-xl bg-white p-2 md:p-3">
+    <div className="process-card rounded-xl bg-white p-2 md:p-3">
       <div className="mb-2 flex items-center justify-between gap-3 px-1">
         <h2 className="text-sm font-bold">功能選單</h2>
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
         {steps.map((step, index) => {
           const stepNumber = index + 1;
           const canRun = stepCanRun(project, stepNumber) && !busy;
@@ -750,16 +748,18 @@ function ProcessTimeline({
                 </div>
               )}
               <div
-                className={`min-w-[260px] rounded-lg px-2 py-1.5 transition md:min-w-0 ${
+                className={`process-step min-w-[260px] rounded-lg px-2 py-1.5 md:min-w-0 ${
                   activeStep === stepNumber
                     ? "bg-orange-bg text-orange"
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
                 }`}
+                data-active={activeStep === stepNumber}
+                data-running={isActive}
               >
                 <div className="flex items-center gap-2">
                   {/* 數字圈：只當狀態指示與選取，不再是執行按鈕 */}
                   <button
-                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] ${stepStateClass(step.state)}`}
+                    className={`process-dot grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] ${stepStateClass(step.state)}`}
                     onClick={() => onSelectStep(stepNumber)}
                     type="button"
                   >
@@ -771,7 +771,7 @@ function ProcessTimeline({
                   {isActive && <span className="shrink-0 text-[11px] tabular-nums text-orange">{barPct}%</span>}
                   {/* 執行/重跑按鈕：單獨放右邊 */}
                   <button
-                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${canRun ? "border-[var(--border-strong)] text-orange hover:bg-orange hover:text-white" : "border-[var(--border)] text-[var(--gray-300)]"}`}
+                    className={`process-action grid h-6 w-6 shrink-0 place-items-center rounded-full border ${canRun ? "border-[var(--border-strong)] text-orange hover:bg-orange hover:text-white" : "border-[var(--border)] text-[var(--gray-300)]"}`}
                     disabled={!canRun}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -784,7 +784,7 @@ function ProcessTimeline({
                   </button>
                 </div>
                 <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
-                  <div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${barPct}%` }} />
+                  <div className={`process-bar h-full w-full ${barColor}`} style={{ transform: `scaleX(${barPct / 100})` }} />
                 </div>
               </div>
             </div>

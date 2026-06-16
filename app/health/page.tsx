@@ -2,7 +2,6 @@
 
 import { Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Shell } from "@/components/Shell";
 
 type CheckStatus = "ok" | "warn" | "error";
 type Check = { key: string; label: string; status: CheckStatus; detail: string };
@@ -83,8 +82,7 @@ export default function HealthPage() {
   }, [load]);
 
   return (
-    <Shell>
-      <div className="min-h-screen bg-[var(--warm-white)]">
+    <div className="min-h-screen bg-[var(--warm-white)]">
         <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] bg-white px-6">
           <h1 className="text-base">系統健康檢查</h1>
           <div className="flex items-center gap-2">
@@ -128,7 +126,6 @@ export default function HealthPage() {
             </div>
           )}
         </div>
-      </div>
-    </Shell>
+    </div>
   );
 }

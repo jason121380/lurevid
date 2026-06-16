@@ -112,6 +112,126 @@ textarea {
   background: white;
 }
 
+.process-card {
+  box-shadow: 0 10px 30px rgb(26 26 26 / 0.02);
+}
+
+.process-step {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.process-step::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(255 107 44 / 0.12), rgb(255 107 44 / 0.04));
+  opacity: 0;
+  transform: translateX(-10px) scaleX(0.96);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
+}
+
+.process-step:hover {
+  transform: translateY(-1px);
+}
+
+.process-step[data-active="true"] {
+  box-shadow: inset 0 0 0 1px rgb(255 107 44 / 0.08);
+}
+
+.process-step[data-active="true"]::before {
+  opacity: 1;
+  transform: translateX(0) scaleX(1);
+}
+
+.process-dot,
+.process-action {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 160ms ease;
+}
+
+.process-step:hover .process-dot {
+  transform: scale(1.04);
+}
+
+.process-action:hover:not(:disabled) {
+  transform: scale(1.06);
+  box-shadow: 0 8px 18px rgb(255 107 44 / 0.16);
+}
+
+.process-action:active:not(:disabled),
+.process-dot:active {
+  transform: scale(0.96);
+}
+
+.process-bar {
+  transform-origin: left center;
+  transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes process-active-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(255 107 44 / 0.24);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgb(255 107 44 / 0);
+  }
+}
+
+.process-step[data-running="true"] .process-dot {
+  animation: process-active-pulse 1.35s ease-in-out infinite;
+}
+
+@keyframes page-soft-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-soft-enter {
+  animation: page-soft-enter 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-step,
+  .process-step::before,
+  .process-dot,
+  .process-action,
+  .process-bar,
+  .page-soft-enter {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .process-step:hover,
+  .process-step:hover .process-dot,
+  .process-action:hover:not(:disabled),
+  .process-action:active:not(:disabled),
+  .process-dot:active {
+    transform: none;
+  }
+}
+
 @supports (padding: max(0px)) {
   body {
     padding-bottom: env(safe-area-inset-bottom);
