@@ -134,39 +134,39 @@ export function Shell({ children }: { children: ReactNode }) {
         </Link>
       </div>
       {mobileOpen && <button className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={closeMobileMenu} aria-label="關閉選單" />}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,300px)] flex-col border-r border-[var(--border)] bg-white transition-transform duration-200 md:z-40 md:w-[var(--sidebar-w)] md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] px-5">
-          <Image className="h-6 w-auto max-w-[132px]" src="/logo.svg" alt="lurevid" width={132} height={24} priority />
-          <button className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] md:hidden" onClick={closeMobileMenu} title="關閉選單">
-            <X size={18} />
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(78vw,280px)] flex-col border-r border-[var(--border)] bg-white transition-transform duration-200 md:z-40 md:w-[var(--sidebar-w)] md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex h-12 items-center justify-between border-b border-[var(--border)] px-4 md:h-[52px]">
+          <Image className="h-5 w-auto max-w-[118px]" src="/logo.svg" alt="lurevid" width={118} height={22} priority />
+          <button className="grid h-8 w-8 place-items-center rounded-lg text-[var(--gray-500)] md:hidden" onClick={closeMobileMenu} title="關閉選單">
+            <X size={16} />
           </button>
         </div>
-        <nav className="flex min-h-0 flex-1 flex-col p-3">
-          <div className="space-y-1">
+        <nav className="flex min-h-0 flex-1 flex-col p-2">
+          <div className="space-y-0.5">
             <Link
-              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${pathname === "/" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
               href="/"
               onClick={closeMobileMenu}
               title="新增專案"
             >
-              <Plus size={17} />
+              <Plus size={16} />
               <span>新增專案</span>
             </Link>
           </div>
 
-          <div className="mt-4 min-h-0 flex-1 border-t border-[var(--border)] pt-3">
-            <div className="mb-2 flex items-center justify-between px-2">
+          <div className="mt-3 min-h-0 flex-1 border-t border-[var(--border)] pt-2">
+            <div className="mb-1.5 flex items-center justify-between px-2">
               <div className="text-[11px] uppercase tracking-wide text-[var(--gray-500)]">專案</div>
               <span className="text-[11px] text-[var(--gray-300)]">{projects.length}</span>
             </div>
-            <div className="max-h-[calc(100vh-170px)] space-y-0.5 overflow-y-auto pr-1">
-              {projects.length === 0 && <div className="rounded-xl bg-[var(--warm-white)] px-3 py-3 text-xs leading-5 text-[var(--gray-500)]">開始分析後，專案會自動存到這裡。</div>}
+            <div className="max-h-[calc(100vh-146px)] space-y-0.5 overflow-y-auto pr-1">
+              {projects.length === 0 && <div className="rounded-lg bg-[var(--warm-white)] px-3 py-2 text-xs leading-5 text-[var(--gray-500)]">開始分析後，專案會自動存到這裡。</div>}
               {projects.map((project) => {
                 const active = activeProjectId === project.id;
                 const editing = editingId === project.id;
 
                 return (
-                  <div className={`rounded-lg px-2 py-1 ${active ? "bg-orange-bg" : "hover:bg-[var(--warm-white)]"}`} key={project.id}>
+                  <div className={`rounded-lg px-2 py-0.5 ${active ? "bg-orange-bg" : "hover:bg-[var(--warm-white)]"}`} key={project.id}>
                     {editing ? (
                       <div className="flex items-start gap-1">
                         <input
@@ -189,7 +189,7 @@ export function Shell({ children }: { children: ReactNode }) {
                     ) : (
                       <div className="flex items-center gap-1">
                         <Link className="block min-w-0 flex-1 py-1" href={`/projects/${project.id}`} onClick={closeMobileMenu}>
-                          <div className={`truncate text-xs leading-5 ${active ? "text-orange" : "text-[var(--black)]"}`}>{projectDisplayTitle(project)}</div>
+                          <div className={`truncate text-xs leading-4 ${active ? "text-orange" : "text-[var(--black)]"}`}>{projectDisplayTitle(project)}</div>
                         </Link>
                         <div className="flex shrink-0 gap-1">
                           <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
@@ -206,37 +206,37 @@ export function Shell({ children }: { children: ReactNode }) {
               })}
             </div>
           </div>
-          <div className="mt-auto space-y-1 border-t border-[var(--border)] pt-3">
+          <div className="mt-auto space-y-0.5 border-t border-[var(--border)] pt-2">
             {isAdmin && (
               <>
                 <Link
-                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/health" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${pathname === "/health" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
                   href="/health"
                   onClick={closeMobileMenu}
                   title="系統健康檢查"
                 >
-                  <Activity size={17} />
+                  <Activity size={16} />
                   <span>健康檢查</span>
                 </Link>
                 <Link
-                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
                   href="/settings"
                   onClick={closeMobileMenu}
                   title="設定"
                 >
-                  <Settings size={17} />
+                  <Settings size={16} />
                   <span>設定</span>
                 </Link>
               </>
             )}
             {session?.user && (
               <button
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 title="登出"
                 type="button"
               >
-                <LogOut size={17} />
+                <LogOut size={16} />
                 <span>登出</span>
               </button>
             )}

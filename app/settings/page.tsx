@@ -179,9 +179,9 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] bg-white px-6">
-          <h1 className="text-base">設定</h1>
-          <button className="btn btn-primary" disabled={saving || loading} onClick={save}>
+        <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:h-[60px] md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
+          <h1 className="text-base font-bold">設定</h1>
+          <button className="btn btn-primary w-full md:w-auto" disabled={saving || loading} onClick={save}>
             <Save size={16} />
             {saving ? "儲存中" : "儲存"}
           </button>
@@ -194,7 +194,7 @@ export default function SettingsPage() {
                 <h2 className="text-sm font-bold">登入資訊</h2>
                 <p className="mt-1 text-xs text-[var(--gray-500)]">目前使用中的帳號</p>
               </div>
-              <div className="rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-sm text-[var(--black)]">
+              <div className="max-w-full break-all rounded-xl border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-sm text-[var(--black)] md:rounded-full">
                 {session?.user?.email || "未取得 email"}
               </div>
             </div>
@@ -217,11 +217,11 @@ export default function SettingsPage() {
                       onClick={() => setExpanded((current) => ({ ...current, [group.title]: !current[group.title] }))}
                       type="button"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <h2 className="text-sm">{group.title}</h2>
                         <p className="mt-1 text-xs leading-5 text-[var(--gray-500)]">{group.description}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-2">
                         <StatusBadge status={status} />
                         <ChevronDown className={`text-[var(--gray-500)] transition-transform ${expanded[group.title] ? "rotate-180" : ""}`} size={18} />
                       </div>

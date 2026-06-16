@@ -83,6 +83,13 @@ function buildProcessSteps(project: Project): StepInfo[] {
   // 步驟 5-7（影片生成）：用整體 status + 產物判斷。
   const phase = (done: boolean, active: boolean): StepState =>
     project.status === "FAILED" && active ? "failed" : done ? "done" : active ? "active" : "waiting";
+  const generatedPhase = (key: string, done: boolean, active: boolean): StepState => {
+    const s = steps[key]?.status;
+    if (s === "running") return "active";
+    if (s === "failed") return "failed";
+    if (done || s === "done") return "done";
+    return phase(done, active);
+  };
 
   const mk = (key: string, title: string, description: string, state: StepState, progress?: number): StepInfo => ({
     title,
@@ -102,9 +109,9 @@ function buildProcessSteps(project: Project): StepInfo[] {
     mk("transcribe", "轉錄音訊", "把影片聲音轉成逐字稿", s2, subProgress("transcribe", s2)),
     mk("frames", "抽取影格", "用 ffmpeg 抽出代表性畫面", s3, subProgress("frames", s3)),
     mk("analyze", "逐字稿 + 影格分析", "依據逐字稿與影格產出洞察", s4, subProgress("analyze", s4)),
-    mk("adapt", "改編腳本", "內部拆解結構並改寫成新腳本", phase(Boolean(project.adaptedScript), ["STRUCTURING", "ADAPTING"].includes(project.status))),
-    mk("storyboard", "產生分鏡", "確認腳本後產生 9 張分鏡圖", phase(storyboardDone, project.status === "STORYBOARDING")),
-    mk("video", "生成影片", "送 Seedance 產片段並合成 final.mp4", phase(project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["QUEUED", "GENERATING", "MERGING"].includes(project.status)))
+    mk("adapt", "改編腳本", "內部拆解結構並改寫成新腳本", generatedPhase("adapt", Boolean(project.adaptedScript), ["STRUCTURING", "ADAPTING"].includes(project.status)), steps.adapt?.progress),
+    mk("storyboard", "產生分鏡", "確認腳本後產生 9 張分鏡圖", generatedPhase("storyboard", storyboardDone, project.status === "STORYBOARDING"), steps.storyboard?.progress),
+    mk("video", "生成影片", "送 Seedance 產片段並合成 final.mp4", generatedPhase("video", project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["QUEUED", "GENERATING", "MERGING"].includes(project.status)), steps.video?.progress)
   ];
 }
 
@@ -146,7 +153,24 @@ function stepActionLabel(project: Project, stepNumber: number) {
 }
 
 function activeStepError(project: Project, stepNumber: number) {
-  return buildProcessSteps(project)[stepNumber - 1]?.errorMessage || "";
+  const stepError = buildProcessSteps(project)[stepNumber - 1]?.errorMessage || "";
+  if (stepError) return stepError;
+  if (project.status !== "FAILED" || !project.error) return "";
+
+  if (stepNumber === failedProjectStep(project)) return project.error;
+  return "";
+}
+
+function failedProjectStep(project: Project) {
+  if (project.error?.toLowerCase().includes("seedance")) return 7;
+  if (hasNineStoryboardImages(project) && !project.finalVideoUrl) return 7;
+  if (project.scenes.length > 0 && !hasNineStoryboardImages(project)) return 6;
+  if (project.adaptedScript) return 6;
+  if (project.analysis) return 5;
+  if (project.sourceTranscript && project.sourceFrameUrls?.length) return 4;
+  if (project.sourceFrameUrls?.length) return 3;
+  if (project.sourceTranscript) return 2;
+  return 1;
 }
 
 // 抽影格間隔為 3 秒（lib/visual.ts 用 fps=1/3），故第 index 張約在 index*3 秒。
@@ -174,8 +198,14 @@ function sceneProgress(status: string): { pct: number; color: string } {
   }
 }
 
-function shouldShowSceneProgress(status: string) {
-  return ["IMAGE_GENERATING", "QUEUED", "GENERATING"].includes(status);
+function storyboardSceneStatus(scene: Scene) {
+  if (scene.imageUrl) return "IMAGE_READY";
+  return scene.status;
+}
+
+function shouldShowSceneProgress(scene: Scene) {
+  if (scene.imageUrl) return false;
+  return ["IMAGE_GENERATING", "QUEUED", "GENERATING"].includes(scene.status);
 }
 
 function statusClass(status: string) {
@@ -456,7 +486,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const currentPanelDescription = activeStep === "project"
     ? "管理來源連結、專案名稱與目前處理狀態。"
     : currentStep?.description || "";
-  const projectBadgeClass = project.status === "FAILED" ? "badge-error" : project.status === "COMPLETED" ? "badge-active" : "badge-warn";
+  const shouldShowProjectStatusBadge = project.status !== "FAILED";
+  const projectBadgeClass = project.status === "COMPLETED" ? "badge-active" : "badge-warn";
+  const projectStatusBadge = shouldShowProjectStatusBadge ? <span className={`badge ${projectBadgeClass}`}>{projectStatusLabel(project.status)}</span> : null;
+  const failedStep = project.status === "FAILED" ? failedProjectStep(project) : 0;
   const seedanceScenes = project.scenes.filter((scene) => scene.imageUrl);
   const canGenerateVideo = hasNineStoryboardImages(project);
   const seedancePrompt = buildSeedancePreviewPrompt(project.scenes);
@@ -501,7 +534,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-[11px] font-semibold uppercase text-orange">來源 · {project.sourcePlatform || "影片"}</p>
-          <span className={`badge ${projectBadgeClass}`}>{projectStatusLabel(project.status)}</span>
+          {projectStatusBadge}
         </div>
         {project.sourceUrl && (
           <a className="flex items-start gap-2 break-all rounded-lg border border-[var(--border)] bg-[var(--warm-white)] p-3 text-xs leading-5 text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
@@ -509,11 +542,12 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             {project.sourceUrl}
           </a>
         )}
-        <p className="mt-3 flex items-center gap-2 text-xs text-[var(--gray-500)]">
-          {busy && <Loader2 size={13} className="animate-spin text-orange" />}
-          {project.message}
-        </p>
-        {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
+        {project.status !== "FAILED" && (
+          <p className="mt-3 flex items-center gap-2 text-xs text-[var(--gray-500)]">
+            {busy && <Loader2 size={13} className="animate-spin text-orange" />}
+            {project.message}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -526,11 +560,13 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             {project.sourceVideoUrl ? "已取得 MP4" : busy ? "處理中" : "尚未取得"}
           </span>
         </div>
-        <p className="mt-3 flex items-center gap-2 text-xs text-[var(--gray-500)]">
-          {busy && <Loader2 size={13} className="animate-spin text-orange" />}
-          {project.message}
-        </p>
-        {project.error && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{project.error}</p>}
+        {(project.status !== "FAILED" || failedStep === 1) && (
+          <p className="mt-3 flex items-center gap-2 text-xs text-[var(--gray-500)]">
+            {busy && <Loader2 size={13} className="animate-spin text-orange" />}
+            {project.message}
+          </p>
+        )}
+        {activeStepError(project, 1) && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{activeStepError(project, 1)}</p>}
       </div>
       <div className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4">
         {downloadButton}
@@ -620,9 +656,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             <article key={scene.id} className="card p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
-                <span className={`badge ${statusClass(scene.status)}`}>{sceneStatusLabel(scene.status)}</span>
+                {storyboardSceneStatus(scene) !== "FAILED" && <span className={`badge ${statusClass(storyboardSceneStatus(scene))}`}>{sceneStatusLabel(storyboardSceneStatus(scene))}</span>}
               </div>
-              {shouldShowSceneProgress(scene.status) && (
+              {shouldShowSceneProgress(scene) && (
                 <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
                   <div className={`h-full transition-all duration-500 ${sceneProgress(scene.status).color}`} style={{ width: `${sceneProgress(scene.status).pct}%` }} />
                 </div>
@@ -716,9 +752,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                   <h3 className="text-sm font-bold">送出給 Seedance 的 9 張參考圖</h3>
                   <p className="mt-1 text-xs text-[var(--gray-500)]">這 9 張圖會和同一組合併 prompt 一起送出，生成一支影片。</p>
                 </div>
-                <span className={`badge ${["COMPLETED", "STORYBOARD_READY"].includes(project.status) ? "badge-active" : project.status === "FAILED" ? "badge-error" : "badge-warn"}`}>
-                  {project.finalVideoUrl ? "已完成" : ["GENERATING", "MERGING"].includes(project.status) ? "Seedance 生成中" : project.status === "STORYBOARD_READY" ? "待送出" : project.status === "FAILED" ? "失敗" : "準備中"}
-                </span>
+                {project.status !== "FAILED" && (
+                  <span className={`badge ${["COMPLETED", "STORYBOARD_READY"].includes(project.status) ? "badge-active" : "badge-warn"}`}>
+                    {project.finalVideoUrl ? "已完成" : ["GENERATING", "MERGING"].includes(project.status) ? "Seedance 生成中" : project.status === "STORYBOARD_READY" ? "待送出" : "準備中"}
+                  </span>
+                )}
               </div>
               {["GENERATING", "MERGING"].includes(project.status) && (
                 <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
@@ -806,8 +844,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     <div className="min-h-screen bg-[var(--warm-white)]">
       <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[340px_minmax(0,1fr)] md:gap-4 md:p-6">
         <aside className="space-y-4 md:sticky md:top-6 md:h-fit">
-          <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
-          {previewPanel}
+          <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} />
+          <div className="hidden md:block">{previewPanel}</div>
         </aside>
 
         <section className="min-w-0 space-y-3">
@@ -815,10 +853,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className={`badge ${projectBadgeClass}`}>{projectStatusLabel(project.status)}</span>
+                  {projectStatusBadge}
                   {currentMeta && <span className="rounded-full bg-[var(--warm-white)] px-2.5 py-1 text-[11px] text-[var(--gray-500)]">{currentMeta.group}</span>}
                 </div>
-                <h1 className="text-xl font-bold tracking-normal text-[var(--black)]">{currentPanelTitle}</h1>
+                <h1 className="text-lg font-bold tracking-normal text-[var(--black)] md:text-xl">{currentPanelTitle}</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--gray-500)]">{currentPanelDescription}</p>
               </div>
               {typeof activeStep === "number" && (
@@ -899,47 +937,39 @@ function ProjectProgressToast({ project, onClose }: { project: Project; onClose:
 function ProcessTimeline({
   project,
   activeStep,
-  busy,
-  onSelectStep,
-  onRunStep
+  onSelectStep
 }: {
   project: Project;
   activeStep: ActivePanel;
-  busy: boolean;
   onSelectStep: (step: ActivePanel) => void;
-  onRunStep: (step: number) => void;
 }) {
   const steps = buildProcessSteps(project);
 
   return (
-    <div className="process-card rounded-xl border border-[var(--border)] bg-white p-2 md:p-3">
-      <div className="mb-3 flex items-center justify-between gap-3 px-1">
+    <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5 md:p-3">
+      <div className="mb-2 flex items-center justify-between gap-3 px-1 md:mb-3">
         <div>
-          <h2 className="text-sm font-bold">功能選單</h2>
-          <p className="mt-0.5 text-[11px] text-[var(--gray-500)]">每步可獨立檢視，符合依賴後才能執行。</p>
+          <h2 className="text-xs font-bold md:text-sm">功能選單</h2>
         </div>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 md:block md:space-y-2 md:overflow-visible md:pb-0">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-2 md:overflow-visible md:pb-0">
         <div
-          className={`process-step min-w-[240px] rounded-lg border px-3 py-2 md:min-w-0 ${
+          className={`process-step min-w-[160px] rounded-lg border px-2 py-1.5 md:min-w-0 md:px-2.5 md:py-2 ${
             activeStep === "project" ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"
           } ${activeStep === "project" ? "border-[var(--orange-border)]" : "border-transparent"}`}
           data-active={activeStep === "project"}
         >
-          <button className="process-tab flex w-full min-w-0 items-center gap-2.5 rounded-md py-1 text-left" onClick={() => onSelectStep("project")} type="button">
-            <span className="process-status grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-orange bg-orange text-white" title="專案資料">
-              <Link2 size={15} />
+          <button className="process-tab flex w-full min-w-0 items-center gap-2 rounded-md py-0.5 text-left md:gap-2.5 md:py-1" onClick={() => onSelectStep("project")} type="button">
+            <span className="process-status grid h-6 w-6 shrink-0 place-items-center rounded-md border border-orange bg-orange text-white md:h-8 md:w-8 md:rounded-lg" title="專案資料">
+              <Link2 size={13} className="md:size-[15px]" />
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold leading-5">專案資料</span>
-              <span className="block truncate text-[11px] leading-4 text-[var(--gray-500)]">來源、命名與狀態</span>
+              <span className="block truncate text-xs font-semibold leading-4 md:text-sm md:leading-5">專案資料</span>
             </span>
           </button>
         </div>
         {steps.map((step, index) => {
           const stepNumber = index + 1;
-          const canRun = stepCanRun(project, stepNumber) && !busy;
-          const blockedReason = stepBlockedReason(project, stepNumber, busy);
           const isDone = step.state === "done";
           const isActive = step.state === "active";
           const isFailed = step.state === "failed";
@@ -952,12 +982,12 @@ function ProcessTimeline({
           return (
             <div className="contents" key={step.title}>
               {sectionLabel && (
-                <div className={`px-2 pt-2 text-[11px] uppercase tracking-wide text-[var(--gray-500)] ${stepNumber !== 1 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
+                <div className={`px-1.5 pt-1 text-[10px] uppercase tracking-wide text-[var(--gray-500)] md:px-2 md:pt-1.5 md:text-[11px] ${stepNumber !== 1 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
                   {sectionLabel}
                 </div>
               )}
               <div
-                className={`process-step min-w-[260px] rounded-lg border px-3 py-2 md:min-w-0 ${
+                className={`process-step min-w-[170px] rounded-lg border px-2 py-1.5 md:min-w-0 md:px-2.5 md:py-2 ${
                   selected
                     ? "bg-orange-bg text-orange"
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
@@ -965,14 +995,14 @@ function ProcessTimeline({
                 data-active={selected}
                 data-running={isActive}
               >
-                <div className="flex items-start gap-2">
+                <div className="flex items-start">
                   <button
-                    className="process-tab flex min-w-0 flex-1 items-start gap-2.5 rounded-md py-1 text-left"
+                    className="process-tab flex min-w-0 flex-1 items-start gap-2 rounded-md py-0.5 text-left md:gap-2.5 md:py-1"
                     onClick={() => onSelectStep(stepNumber as ActivePanel)}
                     type="button"
                   >
                     <span
-                      className={`process-status grid h-8 w-8 shrink-0 place-items-center rounded-lg border ${
+                      className={`process-status grid h-6 w-6 shrink-0 place-items-center rounded-md border md:h-8 md:w-8 md:rounded-lg ${
                         isFailed
                           ? "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]"
                         : isDone
@@ -983,31 +1013,11 @@ function ProcessTimeline({
                       }`}
                       title={stateLabel}
                     >
-                      {isActive ? <Loader2 size={14} className="animate-spin" /> : isFailed ? <X size={14} /> : isDone ? <Check size={14} /> : <Icon size={14} />}
+                      {isActive ? <Loader2 size={13} className="animate-spin md:size-[14px]" /> : isFailed ? <X size={13} className="md:size-[14px]" /> : isDone ? <Check size={13} className="md:size-[14px]" /> : <Icon size={13} className="md:size-[14px]" />}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold leading-5">{stepNumber}. {step.title}</span>
-                      <span className="block truncate text-[11px] leading-4 text-[var(--gray-500)]">需要：{meta.dependency}</span>
-                      <span className="block truncate text-[11px] leading-4 text-[var(--gray-500)]">產出：{meta.output}</span>
-                      {isFailed && step.errorMessage && (
-                        <span className="mt-0.5 block truncate text-[11px] leading-4 text-[var(--red)]">{step.errorMessage}</span>
-                      )}
-                      {!canRun && !isActive && blockedReason && (
-                        <span className="mt-0.5 block truncate text-[11px] leading-4 text-[var(--gray-400)]">{blockedReason}</span>
-                      )}
+                      <span className="block truncate text-xs font-semibold leading-4 md:text-sm md:leading-5">{stepNumber}. {step.title}</span>
                     </span>
-                  </button>
-                  <button
-                    className={`process-action mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-lg border ${canRun ? "border-[var(--border-strong)] text-orange hover:bg-orange hover:text-white" : "border-[var(--border)] text-[var(--gray-300)]"}`}
-                    disabled={!canRun}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRunStep(stepNumber);
-                    }}
-                    title={canRun ? (isDone || isFailed ? "重新執行" : "開始執行") : blockedReason || "尚不能執行"}
-                    type="button"
-                  >
-                    {isActive ? <Loader2 size={13} className="animate-spin" /> : isDone || isFailed ? <RotateCcw size={12} /> : <Play size={11} fill="currentColor" />}
                   </button>
                 </div>
               </div>

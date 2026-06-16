@@ -47,7 +47,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-[var(--warm-white)] p-4">
+    <div className="grid min-h-dvh place-items-start bg-[var(--warm-white)] p-4 pt-[clamp(56px,12dvh,120px)] sm:place-items-center sm:pt-4">
       <section className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <Image className="mx-auto h-7 w-auto" src="/logo.svg" alt="lurevid" width={132} height={28} priority />

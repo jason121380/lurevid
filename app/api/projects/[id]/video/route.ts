@@ -44,10 +44,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await prisma.project.update({
     where: { id },
-    data: { ...settings, status: "QUEUED", message: "已排入影片生成佇列", progress: 0.5 }
+    data: { ...settings, status: "QUEUED", message: "已排入影片生成佇列，等待 worker 接手", progress: 0.5 }
   });
 
-  await enqueueProjectJob(id, "video", { attempts: 2, backoff: { type: "exponential", delay: 5000 } });
+  await enqueueProjectJob(id, "video", { attempts: 1 });
 
   const next = await prisma.project.findFirst({
     where: { id, userId: user.id },

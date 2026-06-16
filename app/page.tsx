@@ -63,15 +63,15 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[var(--warm-white)]">
-      <div className="grid min-h-screen place-items-center p-4 md:p-8">
-        <section className="w-full max-w-xl -translate-y-8 md:-translate-y-12">
-          <h2 className="mb-5 text-center text-xl font-normal tracking-normal text-[var(--black)] md:text-2xl">
+      <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 pb-10 pt-[clamp(56px,14dvh,120px)] md:min-h-screen md:items-center md:p-8">
+        <section className="w-full max-w-xl md:-translate-y-12">
+          <h2 className="mb-5 text-center text-[1.55rem] font-bold leading-tight tracking-normal text-[var(--black)] md:text-2xl">
             今天想分析哪支影片呢 👀
           </h2>
-          <div className="rounded-full border border-[var(--border-strong)] bg-white px-3 py-2 transition focus-within:border-orange">
-            <div className="grid min-h-10 gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div className="rounded-2xl border border-[var(--border-strong)] bg-white p-2 shadow-[0_14px_48px_rgb(26_26_26/0.04)] transition focus-within:border-orange md:rounded-full">
+            <div className="grid gap-2 md:min-h-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
               <input
-                className="min-w-0 border-0 bg-transparent px-1 py-1 text-xs outline-none placeholder:text-[var(--gray-300)] md:text-sm"
+                className="min-w-0 border-0 bg-transparent px-3 py-3 text-base outline-none placeholder:text-[var(--gray-300)] md:px-1 md:py-1 md:text-sm"
                 placeholder="貼上 TikTok 影片連結"
                 value={sourceUrl}
                 onChange={(event) => {
@@ -83,16 +83,17 @@ export default function HomePage() {
                 }}
               />
               <button
-                className="grid h-8 w-full place-items-center rounded-full bg-orange text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-9 md:w-9"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 text-sm font-semibold text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-9 md:w-9 md:rounded-full md:px-0"
                 disabled={!canSubmit}
                 onClick={start}
                 title={loading ? "建立中" : "開始分析"}
               >
                 <Wand2 size={14} />
+                <span className="md:sr-only">{loading ? "建立中" : "開始分析"}</span>
               </button>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-[var(--gray-500)]">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-[var(--gray-500)]">
             <span>支援平台</span>
             {["TikTok"].map((name) => (
               <span key={name} className="rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[var(--gray-500)]">

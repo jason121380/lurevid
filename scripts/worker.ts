@@ -13,7 +13,7 @@ import {
   generateStoryboardWithTwoModels
 } from "@/lib/openai";
 import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
-import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
+import { SeedanceApiError, createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
 import { analyzeVideoFrames, extractVideoFrames, withDownloadedVideo } from "@/lib/visual";
 import { downloadVideo, storageRoot } from "@/lib/video";
 import { uploadFileObject, uploadObject } from "@/lib/storage";
@@ -363,29 +363,43 @@ async function generateVideo(projectId: string) {
 
   await prisma.project.update({
     where: { id: projectId },
-    data: { status: "GENERATING", message: "正在把 9 張分鏡圖一次送入 Seedance", progress: 0.52, error: null }
+    data: { status: "GENERATING", message: "正在建立 Seedance 影片任務", progress: 0.52, error: null }
   });
+  await markStepRunning(projectId, "video", 0.52);
 
   await prisma.scene.updateMany({
     where: { projectId },
-    data: { status: "QUEUED", seedanceTaskId: null, videoUrl: null, localPath: null, error: null }
+    data: { seedanceTaskId: null, videoUrl: null, localPath: null, error: null }
   });
 
-  const task = await createSeedanceTask(
-    combinedSeedancePrompt(project.scenes),
-    {
-      ratio: project.ratio,
-      resolution: project.resolution,
-      duration: project.duration
-    },
-    project.scenes.map((scene) => scene.imageUrl!)
-  );
+  let task;
+  try {
+    task = await createSeedanceTask(
+      combinedSeedancePrompt(project.scenes),
+      {
+        ratio: project.ratio,
+        resolution: project.resolution,
+        duration: project.duration
+      },
+      project.scenes.map((scene) => scene.imageUrl!)
+    );
+  } catch (error) {
+    if (error instanceof SeedanceApiError && error.status === 404) {
+      throw new Error("Seedance 建立任務失敗 (404)：請檢查 ARK_API_KEY 權限/區域與 SEEDANCE_MODEL 是否正確");
+    }
+    throw error;
+  }
   const taskId = task.id || task.task_id;
   if (!taskId) throw new Error("Seedance 沒有回傳 task id");
 
   await prisma.scene.updateMany({
     where: { projectId },
-    data: { status: "GENERATING", seedanceTaskId: taskId, raw: jsonValue(task) }
+    data: { seedanceTaskId: taskId, raw: jsonValue(task) }
+  });
+  await markStepRunning(projectId, "video", 0.62);
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { message: "Seedance 任務已建立，正在等待生成結果", progress: 0.62 }
   });
 
   const pollDeadline = Date.now() + SEEDANCE_POLL_TIMEOUT_MS;
@@ -409,18 +423,19 @@ async function generateVideo(projectId: string) {
         message: "Seedance 正在根據 9 張分鏡圖生成影片"
       }
     });
+    await markStepRunning(projectId, "video", upstreamStatus === "succeeded" && videoUrl ? 0.9 : 0.7);
 
     if (upstreamStatus === "succeeded" && videoUrl) {
       await prisma.scene.updateMany({
         where: { projectId },
-        data: { status: "SUCCEEDED", raw: jsonValue(latestTask) }
+        data: { raw: jsonValue(latestTask) }
       });
       break;
     }
     if (["failed", "cancelled", "expired"].includes(upstreamStatus)) {
       await prisma.scene.updateMany({
         where: { projectId },
-        data: { status: "FAILED", error: upstreamStatus, raw: jsonValue(latestTask) }
+        data: { error: upstreamStatus, raw: jsonValue(latestTask) }
       });
       throw new Error(`Seedance 生成失敗：${upstreamStatus}`);
     }
@@ -440,6 +455,7 @@ async function generateVideo(projectId: string) {
     where: { id: projectId },
     data: { status: "COMPLETED", message: "影片完成", progress: 1, finalVideoUrl }
   });
+  await markStepDone(projectId, "video");
 }
 
 const worker = new Worker(
@@ -462,6 +478,9 @@ const worker = new Worker(
       if (!exists) {
         console.warn(`skip stale job ${job.id}: project ${projectId} no longer exists`);
         return;
+      }
+      if (["source", "transcribe", "frames", "analyze", "structure", "adapt", "storyboard", "video"].includes(action)) {
+        await markStepFailed(projectId, action as StepKey, error instanceof Error ? error.message : "未知錯誤");
       }
       await prisma.project.update({
         where: { id: projectId },

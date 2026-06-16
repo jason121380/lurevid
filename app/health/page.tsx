@@ -81,9 +81,9 @@ export default function HealthPage() {
 
   return (
     <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] bg-white px-6">
-          <h1 className="text-base">系統健康檢查</h1>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:h-[60px] md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
+          <h1 className="text-base font-bold">系統健康檢查</h1>
+          <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
             <button className="btn btn-ghost" disabled={cleaning || loading} onClick={cleanFailed} type="button">
               {cleaning ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
               清除失敗紀錄

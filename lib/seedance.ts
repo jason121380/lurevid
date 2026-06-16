@@ -23,6 +23,16 @@ export type SeedanceTask = {
 
 const BYTEPLUS_BASE_URL = "https://ark.ap-southeast.bytepluses.com/api/v3";
 
+export class SeedanceApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "SeedanceApiError";
+  }
+}
+
 function seedanceError(data: unknown, fallback: string) {
   if (typeof data === "object" && data !== null) {
     const maybe = data as { error?: unknown; message?: unknown };
@@ -61,7 +71,9 @@ export async function createSeedanceTask(
   });
 
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(seedanceError(data, `Seedance 建立任務失敗 (${response.status})`));
+  if (!response.ok) {
+    throw new SeedanceApiError(seedanceError(data, `Seedance 建立任務失敗 (${response.status})`), response.status);
+  }
   return data as SeedanceTask;
 }
 
@@ -75,7 +87,9 @@ export async function getSeedanceTask(taskId: string): Promise<SeedanceTask> {
   });
 
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(seedanceError(data, `Seedance 查詢任務失敗 (${response.status})`));
+  if (!response.ok) {
+    throw new SeedanceApiError(seedanceError(data, `Seedance 查詢任務失敗 (${response.status})`), response.status);
+  }
   return data as SeedanceTask;
 }
 
