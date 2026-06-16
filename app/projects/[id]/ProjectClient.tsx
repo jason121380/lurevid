@@ -169,6 +169,23 @@ function sceneStatusLabel(status: string) {
   }
 }
 
+function buildSeedancePreviewPrompt(scenes: Scene[]) {
+  const sequence = scenes
+    .map(
+      (scene) =>
+        `${scene.sceneNumber}. ${scene.title}\nVisual goal: ${scene.visualGoal}\nMotion prompt: ${scene.seedancePrompt}`
+    )
+    .join("\n\n");
+
+  return [
+    "Create one continuous short-form vertical video using the 9 reference images in order as a storyboard.",
+    "Use each reference image as the visual anchor for its matching numbered scene. Preserve character identity, style, setting continuity, and the narrative order from scene 1 to scene 9.",
+    "Do not add subtitles, captions, logos, watermarks, or readable on-screen text. Use smooth cinematic transitions between storyboard beats.",
+    "Storyboard sequence:",
+    sequence
+  ].join("\n\n");
+}
+
 function sourceEmbedUrl(url?: string) {
   if (!url) return "";
   let parsed: URL;
@@ -404,7 +421,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const previewPanel = (
-    <div className="w-full max-w-[325px] justify-self-center md:justify-self-start">
+    <div className="w-full">
       <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-xl bg-transparent text-sm text-[var(--gray-500)]">
         <div className="relative h-full w-full overflow-hidden bg-transparent">
           {project.finalVideoUrl ? (
@@ -427,7 +444,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const transcriptPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-bold">2 · 轉錄音訊</h2>
+        <h2 className="text-sm font-bold">轉錄音訊</h2>
         <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
       </div>
       {project.sourceTranscript ? (
@@ -440,7 +457,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const framePanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold">3 · 抽取影格</h2>
+        <h2 className="text-sm font-bold">抽取影格</h2>
         <span className="text-[11px] text-[var(--gray-500)]">{project.sourceFrameUrls?.length || 0} 張</span>
       </div>
       {project.sourceFrameUrls?.length ? (
@@ -466,7 +483,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const storyboardPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-bold">{activeStep === 8 ? "8 · 生成影片" : "7 · 產生分鏡"}</h2>
+        <h2 className="text-sm font-bold">{activeStep === 8 ? "生成影片" : "產生分鏡"}</h2>
         {project.status === "STORYBOARD_READY" && (
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
@@ -533,46 +550,160 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       )}
     </div>
   );
+  const seedanceScenes = project.scenes.filter((scene) => scene.imageUrl);
+  const seedancePrompt = buildSeedancePreviewPrompt(project.scenes);
+  const videoPanel = (
+    <div className="card p-3 md:p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-bold">生成影片</h2>
+          <p className="mt-1 text-xs text-[var(--gray-500)]">送給 Seedance 的 9 張參考圖與合併提示詞</p>
+        </div>
+        {project.status === "STORYBOARD_READY" && (
+          <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
+              <option value={3}>每段 3 秒</option>
+              <option value={4}>每段 4 秒</option>
+              <option value={5}>每段 5 秒</option>
+            </select>
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={ratio} onChange={(event) => setRatio(event.target.value)}>
+              <option>9:16</option>
+              <option>16:9</option>
+              <option>1:1</option>
+            </select>
+            <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={resolution} onChange={(event) => setResolution(event.target.value)}>
+              <option>720p</option>
+              <option>1080p</option>
+              <option>480p</option>
+            </select>
+            <button
+              className="btn btn-primary"
+              disabled={busy || submitting || seedanceScenes.length !== 9}
+              onClick={() => post("/video", { ratio, resolution, duration }, "已開始生成影片")}
+              type="button"
+            >
+              <Play size={14} />
+              送出生成
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-3 grid gap-2 rounded-xl border border-[var(--border)] bg-white p-3 text-xs text-[var(--gray-500)] sm:grid-cols-4">
+        <div>
+          <span className="block text-[var(--gray-400)]">參考圖</span>
+          <strong className="text-sm text-[var(--black)]">{seedanceScenes.length}/9</strong>
+        </div>
+        <div>
+          <span className="block text-[var(--gray-400)]">比例</span>
+          <strong className="text-sm text-[var(--black)]">{ratio}</strong>
+        </div>
+        <div>
+          <span className="block text-[var(--gray-400)]">解析度</span>
+          <strong className="text-sm text-[var(--black)]">{resolution}</strong>
+        </div>
+        <div>
+          <span className="block text-[var(--gray-400)]">單段長度</span>
+          <strong className="text-sm text-[var(--black)]">{duration} 秒</strong>
+        </div>
+      </div>
+
+      {project.scenes.length > 0 ? (
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {project.scenes.map((scene) => (
+              <article key={scene.id} className="rounded-xl border border-[var(--border)] bg-white p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs tabular-nums text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
+                  <span className={`badge ${statusClass(scene.status)}`}>{sceneStatusLabel(scene.status)}</span>
+                </div>
+                {shouldShowSceneProgress(scene.status) && (
+                  <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
+                    <div className={`h-full transition-all duration-500 ${sceneProgress(scene.status).color}`} style={{ width: `${sceneProgress(scene.status).pct}%` }} />
+                  </div>
+                )}
+                <h3 className="text-sm font-bold">{scene.title}</h3>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-1 text-[11px] text-[var(--gray-500)]">送出參考圖</p>
+                    <div className="grid aspect-[9/16] place-items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
+                      {scene.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={scene.imageUrl} alt={`Seedance 參考圖 ${scene.sceneNumber}`} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="px-2 text-center text-xs text-[var(--gray-500)]">尚未產生圖片</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[11px] text-[var(--gray-500)]">回傳影片</p>
+                    <div className="grid aspect-[9/16] place-items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
+                      {scene.videoUrl ? (
+                        <video src={scene.videoUrl} className="h-full w-full object-cover" muted loop autoPlay playsInline />
+                      ) : (
+                        <span className="px-2 text-center text-xs text-[var(--gray-500)]">{["GENERATING", "QUEUED"].includes(scene.status) ? "Seedance 生成中" : "尚未回傳"}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <details className="mt-3 rounded-lg bg-[var(--warm-white)] p-2">
+                  <summary className="cursor-pointer text-xs font-medium text-[var(--black)]">Seedance prompt</summary>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-[var(--gray-500)]">{scene.seedancePrompt}</p>
+                </details>
+              </article>
+            ))}
+          </div>
+          <details className="rounded-xl border border-[var(--border)] bg-white p-3">
+            <summary className="cursor-pointer text-sm font-bold">實際合併 prompt</summary>
+            <pre className="mt-3 max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--warm-white)] p-3 text-xs leading-5 text-[var(--gray-500)]">{seedancePrompt}</pre>
+          </details>
+        </div>
+      ) : (
+        <EmptyPanel title="尚未產生分鏡圖" description="第 8 步會呈現送給 Seedance 的 9 張分鏡圖；請先完成第 7 步。" />
+      )}
+    </div>
+  );
   const selectedPanel = (() => {
     if (activeStep === 1) return sourcePanel;
     if (activeStep === 2) return transcriptPanel;
     if (activeStep === 3) return framePanel;
     if (activeStep === 4) {
       return project.analysis ? (
-        <ResultCard index="4" title="影片分析" value={analysis} />
+        <ResultCard title="影片分析" value={analysis} />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未完成影片分析" description="完成轉錄與抽取影格後，會整合畫面與逐字稿產出洞察。" /></div>
       );
     }
     if (activeStep === 5) {
       return project.structure ? (
-        <ResultCard index="5" title="結構分析" value={structure} />
+        <ResultCard title="結構分析" value={structure} />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未結構分析" description="確認分析後，會拆出 hook、鋪陳、賣點與 CTA。" /></div>
       );
     }
     if (activeStep === 6) {
       return project.adaptedScript ? (
-        <StepCard index="6" title="改編腳本" value={script} onChange={setScript} />
+        <StepCard title="改編腳本" value={script} onChange={setScript} />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未改編腳本" description="完成結構拆解後，會改寫成新的短影音腳本。" /></div>
       );
     }
-    if (activeStep === 7 || activeStep === 8) return storyboardPanel;
+    if (activeStep === 7) return storyboardPanel;
+    if (activeStep === 8) return videoPanel;
     return sourcePanel;
   })();
 
   return (
     <Shell>
       <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[420px_minmax(0,1fr)] md:gap-4 md:p-6">
-          <aside className="h-fit md:sticky md:top-6">
+        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[325px_minmax(0,1fr)] md:gap-4 md:p-6">
+          <aside className="space-y-4 md:sticky md:top-6 md:h-fit">
             <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
+            {previewPanel}
           </aside>
 
-          <section className="min-w-0 space-y-4">
+          <section className="min-w-0">
             {selectedPanel}
-            {previewPanel}
           </section>
         </div>
       </div>
@@ -687,8 +818,21 @@ function renderInlineMarkdown(text: string) {
   });
 }
 
+function removeOneSentenceSummary(value: string) {
+  const lines = value.split(/\r?\n/);
+  const start = lines.findIndex((line) => {
+    const normalized = line
+      .replace(/^#{1,6}\s*/, "")
+      .replace(/^\d+\s*[.、．]\s*/, "")
+      .trim();
+    return normalized.includes("一句話總結");
+  });
+  if (start === -1) return value;
+  return lines.slice(0, start).join("\n").trimEnd();
+}
+
 function MarkdownResult({ value }: { value: string }) {
-  const lines = useMemo(() => value.split(/\r?\n/), [value]);
+  const lines = useMemo(() => removeOneSentenceSummary(value).split(/\r?\n/), [value]);
 
   return (
     <div className="max-h-[60vh] overflow-y-auto px-1 py-1 text-sm leading-7 md:max-h-[560px]">
@@ -756,21 +900,34 @@ function TranscriptResult({ value }: { value: string }) {
   );
 }
 
+function parseStoryboardScript(value: string) {
+  try {
+    const parsed = JSON.parse(value) as {
+      scenes?: Array<{ sceneNumber?: number; title?: string; visualGoal?: string }>;
+    };
+    const scenes = parsed.scenes || [];
+    if (scenes.length !== 9) return null;
+    return scenes.map((scene, index) => ({
+      sceneNumber: scene.sceneNumber || index + 1,
+      title: scene.title || `第 ${index + 1} 格`,
+      visualGoal: scene.visualGoal || ""
+    }));
+  } catch {
+    return null;
+  }
+}
+
 function ResultCard({
-  index,
   title,
   value
 }: {
-  index: string;
   title: string;
   value: string;
 }) {
   return (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold">
-          {index} · {title}
-        </h2>
+        <h2 className="text-sm font-bold">{title}</h2>
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
       </div>
       <MarkdownResult value={value} />
@@ -779,24 +936,33 @@ function ResultCard({
 }
 
 function StepCard({
-  index,
   title,
   value,
   onChange
 }: {
-  index: string;
   title: string;
   value: string;
   onChange: (value: string) => void;
 }) {
+  const storyboardScript = parseStoryboardScript(value);
+
   return (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold">
-          {index} · {title}
-        </h2>
+        <h2 className="text-sm font-bold">{title}</h2>
         <span className="text-[11px] text-[var(--gray-500)]">可編輯後再繼續</span>
       </div>
+      {storyboardScript && (
+        <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {storyboardScript.map((scene) => (
+            <article className="rounded-xl border border-[var(--border)] bg-[var(--warm-white)] p-3" key={scene.sceneNumber}>
+              <div className="mb-2 text-xs tabular-nums text-orange">{String(scene.sceneNumber).padStart(2, "0")}</div>
+              <h3 className="text-sm font-bold">{scene.title}</h3>
+              <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">{scene.visualGoal}</p>
+            </article>
+          ))}
+        </div>
+      )}
       <textarea
         className="min-h-[220px] w-full resize-y rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm leading-7 outline-none focus:border-orange md:min-h-[180px] md:p-4"
         value={value}

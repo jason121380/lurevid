@@ -17,6 +17,18 @@ const storyboardSchema = z.object({
     .length(9)
 });
 
+const storyboardBeatSchema = z.object({
+  scenes: z
+    .array(
+      z.object({
+        sceneNumber: z.number().int().min(1).max(9),
+        title: z.string().min(1),
+        visualGoal: z.string().min(1)
+      })
+    )
+    .length(9)
+});
+
 function isMissingApiKey(value: string) {
   return !value || value === "sk-..." || value.startsWith("replace-with");
 }
@@ -59,8 +71,8 @@ const textModel = async () => (await getAppSettings()).OPENAI_STORY_MODEL || "gp
 export async function analyzeVideo(transcript: string, platform: string, visualAnalysis?: string) {
   return generateText(
     await textModel(),
-    "你是短影音內容策略分析師。根據逐字稿與視覺分鏡分析這支短影音，用繁體中文、條列重點，精簡有洞察。",
-    `平台：${platform}\n逐字稿：\n${transcript}\n\n視覺分鏡分析：\n${visualAnalysis || "未取得"}\n\n請整合分析：主題、目標受眾、核心賣點、語氣與風格、畫面與字幕如何輔助說服、分鏡/剪輯節奏，以及它為什麼會吸引人。`
+    "你是短影音內容策略分析師。根據逐字稿與視覺分鏡分析這支短影音，用繁體中文、條列重點，精簡有洞察。不要輸出「一句話總結」、下一步建議、可整理成模板等結尾推銷段落。",
+    `平台：${platform}\n逐字稿：\n${transcript}\n\n視覺分鏡分析：\n${visualAnalysis || "未取得"}\n\n請整合分析：主題、目標受眾、核心賣點、語氣與風格、畫面與字幕如何輔助說服、分鏡/剪輯節奏，以及它為什麼會吸引人。不要加總結段落。`
   );
 }
 
@@ -68,18 +80,72 @@ export async function analyzeVideo(transcript: string, platform: string, visualA
 export async function analyzeStructure(transcript: string, analysis: string) {
   return generateText(
     await textModel(),
-    "你是爆款短影音結構拆解專家。用繁體中文條列影片的敘事結構與節奏。",
-    `先前分析：\n${analysis}\n\n逐字稿：\n${transcript}\n\n請拆解：開頭 hook、鋪陳、賣點呈現、CTA／結尾，每段大約時間佔比與使用的手法。`
+    "你是爆款短影音結構拆解專家。用繁體中文條列影片的敘事結構與節奏。不要輸出「一句話總結」、下一步建議、可整理成模板等結尾推銷段落。",
+    `先前分析：\n${analysis}\n\n逐字稿：\n${transcript}\n\n請拆解：開頭 hook、鋪陳、賣點呈現、CTA／結尾，每段大約時間佔比與使用的手法。不要加總結段落。`
   );
 }
 
-/** 第 3 步：改編成全新原創腳本構想（接給分鏡使用）。 */
+/** 第 3 步：改編成全新原創 9 宮格腳本（接給分鏡使用）。 */
 export async function adaptScript(analysis: string, structure: string) {
-  return generateText(
-    (await getAppSettings()).OPENAI_PROMPT_MODEL || (await textModel()),
-    "你是短影音編劇。根據結構分析，改編出一支全新、原創、不抄襲的短影音腳本構想，用繁體中文。",
-    `分析：\n${analysis}\n\n結構：\n${structure}\n\n請輸出一份可直接拿去做分鏡的腳本構想：一段完整描述，包含主題、調性、畫面走向與節奏。`
-  );
+  const openai = await client();
+  const model = (await getAppSettings()).OPENAI_PROMPT_MODEL || (await textModel());
+  const response = await openai.responses.create({
+    model,
+    input: [
+      {
+        role: "system",
+        content:
+          "你是短影音編劇。根據分析與結構，改編出全新、原創、不抄襲的 9 宮格短影音腳本。title 與 visualGoal 一律用繁體中文。輸出只能是 JSON，不要 markdown。"
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          analysis,
+          structure,
+          rules: [
+            "正好 9 個連續分鏡",
+            "sceneNumber 必須是 1 到 9",
+            "title 是該格的短標題",
+            "visualGoal 是該格的畫面、動作、情緒、節奏與文案重點描述",
+            "內容需是全新原創改編，不可逐字複製原影片",
+            "不要輸出一句話總結或下一步建議"
+          ]
+        })
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "adapted_storyboard_script",
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["scenes"],
+          properties: {
+            scenes: {
+              type: "array",
+              minItems: 9,
+              maxItems: 9,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["sceneNumber", "title", "visualGoal"],
+                properties: {
+                  sceneNumber: { type: "number" },
+                  title: { type: "string" },
+                  visualGoal: { type: "string" }
+                }
+              }
+            }
+          }
+        },
+        strict: true
+      }
+    }
+  });
+
+  const parsed = storyboardBeatSchema.parse(parseJsonText(response.output_text));
+  return JSON.stringify(parsed, null, 2);
 }
 
 function parseJsonText(text: string) {
@@ -89,6 +155,12 @@ function parseJsonText(text: string) {
 }
 
 export async function createStoryboardBeats(idea: string): Promise<StoryboardBeat[]> {
+  try {
+    return storyboardBeatSchema.parse(parseJsonText(idea)).scenes;
+  } catch {
+    // 舊專案可能還是一般文字腳本，沿用模型拆分成 9 格。
+  }
+
   const openai = await client();
   const model = (await getAppSettings()).OPENAI_STORY_MODEL || "gpt-5.4-mini";
   const response = await openai.responses.create({
