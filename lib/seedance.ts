@@ -34,7 +34,28 @@ export class SeedanceApiError extends Error {
   }
 }
 
-function seedanceError(data: unknown, fallback: string) {
+export function isSeedancePrivacyImageError(error: unknown) {
+  if (!(error instanceof SeedanceApiError)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("inputimagesensitivecontentdetected") ||
+    message.includes("privacyinformation") ||
+    message.includes("input image may contain real person") ||
+    message.includes("real person")
+  );
+}
+
+async function parseSeedanceResponse(response: Response) {
+  const raw = await response.text().catch(() => "");
+  if (!raw.trim()) return { data: {}, raw: "" };
+  try {
+    return { data: JSON.parse(raw) as unknown, raw };
+  } catch {
+    return { data: {}, raw };
+  }
+}
+
+function seedanceError(data: unknown, fallback: string, raw = "") {
   if (typeof data === "object" && data !== null) {
     const maybe = data as { error?: unknown; message?: unknown; code?: unknown };
     if (typeof maybe.error === "string") return maybe.error;
@@ -52,6 +73,7 @@ function seedanceError(data: unknown, fallback: string) {
       return fallback;
     }
   }
+  if (raw.trim()) return `${fallback}：${raw.trim().slice(0, 500)}`;
   return fallback;
 }
 
@@ -93,9 +115,9 @@ export async function createSeedanceTask(
     })
   });
 
-  const data = await response.json().catch(() => ({}));
+  const { data, raw } = await parseSeedanceResponse(response);
   if (!response.ok) {
-    throw new SeedanceApiError(seedanceError(data, `Seedance 建立任務失敗 (${response.status})`), response.status);
+    throw new SeedanceApiError(seedanceError(data, `Seedance 建立任務失敗 (${response.status})`, raw), response.status);
   }
   return data as SeedanceTask;
 }
@@ -109,9 +131,9 @@ export async function getSeedanceTask(taskId: string): Promise<SeedanceTask> {
     }
   });
 
-  const data = await response.json().catch(() => ({}));
+  const { data, raw } = await parseSeedanceResponse(response);
   if (!response.ok) {
-    throw new SeedanceApiError(seedanceError(data, `Seedance 查詢任務失敗 (${response.status})`), response.status);
+    throw new SeedanceApiError(seedanceError(data, `Seedance 查詢任務失敗 (${response.status})`, raw), response.status);
   }
   return data as SeedanceTask;
 }

@@ -6,6 +6,7 @@ import { useToast } from "@/components/Toast";
 
 type CheckStatus = "ok" | "warn" | "error";
 type Check = { key: string; label: string; status: CheckStatus; detail: string };
+type Metric = { key: string; label: string; value: string; status: CheckStatus; detail: string };
 
 function dotClass(status: CheckStatus) {
   if (status === "ok") return "bg-[var(--green)]";
@@ -28,6 +29,7 @@ function statusLabel(status: CheckStatus) {
 export default function HealthPage() {
   const toast = useToast();
   const [checks, setChecks] = useState<Check[]>([]);
+  const [metrics, setMetrics] = useState<Metric[]>([]);
   const [loading, setLoading] = useState(true);
   const [cleaning, setCleaning] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +44,7 @@ export default function HealthPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "讀取健康狀態失敗");
         setChecks(data.checks || []);
+        setMetrics(data.metrics || []);
         setCheckedAt(data.checkedAt || "");
         if (withToast) toast("已重新檢查");
       } catch (err) {
@@ -81,43 +84,79 @@ export default function HealthPage() {
 
   return (
     <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:h-[60px] md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
-          <h1 className="text-base">系統健康檢查</h1>
-          <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
-            <button className="btn btn-ghost" disabled={cleaning || loading} onClick={cleanFailed} type="button">
-              {cleaning ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-              清除失敗紀錄
-            </button>
-            <button className="btn btn-primary" disabled={loading} onClick={() => load(true)} type="button">
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-              重新檢查
-            </button>
-          </div>
+      <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:h-[60px] md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
+        <h1 className="text-base">系統健康檢查</h1>
+        <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
+          <button className="btn btn-ghost" disabled={cleaning || loading} onClick={cleanFailed} type="button">
+            {cleaning ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            清除失敗紀錄
+          </button>
+          <button className="btn btn-primary" disabled={loading} onClick={() => load(true)} type="button">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+            重新檢查
+          </button>
         </div>
+      </div>
 
-        <div className="mx-auto max-w-4xl space-y-4 p-4 lg:p-6">
-          {error && <div className="rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}
-          {checkedAt && <p className="text-xs text-[var(--gray-500)]">最後檢查：{new Date(checkedAt).toLocaleString("zh-TW")}（每 15 秒自動更新）</p>}
+      <div className="mx-auto max-w-4xl space-y-4 p-4 lg:p-6">
+        {error && <div className="rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}
+        {checkedAt && <p className="text-xs text-[var(--gray-500)]">最後檢查：{new Date(checkedAt).toLocaleString("zh-TW")}（每 15 秒自動更新）</p>}
 
-          {loading && checks.length === 0 ? (
-            <div className="card p-4 text-sm text-[var(--gray-500)]">檢查中…</div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {checks.map((check) => (
-                <div className="card flex items-center justify-between gap-3 p-4" key={check.key}>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass(check.status)}`} />
-                    <div className="min-w-0">
-                      <div className="text-sm text-[var(--black)]">{check.label}</div>
-                      <div className="truncate text-xs text-[var(--gray-500)]">{check.detail}</div>
-                    </div>
-                  </div>
-                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs ${badgeClass(check.status)}`}>{statusLabel(check.status)}</span>
+        {loading && checks.length === 0 && metrics.length === 0 ? (
+          <div className="card p-4 text-sm text-[var(--gray-500)]">檢查中…</div>
+        ) : (
+          <>
+            {metrics.length > 0 && (
+              <section className="space-y-3">
+                <div>
+                  <h2 className="text-base">資源用量</h2>
+                  <p className="text-xs text-[var(--gray-500)]">記憶體、硬碟、資料庫與專案資料狀態</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {metrics.map((metric) => (
+                    <div className="card flex flex-col gap-3 p-4" key={metric.key}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass(metric.status)}`} />
+                          <div className="truncate text-sm text-[var(--gray-500)]">{metric.label}</div>
+                        </div>
+                        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs ${badgeClass(metric.status)}`}>{statusLabel(metric.status)}</span>
+                      </div>
+                      <div className="text-2xl tracking-normal text-[var(--black)]">{metric.value}</div>
+                      <div className="truncate text-xs text-[var(--gray-500)]" title={metric.detail}>
+                        {metric.detail}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-base">服務狀態</h2>
+                <p className="text-xs text-[var(--gray-500)]">資料庫、背景服務、佇列與第三方設定</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {checks.map((check) => (
+                  <div className="card flex items-center justify-between gap-3 p-4" key={check.key}>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass(check.status)}`} />
+                      <div className="min-w-0">
+                        <div className="text-sm text-[var(--black)]">{check.label}</div>
+                        <div className="truncate text-xs text-[var(--gray-500)]" title={check.detail}>
+                          {check.detail}
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs ${badgeClass(check.status)}`}>{statusLabel(check.status)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+      </div>
     </div>
   );
 }

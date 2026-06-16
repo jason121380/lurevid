@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import { z } from "zod";
 import { getAppSettings } from "@/lib/settings";
 import type { StoryboardBeat, StoryboardScene } from "@/lib/types";
@@ -408,5 +408,46 @@ export async function generateStoryboardImage(prompt: string, ratio: string) {
   });
   const image = response.data?.[0] as { b64_json?: string; url?: string } | undefined;
   if (!image?.b64_json && !image?.url) throw new Error("OpenAI 沒有回傳分鏡圖");
+  return image;
+}
+
+export async function generateSeedanceReferenceImage(
+  scenes: Array<{ sceneNumber: number; title: string; visualGoal: string; seedancePrompt: string }>,
+  imageBuffers: Buffer[],
+  ratio: string
+) {
+  if (imageBuffers.length !== 9) throw new Error("需要 9 張分鏡圖才能合成 Seedance 參考圖");
+
+  const openai = await client(openaiImageTimeoutMs(), 2);
+  const model = (await getAppSettings()).OPENAI_IMAGE_MODEL || "gpt-image-2";
+  const size = ratio === "9:16" ? "1024x1536" : ratio === "1:1" ? "1024x1024" : "1536x1024";
+  const files = await Promise.all(
+    imageBuffers.map((buffer, index) => toFile(buffer, `storyboard-${String(index + 1).padStart(2, "0")}.png`, { type: "image/png" }))
+  );
+  const sceneText = scenes
+    .map((scene) => `${scene.sceneNumber}. ${scene.title}: ${scene.visualGoal}\nMotion: ${scene.seedancePrompt}`)
+    .join("\n\n");
+  const response = await openai.images.edit({
+    model,
+    image: files,
+    prompt: [
+      "Create one clean cinematic reference image for a short-form video generator.",
+      "Use the 9 input images as storyboard frames in order, but convert any people into fictional, non-identifiable commercial characters.",
+      "Do not preserve real identity, facial likeness, biometric details, birthmarks, private information, celebrity likeness, or exact faces from the input images.",
+      "Preserve only broad story intent, wardrobe category, color palette, environment continuity, pose language, mood, lighting, and visual style.",
+      "If a face is visible, make it generic, softly stylized, and non-photorealistic enough that it cannot be recognized as a real person.",
+      "Design the output as a single coherent storyboard reference image, not a text-heavy collage. It should communicate the overall sequence and visual continuity in one frame.",
+      "Do not include readable text, subtitles, logos, watermarks, labels, frame numbers, or UI.",
+      "Keep the output suitable as one reference image for Seedance video generation.",
+      "Storyboard script:",
+      sceneText
+    ].join("\n\n"),
+    size,
+    n: 1,
+    output_format: "png",
+    quality: "standard"
+  });
+  const image = response.data?.[0] as { b64_json?: string; url?: string } | undefined;
+  if (!image?.b64_json && !image?.url) throw new Error("OpenAI 沒有回傳 Seedance 單張參考圖");
   return image;
 }

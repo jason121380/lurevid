@@ -49,55 +49,56 @@ model User {
 }
 
 model Project {
-  id               String        @id @default(cuid())
-  userId           String?
-  user             User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title            String        @default("未命名專案")
-  idea             String        @default("")
-  sourceUrl        String?
-  sourcePlatform   String?
-  sourceVideoUrl   String?
-  sourceFrameUrls  Json?
-  steps            Json          @default("{}")
-  sourceTranscript String?       @db.Text
-  visualAnalysis   String?       @db.Text
-  analysis         String?       @db.Text
-  structure        String?       @db.Text
-  adaptedScript    String?       @db.Text
-  status           ProjectStatus @default(DRAFT)
-  message          String        @default("等待開始")
-  progress         Float         @default(0)
-  ratio            String        @default("9:16")
-  resolution       String        @default("720p")
-  duration         Int           @default(5)
-  finalVideoUrl    String?
-  error            String?
-  scenes           Scene[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  userId             String?
+  user               User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title              String        @default("未命名專案")
+  idea               String        @default("")
+  sourceUrl          String?
+  sourcePlatform     String?
+  sourceVideoUrl     String?
+  sourceFrameUrls    Json?
+  steps              Json          @default("{}")
+  sourceTranscript   String?       @db.Text
+  visualAnalysis     String?       @db.Text
+  analysis           String?       @db.Text
+  structure          String?       @db.Text
+  adaptedScript      String?       @db.Text
+  status             ProjectStatus @default(DRAFT)
+  message            String        @default("等待開始")
+  progress           Float         @default(0)
+  ratio              String        @default("9:16")
+  resolution         String        @default("720p")
+  duration           Int           @default(5)
+  storyboardImageUrl String?
+  finalVideoUrl      String?
+  error              String?
+  scenes             Scene[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   @@index([userId])
 }
 
 model Scene {
-  id              String      @id @default(cuid())
-  projectId       String
-  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  sceneNumber     Int
-  title           String
-  visualGoal      String
-  imagePrompt     String?     @db.Text
-  imageUrl        String?
-  imageLocalPath  String?
-  seedancePrompt  String      @db.Text
-  status          SceneStatus @default(DRAFT)
-  seedanceTaskId  String?
-  videoUrl        String?
-  localPath       String?
-  error           String?
-  raw             Json?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String      @id @default(cuid())
+  projectId      String
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sceneNumber    Int
+  title          String
+  visualGoal     String
+  imagePrompt    String?     @db.Text
+  imageUrl       String?
+  imageLocalPath String?
+  seedancePrompt String      @db.Text
+  status         SceneStatus @default(DRAFT)
+  seedanceTaskId String?
+  videoUrl       String?
+  localPath      String?
+  error          String?
+  raw            Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@unique([projectId, sceneNumber])
 }

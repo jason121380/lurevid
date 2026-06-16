@@ -9,11 +9,12 @@ import {
   adaptScript,
   analyzeStructure,
   analyzeVideo,
+  generateSeedanceReferenceImage,
   generateStoryboardImage,
   generateStoryboardWithTwoModels
 } from "@/lib/openai";
 import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
-import { SeedanceApiError, createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask } from "@/lib/seedance";
+import { SeedanceApiError, createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask, isSeedancePrivacyImageError } from "@/lib/seedance";
 import { analyzeVideoFrames, extractVideoFrames, withDownloadedVideo } from "@/lib/visual";
 import { downloadVideo, storageRoot } from "@/lib/video";
 import { uploadFileObject, uploadObject } from "@/lib/storage";
@@ -57,11 +58,20 @@ function combinedSeedancePrompt(scenes: Array<{ sceneNumber: number; title: stri
     .join("\n\n");
 
   return [
-    "Create one continuous short-form vertical video using the 9 reference images in order as a storyboard.",
-    "Use each reference image as the visual anchor for its matching numbered scene. Preserve character identity, style, setting continuity, and the narrative order from scene 1 to scene 9.",
+    "Create one continuous short-form vertical video using the single reference image as a compressed visual storyboard for the full sequence.",
+    "The reference image was created from 9 storyboard frames. Preserve fictional character design, wardrobe, style, setting continuity, and the narrative order from scene 1 to scene 9.",
+    "Do not reproduce or imply any real person's identity, face, biometric details, private information, or celebrity likeness.",
     "Do not add subtitles, captions, logos, watermarks, or readable on-screen text. Use smooth cinematic transitions between storyboard beats.",
     "Storyboard sequence:",
     sequence
+  ].join("\n\n");
+}
+
+function promptOnlySeedancePrompt(scenes: Array<{ sceneNumber: number; title: string; visualGoal: string; seedancePrompt: string }>) {
+  return [
+    combinedSeedancePrompt(scenes),
+    "No reference image is attached because the image provider rejected the visual reference for privacy safety. Generate from the storyboard text only.",
+    "Use a fictional commercial model or non-identifiable character. Avoid realistic identifiable faces and avoid recreating any real person."
   ].join("\n\n");
 }
 
@@ -372,6 +382,31 @@ async function generateVideo(projectId: string) {
     data: { seedanceTaskId: null, videoUrl: null, localPath: null, error: null }
   });
 
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { message: "正在把 9 張分鏡合成 Seedance 單張參考圖", progress: 0.56 }
+  });
+  await markStepRunning(projectId, "video", 0.56);
+
+  const sourceBuffers = await Promise.all(project.scenes.map((scene) => fetchToBuffer(scene.imageUrl!)));
+  const referenceImage = await generateSeedanceReferenceImage(project.scenes, sourceBuffers, project.ratio);
+  let referenceBuffer: Buffer;
+  if (referenceImage.b64_json) referenceBuffer = Buffer.from(referenceImage.b64_json, "base64");
+  else if (referenceImage.url) referenceBuffer = await fetchToBuffer(referenceImage.url);
+  else throw new Error("Seedance 單張參考圖產生失敗");
+
+  const storyboardImageUrl = await uploadObject(
+    `projects/${projectId}/seedance-storyboard.png`,
+    referenceBuffer,
+    "image/png"
+  );
+
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { storyboardImageUrl, message: "Seedance 單張參考圖已產生，正在建立影片任務", progress: 0.6 }
+  });
+  await markStepRunning(projectId, "video", 0.6);
+
   let task;
   try {
     task = await createSeedanceTask(
@@ -381,13 +416,29 @@ async function generateVideo(projectId: string) {
         resolution: project.resolution,
         duration: project.duration
       },
-      project.scenes.map((scene) => scene.imageUrl!)
+      storyboardImageUrl
     );
   } catch (error) {
+    if (isSeedancePrivacyImageError(error)) {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { message: "Seedance 擋下參考圖，正在改用純文字 prompt 建立影片任務", progress: 0.61 }
+      });
+      task = await createSeedanceTask(
+        promptOnlySeedancePrompt(project.scenes),
+        {
+          ratio: project.ratio,
+          resolution: project.resolution,
+          duration: project.duration
+        },
+        null
+      );
+    } else
     if (error instanceof SeedanceApiError && error.status === 404) {
       throw new Error("Seedance 建立任務失敗 (404)：請檢查 ARK_API_KEY 權限/區域與 SEEDANCE_MODEL 是否正確");
+    } else {
+      throw error;
     }
-    throw error;
   }
   const taskId = task.id || task.task_id;
   if (!taskId) throw new Error("Seedance 沒有回傳 task id");

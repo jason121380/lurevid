@@ -35,6 +35,7 @@ export type Project = {
   ratio?: string;
   resolution?: string;
   duration?: number;
+  storyboardImageUrl?: string;
   finalVideoUrl?: string;
   error?: string;
   steps?: Record<string, { status?: string; progress?: number; message?: string }>;
@@ -671,11 +672,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const videoPanel = (
-    <div className="card p-3 md:p-4">
+    <div className="p-1 md:p-2">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm">生成影片</h2>
-          <p className="mt-1 text-xs text-[var(--gray-500)]">送給 Seedance 的 9 張參考圖與合併提示詞</p>
+          <p className="mt-1 text-xs text-[var(--gray-500)]">先把 9 張分鏡合成單張參考圖，再送給 Seedance。</p>
         </div>
         {canGenerateVideo && (
           <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
@@ -729,35 +730,30 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       {project.scenes.length > 0 ? (
         <div className="space-y-3">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="rounded-xl border border-[var(--border)] bg-white p-3">
+            <div className="p-1 md:p-2">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-sm">送出給 Seedance 的 9 張參考圖</h3>
-                  <p className="mt-1 text-xs text-[var(--gray-500)]">這 9 張圖會和同一組合併 prompt 一起送出，生成一支影片。</p>
+                  <h3 className="text-sm">Seedance 單張腳本分鏡圖</h3>
+                  <p className="mt-1 text-xs text-[var(--gray-500)]">生成影片時會先由 9 張分鏡合成這張參考圖，再搭配 prompt 送出。</p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {project.scenes.map((scene) => (
-                  <article key={scene.id} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
-                    <div className="relative aspect-[9/16]">
-                      {scene.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={scene.imageUrl} alt={`Seedance 參考圖 ${scene.sceneNumber}`} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="grid h-full place-items-center px-2 text-center text-xs text-[var(--gray-500)]">尚未產生</div>
-                      )}
-                      <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] tabular-nums text-orange shadow-sm">{String(scene.sceneNumber).padStart(2, "0")}</span>
-                    </div>
-                    <div className="px-2 py-1.5">
-                      <p className="truncate text-[11px] text-[var(--black)]">{scene.title}</p>
-                    </div>
-                  </article>
-                ))}
+              <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
+                {project.storyboardImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={project.storyboardImageUrl} alt="Seedance 單張腳本分鏡圖" className="h-full w-full object-contain" />
+                ) : ["QUEUED", "GENERATING", "MERGING"].includes(project.status) ? (
+                  <div className="px-4 text-center text-sm leading-6 text-[var(--gray-500)]">
+                    <Loader2 className="mx-auto mb-2 animate-spin text-orange" size={24} />
+                    正在合成 Seedance 單張參考圖
+                  </div>
+                ) : (
+                  <span className="px-4 text-center text-sm text-[var(--gray-500)]">送出生成後會在這裡顯示合成後的單張參考圖</span>
+                )}
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="rounded-xl border border-[var(--border)] bg-white p-3">
+              <div className="p-1 md:p-2">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-sm">Seedance 回傳影片</h3>
                   <span className="text-[11px] text-[var(--gray-500)]">1 支影片</span>

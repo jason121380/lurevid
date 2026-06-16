@@ -42,6 +42,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         ratio: project.ratio,
         resolution: project.resolution,
         duration: project.duration,
+        storyboardImageUrl: project.storyboardImageUrl || undefined,
         finalVideoUrl: project.finalVideoUrl || undefined,
         error: project.error || undefined,
         scenes: project.scenes.map((scene) => ({
