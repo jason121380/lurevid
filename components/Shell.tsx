@@ -35,8 +35,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const [editingId, setEditingId] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
   const [savingId, setSavingId] = useState("");
-  const [collapsed, setCollapsed] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingDeleteProject, setPendingDeleteProject] = useState<ProjectListItem | null>(null);
   const activeProjectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] || "";
 
   const loadProjects = useCallback(async () => {
@@ -52,17 +52,13 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [loadProjects]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("lurevid-sidebar-collapsed");
-    setCollapsed(stored === null ? true : stored === "true");
-  }, []);
-
-  function toggleSidebar() {
-    setCollapsed((current) => {
-      const next = !current;
-      window.localStorage.setItem("lurevid-sidebar-collapsed", String(next));
-      return next;
-    });
-  }
+    if (!pendingDeleteProject) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setPendingDeleteProject(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pendingDeleteProject]);
 
   function beginEdit(project: ProjectListItem) {
     setEditingId(project.id);
@@ -93,7 +89,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }
 
   async function deleteProject(project: ProjectListItem) {
-    if (!window.confirm(`刪除「${projectDisplayTitle(project)}」？這會移除分析、分鏡與影片紀錄。`)) return;
+    setPendingDeleteProject(null);
 
     setSavingId(project.id);
     try {
@@ -119,30 +115,27 @@ export function Shell({ children }: { children: ReactNode }) {
         </Link>
       </div>
       {mobileOpen && <button className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={closeMobileMenu} aria-label="關閉選單" />}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,300px)] flex-col border-r border-[var(--border)] bg-white transition-transform duration-200 md:z-40 md:translate-x-0 md:transition-[width] ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "md:w-16" : "md:w-[var(--sidebar-w)]"}`}>
-        <div className={`flex h-[60px] items-center border-b border-[var(--border)] ${collapsed ? "md:justify-center md:px-2" : "justify-between px-5"}`}>
-          {!collapsed && <Image className="h-6 w-auto max-w-[132px]" src="/logo.svg" alt="lurevid" width={132} height={24} priority />}
-          <button className="hidden h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange md:grid" onClick={toggleSidebar} title={collapsed ? "展開選單" : "收合選單"}>
-            <Menu size={18} />
-          </button>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,300px)] flex-col border-r border-[var(--border)] bg-white transition-transform duration-200 md:z-40 md:w-[var(--sidebar-w)] md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex h-[60px] items-center justify-between border-b border-[var(--border)] px-5">
+          <Image className="h-6 w-auto max-w-[132px]" src="/logo.svg" alt="lurevid" width={132} height={24} priority />
           <button className="grid h-9 w-9 place-items-center rounded-xl text-[var(--gray-500)] md:hidden" onClick={closeMobileMenu} title="關閉選單">
             <X size={18} />
           </button>
         </div>
-        <nav className={`flex min-h-0 flex-1 flex-col p-3 ${collapsed ? "md:p-2" : "md:p-3"}`}>
+        <nav className="flex min-h-0 flex-1 flex-col p-3">
           <div className="space-y-1">
             <Link
-              className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
               href="/"
               onClick={closeMobileMenu}
               title="新增專案"
             >
               <Plus size={17} />
-              <span className={collapsed ? "md:hidden" : ""}>新增專案</span>
+              <span>新增專案</span>
             </Link>
           </div>
 
-          <div className={`mt-4 min-h-0 flex-1 border-t border-[var(--border)] pt-3 ${collapsed ? "md:hidden" : ""}`}>
+          <div className="mt-4 min-h-0 flex-1 border-t border-[var(--border)] pt-3">
             <div className="mb-2 flex items-center justify-between px-2">
               <div className="text-[11px] uppercase tracking-wide text-[var(--gray-500)]">專案</div>
               <span className="text-[11px] text-[var(--gray-300)]">{projects.length}</span>
@@ -183,7 +176,7 @@ export function Shell({ children }: { children: ReactNode }) {
                           <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => beginEdit(project)} title="編輯名稱">
                             <Pencil size={11} />
                           </button>
-                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => deleteProject(project)} title="刪除專案">
+                          <button className="grid h-6 w-6 place-items-center text-[var(--gray-300)] hover:text-[var(--gray-400)]" disabled={savingId === project.id} onClick={() => setPendingDeleteProject(project)} title="刪除專案">
                             <X size={12} />
                           </button>
                         </div>
@@ -198,47 +191,71 @@ export function Shell({ children }: { children: ReactNode }) {
             {isAdmin && (
               <>
                 <Link
-                  className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/health" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/health" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
                   href="/health"
                   onClick={closeMobileMenu}
                   title="系統健康檢查"
                 >
                   <Activity size={17} />
-                  <span className={collapsed ? "md:hidden" : ""}>健康檢查</span>
+                  <span>健康檢查</span>
                 </Link>
                 <Link
-                  className={`flex items-center rounded-xl py-3 text-sm ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"} ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
                   href="/settings"
                   onClick={closeMobileMenu}
                   title="設定"
                 >
                   <Settings size={17} />
-                  <span className={collapsed ? "md:hidden" : ""}>設定</span>
+                  <span>設定</span>
                 </Link>
               </>
             )}
             {session?.user && (
-              <>
-                {!collapsed && (
-                  <div className="truncate px-3 py-1 text-[11px] text-[var(--gray-400)]" title={session.user.email || ""}>
-                    {session.user.email}
-                  </div>
-                )}
-                <button
-                  className={`flex w-full items-center rounded-xl py-3 text-sm text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange ${collapsed ? "gap-3 px-3 md:justify-center md:px-0" : "gap-3 px-3"}`}
-                  onClick={() => signOut({ callbackUrl: "/login" })}
-                  title="登出"
-                  type="button"
-                >
-                  <LogOut size={17} />
-                  <span className={collapsed ? "md:hidden" : ""}>登出</span>
-                </button>
-              </>
+              <button
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                title="登出"
+                type="button"
+              >
+                <LogOut size={17} />
+                <span>登出</span>
+              </button>
             )}
           </div>
         </nav>
       </aside>
-      <main className={`pt-14 transition-[margin] duration-200 md:pt-0 ${collapsed ? "md:ml-16" : "md:ml-[var(--sidebar-w)]"}`}>{children}</main>
+      {pendingDeleteProject && (
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-black/35 px-4" onClick={() => setPendingDeleteProject(null)}>
+          <div
+            className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-4 shadow-[0_24px_80px_rgb(26_26_26/0.18)]"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-project-title"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold" id="delete-project-title">刪除專案</h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--gray-500)]">
+                  確定要刪除「{projectDisplayTitle(pendingDeleteProject)}」？這會移除分析、分鏡與影片紀錄。
+                </p>
+              </div>
+              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--gray-400)] hover:bg-[var(--warm-white)] hover:text-[var(--black)]" onClick={() => setPendingDeleteProject(null)} title="關閉" type="button">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn btn-ghost" disabled={savingId === pendingDeleteProject.id} onClick={() => setPendingDeleteProject(null)} type="button">
+                取消
+              </button>
+              <button className="btn bg-[var(--red)] text-white hover:bg-[#a91f1f]" disabled={savingId === pendingDeleteProject.id} onClick={() => deleteProject(pendingDeleteProject)} type="button">
+                {savingId === pendingDeleteProject.id ? "刪除中" : "刪除"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <main className="pt-14 md:ml-[var(--sidebar-w)] md:pt-0">{children}</main>
     </div>
   );
 }

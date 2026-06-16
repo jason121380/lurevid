@@ -610,53 +610,68 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
 
       {project.scenes.length > 0 ? (
         <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {project.scenes.map((scene) => (
-              <article key={scene.id} className="rounded-xl border border-[var(--border)] bg-white p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs tabular-nums text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
-                  <span className={`badge ${statusClass(scene.status)}`}>{sceneStatusLabel(scene.status)}</span>
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="rounded-xl border border-[var(--border)] bg-white p-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold">送出給 Seedance 的 9 張參考圖</h3>
+                  <p className="mt-1 text-xs text-[var(--gray-500)]">這 9 張圖會和同一組合併 prompt 一起送出，生成一支影片。</p>
                 </div>
-                {shouldShowSceneProgress(scene.status) && (
-                  <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
-                    <div className={`h-full transition-all duration-500 ${sceneProgress(scene.status).color}`} style={{ width: `${sceneProgress(scene.status).pct}%` }} />
-                  </div>
-                )}
-                <h3 className="text-sm font-bold">{scene.title}</h3>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <div>
-                    <p className="mb-1 text-[11px] text-[var(--gray-500)]">送出參考圖</p>
-                    <div className="grid aspect-[9/16] place-items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
+                <span className={`badge ${["COMPLETED", "STORYBOARD_READY"].includes(project.status) ? "badge-active" : project.status === "FAILED" ? "badge-error" : "badge-warn"}`}>
+                  {project.finalVideoUrl ? "已完成" : ["GENERATING", "MERGING"].includes(project.status) ? "Seedance 生成中" : project.status === "STORYBOARD_READY" ? "待送出" : project.status === "FAILED" ? "失敗" : "準備中"}
+                </span>
+              </div>
+              {["GENERATING", "MERGING"].includes(project.status) && (
+                <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
+                  <div className="process-bar h-full w-full bg-orange" style={{ transform: `scaleX(${Math.max(0.52, Math.min(0.95, project.progress || 0.52))})` }} />
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2">
+                {project.scenes.map((scene) => (
+                  <article key={scene.id} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
+                    <div className="relative aspect-[9/16]">
                       {scene.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={scene.imageUrl} alt={`Seedance 參考圖 ${scene.sceneNumber}`} className="h-full w-full object-cover" />
                       ) : (
-                        <span className="px-2 text-center text-xs text-[var(--gray-500)]">尚未產生圖片</span>
+                        <div className="grid h-full place-items-center px-2 text-center text-xs text-[var(--gray-500)]">尚未產生</div>
                       )}
+                      <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] tabular-nums text-orange shadow-sm">{String(scene.sceneNumber).padStart(2, "0")}</span>
                     </div>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-[11px] text-[var(--gray-500)]">回傳影片</p>
-                    <div className="grid aspect-[9/16] place-items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
-                      {scene.videoUrl ? (
-                        <video src={scene.videoUrl} className="h-full w-full object-cover" muted loop autoPlay playsInline />
-                      ) : (
-                        <span className="px-2 text-center text-xs text-[var(--gray-500)]">{["GENERATING", "QUEUED"].includes(scene.status) ? "Seedance 生成中" : "尚未回傳"}</span>
-                      )}
+                    <div className="px-2 py-1.5">
+                      <p className="truncate text-[11px] font-medium text-[var(--black)]">{scene.title}</p>
                     </div>
-                  </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-xl border border-[var(--border)] bg-white p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold">Seedance 回傳影片</h3>
+                  <span className="text-[11px] text-[var(--gray-500)]">1 支影片</span>
                 </div>
-                <details className="mt-3 rounded-lg bg-[var(--warm-white)] p-2">
-                  <summary className="cursor-pointer text-xs font-medium text-[var(--black)]">Seedance prompt</summary>
-                  <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-[var(--gray-500)]">{scene.seedancePrompt}</p>
-                </details>
-              </article>
-            ))}
+                <div className="grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
+                  {project.finalVideoUrl ? (
+                    <video src={project.finalVideoUrl} className="h-full w-full object-contain" controls playsInline />
+                  ) : ["GENERATING", "MERGING"].includes(project.status) ? (
+                    <div className="px-4 text-center text-sm leading-6 text-[var(--gray-500)]">
+                      <Loader2 className="mx-auto mb-2 animate-spin text-orange" size={24} />
+                      正在用 9 張圖與一組 prompt 生成影片
+                    </div>
+                  ) : (
+                    <span className="px-4 text-center text-sm text-[var(--gray-500)]">送出後會在這裡顯示最終影片</span>
+                  )}
+                </div>
+              </div>
+
+              <details className="rounded-xl border border-[var(--border)] bg-white p-3" open>
+                <summary className="cursor-pointer text-sm font-bold">合併 prompt</summary>
+                <pre className="mt-3 max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--warm-white)] p-3 text-xs leading-5 text-[var(--gray-500)]">{seedancePrompt}</pre>
+              </details>
+            </div>
           </div>
-          <details className="rounded-xl border border-[var(--border)] bg-white p-3">
-            <summary className="cursor-pointer text-sm font-bold">實際合併 prompt</summary>
-            <pre className="mt-3 max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--warm-white)] p-3 text-xs leading-5 text-[var(--gray-500)]">{seedancePrompt}</pre>
-          </details>
         </div>
       ) : (
         <EmptyPanel title="尚未產生分鏡圖" description="第 8 步會呈現送給 Seedance 的 9 張分鏡圖；請先完成第 7 步。" />
@@ -694,7 +709,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   })();
 
   return (
-    <div className="page-soft-enter min-h-screen bg-[var(--warm-white)]">
+    <div className="min-h-screen bg-[var(--warm-white)]">
       <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[325px_minmax(0,1fr)] md:gap-4 md:p-6">
         <aside className="space-y-4 md:sticky md:top-6 md:h-fit">
           <ProcessTimeline project={project} activeStep={activeStep} busy={busy} onSelectStep={setActiveStep} onRunStep={runStep} />
@@ -835,7 +850,7 @@ function MarkdownResult({ value }: { value: string }) {
   const lines = useMemo(() => removeOneSentenceSummary(value).split(/\r?\n/), [value]);
 
   return (
-    <div className="max-h-[60vh] overflow-y-auto px-1 py-1 text-sm leading-7 md:max-h-[560px]">
+    <div className="h-full overflow-y-auto px-1 py-1 text-sm leading-7">
       {lines.map((line, index) => {
         const trimmed = line.trim();
         if (!trimmed) return <div className="h-3" key={index} />;
@@ -925,12 +940,14 @@ function ResultCard({
   value: string;
 }) {
   return (
-    <div className="card p-3 md:p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
         <h2 className="text-sm font-bold">{title}</h2>
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
       </div>
-      <MarkdownResult value={value} />
+      <div className="min-h-0 flex-1">
+        <MarkdownResult value={value} />
+      </div>
     </div>
   );
 }
@@ -947,13 +964,13 @@ function StepCard({
   const storyboardScript = parseStoryboardScript(value);
 
   return (
-    <div className="card p-3 md:p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
         <h2 className="text-sm font-bold">{title}</h2>
         <span className="text-[11px] text-[var(--gray-500)]">可編輯後再繼續</span>
       </div>
       {storyboardScript && (
-        <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mb-3 grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {storyboardScript.map((scene) => (
             <article className="rounded-xl border border-[var(--border)] bg-[var(--warm-white)] p-3" key={scene.sceneNumber}>
               <div className="mb-2 text-xs tabular-nums text-orange">{String(scene.sceneNumber).padStart(2, "0")}</div>
@@ -964,7 +981,7 @@ function StepCard({
         </div>
       )}
       <textarea
-        className="min-h-[220px] w-full resize-y rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm leading-7 outline-none focus:border-orange md:min-h-[180px] md:p-4"
+        className="min-h-[220px] w-full flex-1 resize-none overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm leading-7 outline-none focus:border-orange md:min-h-0 md:p-4"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />

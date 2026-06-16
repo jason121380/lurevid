@@ -197,28 +197,12 @@ textarea {
   animation: process-active-pulse 1.35s ease-in-out infinite;
 }
 
-@keyframes page-soft-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.page-soft-enter {
-  animation: page-soft-enter 220ms ease-out both;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .process-step,
   .process-step::before,
   .process-dot,
   .process-action,
-  .process-bar,
-  .page-soft-enter {
+  .process-bar {
     animation: none !important;
     transition: none !important;
   }

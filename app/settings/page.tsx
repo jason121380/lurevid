@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, Eye, EyeOff, Save } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
 
@@ -52,6 +53,7 @@ const groups: SettingGroup[] = [
 
 export default function SettingsPage() {
   const toast = useToast();
+  const { data: session } = useSession();
   const [fields, setFields] = useState<SettingField[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
@@ -184,6 +186,18 @@ export default function SettingsPage() {
         </div>
 
         <div className="mx-auto max-w-5xl space-y-4 p-4 lg:p-6">
+          <section className="card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold">登入資訊</h2>
+                <p className="mt-1 text-xs text-[var(--gray-500)]">目前使用中的帳號</p>
+              </div>
+              <div className="rounded-full border border-[var(--border)] bg-[var(--warm-white)] px-3 py-1.5 text-sm text-[var(--black)]">
+                {session?.user?.email || "未取得 email"}
+              </div>
+            </div>
+          </section>
+
           {message && <div className="rounded-xl border border-[var(--green)] bg-[var(--green-bg)] p-3 text-sm text-[var(--green)]">{message}</div>}
           {error && <div className="rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}
 
