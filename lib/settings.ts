@@ -17,6 +17,14 @@ export const APP_SETTING_FIELDS = [
   { key: "OPENAI_TRANSCRIBE_MODEL", label: "OpenAI 轉錄模型", secret: false, defaultValue: "gpt-4o-transcribe", envFallback: true },
   { key: "ARK_API_KEY", label: "BytePlus ModelArk API Key", secret: true, envFallback: true },
   {
+    key: "ARK_BASE_URL",
+    label: "BytePlus ModelArk Base URL",
+    secret: false,
+    defaultValue: "https://ark.ap-southeast.bytepluses.com/api/v3",
+    placeholder: "https://ark.ap-southeast.bytepluses.com/api/v3",
+    envFallback: true
+  },
+  {
     key: "SEEDANCE_MODEL",
     label: "Seedance 模型",
     secret: false,

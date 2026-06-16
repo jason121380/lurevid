@@ -70,6 +70,7 @@ These are needed before the app can authenticate users and read settings from th
 - `OPENAI_PROMPT_MODEL`: `gpt-5.4-mini`
 - `OPENAI_IMAGE_MODEL`: `gpt-image-2`
 - `OPENAI_TRANSCRIBE_MODEL`: `gpt-4o-transcribe`
+- `ARK_BASE_URL`: `https://ark.ap-southeast.bytepluses.com/api/v3`
 - `SEEDANCE_MODEL`: `dreamina-seedance-2-0-260128`
 
 Transcription model behavior (`lib/transcribe.ts`):
