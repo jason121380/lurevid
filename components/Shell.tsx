@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Check, LogOut, Menu, Pencil, Plus, Settings, X } from "lucide-react";
+import { Activity, BarChart3, Check, LogOut, Menu, Pencil, Plus, Settings, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -217,6 +217,15 @@ export function Shell({ children }: { children: ReactNode }) {
                 >
                   <Activity size={16} />
                   <span>健康檢查</span>
+                </Link>
+                <Link
+                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${pathname === "/usage" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}
+                  href="/usage"
+                  onClick={closeMobileMenu}
+                  title="用量與預估花費"
+                >
+                  <BarChart3 size={16} />
+                  <span>用量</span>
                 </Link>
                 <Link
                   className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${pathname === "/settings" ? "bg-orange-bg text-orange" : "text-[var(--gray-500)] hover:bg-orange-bg hover:text-orange"}`}

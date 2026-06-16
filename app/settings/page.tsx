@@ -40,8 +40,8 @@ const groups: SettingGroup[] = [
   {
     title: "Seedance",
     description: "把分鏡變成影片片段時會用這組設定。",
-    keys: ["ARK_API_KEY", "SEEDANCE_MODEL"],
-    requiredKeys: ["ARK_API_KEY", "SEEDANCE_MODEL"]
+    keys: ["ARK_API_KEY", "ARK_BASE_URL", "SEEDANCE_MODEL"],
+    requiredKeys: ["ARK_API_KEY", "ARK_BASE_URL", "SEEDANCE_MODEL"]
   },
   {
     title: "R2 物件儲存（Cloudflare）",
