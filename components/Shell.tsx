@@ -254,7 +254,7 @@ export function Shell({ children }: { children: ReactNode }) {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold" id="delete-project-title">刪除專案</h2>
+                <h2 className="text-base" id="delete-project-title">刪除專案</h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--gray-500)]">
                   確定要刪除「{projectDisplayTitle(pendingDeleteProject)}」？這會移除分析、分鏡與影片紀錄。
                 </p>

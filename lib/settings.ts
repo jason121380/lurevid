@@ -20,7 +20,7 @@ export const APP_SETTING_FIELDS = [
     key: "SEEDANCE_MODEL",
     label: "Seedance 模型",
     secret: false,
-    defaultValue: "dreamina-seedance-2-0-fast-260128",
+    defaultValue: "dreamina-seedance-2-0-260128",
     envFallback: true
   },
   {

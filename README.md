@@ -82,7 +82,7 @@ OPENAI_PROMPT_MODEL="gpt-5.4-mini"
 OPENAI_IMAGE_MODEL="gpt-image-2"
 OPENAI_TRANSCRIBE_MODEL="gpt-4o-transcribe"
 ARK_API_KEY="BytePlus ModelArk API Key"
-SEEDANCE_MODEL="dreamina-seedance-2-0-fast-260128"
+SEEDANCE_MODEL="dreamina-seedance-2-0-260128"
 
 # S3 相容物件儲存（例：Cloudflare R2）
 S3_ENDPOINT="https://<account-id>.r2.cloudflarestorage.com"

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, Play, RotateCcw, Sparkles, Video, X } from "lucide-react";
+import { Check, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, Pencil, Play, RotateCcw, Save, Sparkles, Video, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 
@@ -108,7 +108,7 @@ function buildProcessSteps(project: Project): StepInfo[] {
     mk("source", "影片下載", "下載來源 MP4", s1, subProgress("source", s1)),
     mk("transcribe", "轉錄音訊", "把影片聲音轉成逐字稿", s2, subProgress("transcribe", s2)),
     mk("frames", "抽取影格", "用 ffmpeg 抽出代表性畫面", s3, subProgress("frames", s3)),
-    mk("analyze", "逐字稿 + 影格分析", "依據逐字稿與影格產出洞察", s4, subProgress("analyze", s4)),
+    mk("analyze", "影片分析", "依據逐字稿與影格產出洞察", s4, subProgress("analyze", s4)),
     mk("adapt", "改編腳本", "內部拆解結構並改寫成新腳本", generatedPhase("adapt", Boolean(project.adaptedScript), ["STRUCTURING", "ADAPTING"].includes(project.status)), steps.adapt?.progress),
     mk("storyboard", "產生分鏡", "確認腳本後產生 9 張分鏡圖", generatedPhase("storyboard", storyboardDone, project.status === "STORYBOARDING"), steps.storyboard?.progress),
     mk("video", "生成影片", "送 Seedance 產片段並合成 final.mp4", generatedPhase("video", project.status === "COMPLETED" || Boolean(project.finalVideoUrl), ["QUEUED", "GENERATING", "MERGING"].includes(project.status)), steps.video?.progress)
@@ -198,45 +198,6 @@ function sceneProgress(status: string): { pct: number; color: string } {
   }
 }
 
-function storyboardSceneStatus(scene: Scene) {
-  if (scene.imageUrl) return "IMAGE_READY";
-  return scene.status;
-}
-
-function shouldShowSceneProgress(scene: Scene) {
-  if (scene.imageUrl) return false;
-  return ["IMAGE_GENERATING", "QUEUED", "GENERATING"].includes(scene.status);
-}
-
-function statusClass(status: string) {
-  if (["COMPLETED", "SUCCEEDED", "IMAGE_READY"].includes(status)) return "badge-active";
-  if (status === "FAILED") return "badge-error";
-  return "badge-warn";
-}
-
-function sceneStatusLabel(status: string) {
-  switch (status) {
-    case "DRAFT":
-      return "待處理";
-    case "PROMPT_READY":
-      return "提示完成";
-    case "IMAGE_GENERATING":
-      return "產圖中";
-    case "IMAGE_READY":
-      return "完成";
-    case "QUEUED":
-      return "排隊中";
-    case "GENERATING":
-      return "生成中";
-    case "SUCCEEDED":
-      return "完成";
-    case "FAILED":
-      return "失敗";
-    default:
-      return "處理中";
-  }
-}
-
 function projectStatusLabel(status: string) {
   switch (status) {
     case "DRAFT":
@@ -321,8 +282,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const [resolution, setResolution] = useState(initialProject?.resolution || "720p");
   const [duration, setDuration] = useState(initialProject?.duration || 5);
   const [activeStep, setActiveStep] = useState<ActivePanel>("project");
-  const [progressToastDismissed, setProgressToastDismissed] = useState(false);
+  const [taskToastProject, setTaskToastProject] = useState<Project | null>(BUSY.includes(initialProject?.status || "") ? initialProject || null : null);
+  const [taskToastDismissed, setTaskToastDismissed] = useState(false);
   const [pollVersion, setPollVersion] = useState(0);
+  const taskToastProjectRef = useRef<Project | null>(BUSY.includes(initialProject?.status || "") ? initialProject || null : null);
   const settingsInit = useRef(Boolean(initialProject));
   const lastServer = useRef<{ analysis?: string; structure?: string; adaptedScript?: string }>({
     analysis: initialProject?.analysis,
@@ -389,6 +352,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         }
 
         setProject(data);
+        const currentBusy = BUSY.includes(data.status);
+        if (currentBusy || taskToastProjectRef.current) {
+          taskToastProjectRef.current = data;
+          setTaskToastProject(data);
+        }
         notifyProjectsChanged();
         // 終態（完成/失敗）就停止輪詢；其餘狀態繼續輪詢（有任務在跑時更頻繁）。
         if (!["COMPLETED", "FAILED"].includes(data.status)) schedule(data.status);
@@ -405,13 +373,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     };
   }, [projectId, pollVersion]);
 
-  const projectBusy = project ? BUSY.includes(project.status) : false;
-
-  useEffect(() => {
-    if (!projectBusy) setProgressToastDismissed(false);
-  }, [projectBusy, projectId]);
-
-  async function post(path: string, payload?: Record<string, unknown>, successMessage = "已送出") {
+  async function post(path: string, payload?: Record<string, unknown>) {
     setSubmitting(true);
     setError("");
     try {
@@ -427,10 +389,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         return;
       }
       setProject(data);
+      taskToastProjectRef.current = data;
+      setTaskToastProject(data);
+      setTaskToastDismissed(false);
       notifyProjectsChanged();
-      setProgressToastDismissed(false);
       setPollVersion((version) => version + 1);
-      toast(successMessage);
     } catch {
       setError("API 沒有回應");
       toast("API 沒有回應", "error");
@@ -469,16 +432,46 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     }
   }
 
+  async function saveAdaptedScript(nextScript: string): Promise<boolean> {
+    if (!project) return false;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adaptedScript: nextScript })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "儲存改編腳本失敗");
+        toast(data.error || "儲存改編腳本失敗", "error");
+        return false;
+      }
+      setProject(data);
+      setScript(data.adaptedScript || nextScript);
+      lastServer.current = { analysis: data.analysis, structure: data.structure, adaptedScript: data.adaptedScript };
+      toast("已儲存改編腳本");
+      return true;
+    } catch {
+      setError("API 沒有回應");
+      toast("API 沒有回應", "error");
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function runStep(stepNumber: number) {
     if (!project) return;
     setActiveStep(stepNumber as ActivePanel);
-    if (stepNumber === 1) return void post("/source", undefined, "已開始重新下載來源");
-    if (stepNumber === 2) return void post("/transcribe", undefined, "已開始轉錄");
-    if (stepNumber === 3) return void post("/frames", undefined, "已開始抽取影格");
-    if (stepNumber === 4) return void post("/analyze", undefined, "已開始影片分析");
-    if (stepNumber === 5) return void post("/adapt", { analysis: project.analysis || analysis, structure }, "已開始改編腳本");
-    if (stepNumber === 6) return void post("/storyboard", { adaptedScript: script }, "已開始產生分鏡");
-    if (stepNumber === 7) return void post("/video", { ratio, resolution, duration }, "已開始生成影片");
+    if (stepNumber === 1) return void post("/source");
+    if (stepNumber === 2) return void post("/transcribe");
+    if (stepNumber === 3) return void post("/frames");
+    if (stepNumber === 4) return void post("/analyze");
+    if (stepNumber === 5) return void post("/adapt", { analysis: project.analysis || analysis, structure });
+    if (stepNumber === 6) return void post("/storyboard", { adaptedScript: script });
+    if (stepNumber === 7) return void post("/video", { ratio, resolution, duration });
   }
 
   if (error && !project) return <div className="p-6 text-[var(--red)]">{error}</div>;
@@ -498,7 +491,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const shouldShowProjectStatusBadge = project.status !== "FAILED";
   const projectBadgeClass = project.status === "COMPLETED" ? "badge-active" : "badge-warn";
   const projectStatusBadge = shouldShowProjectStatusBadge ? <span className={`badge ${projectBadgeClass}`}>{projectStatusLabel(project.status)}</span> : null;
-  const failedStep = project.status === "FAILED" ? failedProjectStep(project) : 0;
   const seedanceScenes = project.scenes.filter((scene) => scene.imageUrl);
   const canGenerateVideo = hasNineStoryboardImages(project);
   const seedancePrompt = buildSeedancePreviewPrompt(project.scenes);
@@ -514,7 +506,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   );
   const namePanel = (
     <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
-      <p className="mb-2 text-[11px] font-semibold uppercase text-orange">專案命名</p>
+      <p className="mb-2 text-[11px] uppercase text-orange">專案命名</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
           className="min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
@@ -542,7 +534,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       {namePanel}
       <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase text-orange">來源 · {project.sourcePlatform || "影片"}</p>
+          <p className="text-[11px] uppercase text-orange">來源 · {project.sourcePlatform || "影片"}</p>
           {projectStatusBadge}
         </div>
         {project.sourceUrl && (
@@ -551,12 +543,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             {project.sourceUrl}
           </a>
         )}
-        {project.status !== "FAILED" && (
-          <p className="mt-3 flex items-center gap-2 text-xs text-[var(--gray-500)]">
-            {busy && <Loader2 size={13} className="animate-spin text-orange" />}
-            {project.message}
-          </p>
-        )}
       </div>
     </div>
   );
@@ -564,17 +550,11 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     <div className="space-y-3">
       <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase text-orange">影片下載</p>
+          <p className="text-[11px] uppercase text-orange">影片下載</p>
           <span className={`badge ${project.sourceVideoUrl ? "badge-active" : busy ? "badge-warn" : "badge-warn"}`}>
             {project.sourceVideoUrl ? "已取得 MP4" : busy ? "處理中" : "尚未取得"}
           </span>
         </div>
-        {(project.status !== "FAILED" || failedStep === 1) && (
-          <p className="mt-3 flex items-center gap-2 text-xs text-[var(--gray-500)]">
-            {busy && <Loader2 size={13} className="animate-spin text-orange" />}
-            {project.message}
-          </p>
-        )}
         {activeStepError(project, 1) && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{activeStepError(project, 1)}</p>}
       </div>
       <div className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4">
@@ -589,7 +569,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const previewPanel = (
     <div className="w-full rounded-xl border border-[var(--border)] bg-white p-2">
       <div className="mb-2 flex items-center justify-between px-1">
-        <span className="text-[11px] font-semibold uppercase text-[var(--gray-500)]">影片預覽</span>
+        <span className="text-[11px] uppercase text-[var(--gray-500)]">影片預覽</span>
         <span className="text-[11px] text-orange">{project.finalVideoUrl ? "最終影片" : project.sourceVideoUrl ? "來源 MP4" : "來源嵌入"}</span>
       </div>
       <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-lg bg-[var(--warm-white)] text-sm text-[var(--gray-500)]">
@@ -616,7 +596,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const transcriptPanel = (
     <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
       <div className="mb-3 flex shrink-0 items-center justify-between">
-        <h2 className="text-sm font-bold">轉錄音訊</h2>
+        <h2 className="text-sm">轉錄音訊</h2>
         <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
       </div>
       {project.sourceTranscript ? (
@@ -631,7 +611,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const framePanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-bold">抽取影格</h2>
+        <h2 className="text-sm">抽取影格</h2>
         <span className="text-[11px] text-[var(--gray-500)]">{project.sourceFrameUrls?.length || 0} 張</span>
       </div>
       {project.sourceFrameUrls?.length ? (
@@ -657,7 +637,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const storyboardPanel = (
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-bold">產生分鏡</h2>
+        <h2 className="text-sm">產生分鏡</h2>
       </div>
       {project.scenes.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -665,14 +645,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             <article key={scene.id} className="card p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs text-orange">{String(scene.sceneNumber).padStart(2, "0")}</span>
-                {storyboardSceneStatus(scene) !== "FAILED" && <span className={`badge ${statusClass(storyboardSceneStatus(scene))}`}>{sceneStatusLabel(storyboardSceneStatus(scene))}</span>}
               </div>
-              {shouldShowSceneProgress(scene) && (
-                <div className="mb-2 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
-                  <div className={`h-full transition-all duration-500 ${sceneProgress(scene.status).color}`} style={{ width: `${sceneProgress(scene.status).pct}%` }} />
-                </div>
-              )}
-              <h3 className="text-sm font-bold">{scene.title}</h3>
+              <h3 className="text-sm">{scene.title}</h3>
               <div className="mt-3 grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
                 {scene.videoUrl ? (
                   <video src={scene.videoUrl} className="h-full w-full object-cover" muted loop autoPlay playsInline />
@@ -682,7 +656,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                 ) : (
                   <div className="flex flex-col items-center gap-2">
                     <Loader2 size={22} className="animate-spin text-orange" />
-                    <span className="text-sm tabular-nums font-medium text-orange">{sceneProgress(scene.status).pct}%</span>
+                    <span className="text-sm tabular-nums text-orange">{sceneProgress(scene.status).pct}%</span>
                     <span className="text-xs text-[var(--gray-500)]">分鏡圖生成中</span>
                   </div>
                 )}
@@ -700,7 +674,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     <div className="card p-3 md:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-bold">生成影片</h2>
+          <h2 className="text-sm">生成影片</h2>
           <p className="mt-1 text-xs text-[var(--gray-500)]">送給 Seedance 的 9 張參考圖與合併提示詞</p>
         </div>
         {canGenerateVideo && (
@@ -723,7 +697,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             <button
               className="btn btn-primary"
               disabled={busy || submitting}
-              onClick={() => post("/video", { ratio, resolution, duration }, "已開始生成影片")}
+              onClick={() => post("/video", { ratio, resolution, duration })}
               type="button"
             >
               <Play size={14} />
@@ -758,7 +732,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             <div className="rounded-xl border border-[var(--border)] bg-white p-3">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-sm font-bold">送出給 Seedance 的 9 張參考圖</h3>
+                  <h3 className="text-sm">送出給 Seedance 的 9 張參考圖</h3>
                   <p className="mt-1 text-xs text-[var(--gray-500)]">這 9 張圖會和同一組合併 prompt 一起送出，生成一支影片。</p>
                 </div>
                 {project.status !== "FAILED" && (
@@ -785,7 +759,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                       <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] tabular-nums text-orange shadow-sm">{String(scene.sceneNumber).padStart(2, "0")}</span>
                     </div>
                     <div className="px-2 py-1.5">
-                      <p className="truncate text-[11px] font-medium text-[var(--black)]">{scene.title}</p>
+                      <p className="truncate text-[11px] text-[var(--black)]">{scene.title}</p>
                     </div>
                   </article>
                 ))}
@@ -795,7 +769,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             <div className="space-y-3">
               <div className="rounded-xl border border-[var(--border)] bg-white p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-bold">Seedance 回傳影片</h3>
+                  <h3 className="text-sm">Seedance 回傳影片</h3>
                   <span className="text-[11px] text-[var(--gray-500)]">1 支影片</span>
                 </div>
                 <div className="grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
@@ -813,7 +787,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               </div>
 
               <details className="rounded-xl border border-[var(--border)] bg-white p-3" open>
-                <summary className="cursor-pointer text-sm font-bold">合併 prompt</summary>
+                <summary className="cursor-pointer text-sm">合併 prompt</summary>
                 <pre className="mt-3 max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--warm-white)] p-3 text-xs leading-5 text-[var(--gray-500)]">{seedancePrompt}</pre>
               </details>
             </div>
@@ -838,7 +812,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     }
     if (activeStep === 5) {
       return project.adaptedScript ? (
-        <StepCard title="改編腳本" value={script} onChange={setScript} />
+        <StepCard title="改編腳本" value={script} onChange={setScript} onSave={saveAdaptedScript} saving={submitting} />
       ) : (
         <div className="card p-4"><EmptyPanel title="尚未改編腳本" description="完成影片分析後，系統會先拆解結構，再改寫成新的短影音腳本。" /></div>
       );
@@ -861,7 +835,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           <div className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-[0_14px_40px_rgb(26_26_26/0.03)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <h1 className="text-lg font-bold tracking-normal text-[var(--black)] md:text-xl">{currentPanelTitle}</h1>
+                <h1 className="text-lg tracking-normal text-[var(--black)] md:text-xl">{currentPanelTitle}</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--gray-500)]">{currentPanelDescription}</p>
               </div>
               {typeof activeStep === "number" && (
@@ -894,17 +868,18 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
           {selectedPanel}
         </section>
       </div>
-      {projectBusy && !progressToastDismissed && (
-        <ProjectProgressToast project={project} onClose={() => setProgressToastDismissed(true)} />
+      {taskToastProject && !taskToastDismissed && (
+        <ProjectProgressToast project={taskToastProject} running={BUSY.includes(taskToastProject.status)} onClose={() => setTaskToastDismissed(true)} />
       )}
     </div>
   );
 }
 
-function ProjectProgressToast({ project, onClose }: { project: Project; onClose: () => void }) {
+function ProjectProgressToast({ project, running, onClose }: { project: Project; running: boolean; onClose: () => void }) {
   const steps = buildProcessSteps(project);
   const activeStep = steps.find((step) => step.state === "active");
-  const title = activeStep?.title || "任務執行中";
+  const failed = project.status === "FAILED";
+  const title = running ? activeStep?.title || "任務執行中" : failed ? "任務失敗" : "任務完成";
   const message = project.message || activeStep?.description || "正在處理專案";
 
   return (
@@ -912,14 +887,22 @@ function ProjectProgressToast({ project, onClose }: { project: Project; onClose:
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Loader2 className="shrink-0 animate-spin text-orange" size={16} />
-            <h3 className="truncate text-sm font-bold">{title}</h3>
+            {running ? (
+              <Loader2 className="shrink-0 animate-spin text-orange" size={16} />
+            ) : failed ? (
+              <X className="shrink-0 text-[var(--red)]" size={16} />
+            ) : (
+              <Check className="shrink-0 text-orange" size={16} />
+            )}
+            <h3 className="truncate text-sm">{title}</h3>
           </div>
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--gray-500)]">{message}</p>
         </div>
-        <button className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--gray-400)] hover:bg-[var(--warm-white)] hover:text-[var(--black)]" onClick={onClose} title="關閉進度" type="button">
-          <X size={15} />
-        </button>
+        {!running && (
+          <button className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--gray-400)] hover:bg-[var(--warm-white)] hover:text-[var(--black)]" onClick={onClose} title="關閉進度" type="button">
+            <X size={15} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -940,7 +923,7 @@ function ProcessTimeline({
     <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5 md:p-2">
       <div className="mb-1.5 flex items-center justify-between gap-3 px-1 md:mb-2">
         <div>
-          <h2 className="text-xs font-bold md:text-sm">功能選單</h2>
+          <h2 className="text-xs md:text-sm">功能選單</h2>
         </div>
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
@@ -955,7 +938,7 @@ function ProcessTimeline({
               <Link2 size={13} />
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-xs font-semibold leading-4 md:text-sm md:leading-5">專案資料</span>
+              <span className="block truncate text-xs leading-4 md:text-sm md:leading-5">專案資料</span>
             </span>
           </button>
         </div>
@@ -1007,7 +990,7 @@ function ProcessTimeline({
                       {isActive ? <Loader2 size={13} className="animate-spin" /> : isFailed ? <X size={13} /> : isDone ? <Check size={13} /> : <Icon size={13} />}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-xs font-semibold leading-4 md:text-sm md:leading-5">{stepNumber}. {step.title}</span>
+                      <span className="block truncate text-xs leading-4 md:text-sm md:leading-5">{stepNumber}. {step.title}</span>
                     </span>
                   </button>
                 </div>
@@ -1024,7 +1007,7 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-white p-3">
       <span className="block text-[11px] text-[var(--gray-500)]">{label}</span>
-      <strong className="mt-1 block text-lg font-bold text-[var(--black)]">{value}</strong>
+      <strong className="mt-1 block text-lg text-[var(--black)]">{value}</strong>
     </div>
   );
 }
@@ -1035,7 +1018,7 @@ function RequirementCard({ label, value, tone = "default" }: { label: string; va
   return (
     <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
       <span className="block text-[11px] opacity-75">{label}</span>
-      <strong className="mt-0.5 block text-sm font-semibold">{value}</strong>
+      <strong className="mt-0.5 block text-sm">{value}</strong>
     </div>
   );
 }
@@ -1044,7 +1027,7 @@ function EmptyPanel({ title, description }: { title: string; description: string
   return (
     <div className="grid min-h-[220px] place-items-center rounded-xl border border-dashed border-[var(--border-strong)] bg-white p-4 text-center md:min-h-[260px] md:p-6">
       <div>
-        <h3 className="text-sm font-medium">{title}</h3>
+        <h3 className="text-sm">{title}</h3>
         <p className="mt-2 max-w-md text-sm leading-6 text-[var(--gray-500)]">{description}</p>
       </div>
     </div>
@@ -1056,7 +1039,7 @@ function renderInlineMarkdown(text: string) {
 
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong className="font-bold text-[var(--black)]" key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+      return <strong className=" text-[var(--black)]" key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
     }
 
     return part;
@@ -1089,7 +1072,7 @@ function MarkdownResult({ value }: { value: string }) {
         const heading = trimmed.match(/^#{1,4}\s*(.+)$/);
         if (heading) {
           return (
-            <h3 className="mt-4 text-base font-bold text-[var(--black)] first:mt-0" key={index}>
+            <h3 className="mt-4 text-base text-[var(--black)] first:mt-0" key={index}>
               {renderInlineMarkdown(heading[1])}
             </h3>
           );
@@ -1142,7 +1125,7 @@ function StructuredResult({ value }: { value: string }) {
       <div className="grid gap-3 lg:grid-cols-2">
         {sections.map((section) => (
           <section className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4" key={section.title}>
-            <h3 className="text-sm font-bold text-[var(--black)]">{section.title}</h3>
+            <h3 className="text-sm text-[var(--black)]">{section.title}</h3>
             <div className="mt-3 space-y-2">
               {section.bullets.map((bullet, index) => (
                 <div className="flex gap-2 text-sm leading-6 text-[var(--black)]" key={`${section.title}-${index}`}>
@@ -1170,7 +1153,7 @@ function TranscriptResult({ value }: { value: string }) {
 
   return (
     <div className="h-full overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-2 text-sm md:p-3">
-      <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 border-b border-[var(--border)] px-2 pb-2 text-xs font-semibold text-[var(--gray-500)] sm:grid-cols-[112px_minmax(0,1fr)]">
+      <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 border-b border-[var(--border)] px-2 pb-2 text-xs text-[var(--gray-500)] sm:grid-cols-[112px_minmax(0,1fr)]">
         <div>秒數</div>
         <div>逐字稿</div>
       </div>
@@ -1205,6 +1188,21 @@ function parseStoryboardScript(value: string) {
   }
 }
 
+type EditableStoryboardScene = {
+  sceneNumber: number;
+  title: string;
+  visualGoal: string;
+};
+
+function stringifyStoryboardScript(original: string, scenes: EditableStoryboardScene[]) {
+  try {
+    const parsed = JSON.parse(original) as Record<string, unknown>;
+    return JSON.stringify({ ...parsed, scenes }, null, 2);
+  } catch {
+    return JSON.stringify({ scenes }, null, 2);
+  }
+}
+
 function ResultCard({
   title,
   value
@@ -1215,7 +1213,7 @@ function ResultCard({
   return (
     <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
       <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
-        <h2 className="text-sm font-bold">{title}</h2>
+        <h2 className="text-sm">{title}</h2>
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
       </div>
       <div className="min-h-0 flex-1">
@@ -1228,36 +1226,91 @@ function ResultCard({
 function StepCard({
   title,
   value,
-  onChange
+  onChange,
+  onSave,
+  saving = false
 }: {
   title: string;
   value: string;
   onChange: (value: string) => void;
+  onSave?: (value: string) => boolean | Promise<boolean>;
+  saving?: boolean;
 }) {
-  const storyboardScript = parseStoryboardScript(value);
+  const storyboardScript = useMemo(() => parseStoryboardScript(value), [value]);
+  const [editing, setEditing] = useState(false);
+  const [draftScenes, setDraftScenes] = useState<EditableStoryboardScene[]>(storyboardScript || []);
+
+  useEffect(() => {
+    if (!editing) setDraftScenes(storyboardScript || []);
+  }, [editing, storyboardScript]);
+
+  function updateDraftScene(sceneNumber: number, field: "title" | "visualGoal", nextValue: string) {
+    setDraftScenes((scenes) =>
+      scenes.map((scene) =>
+        scene.sceneNumber === sceneNumber ? { ...scene, [field]: nextValue } : scene
+      )
+    );
+  }
+
+  async function saveDraft() {
+    const nextValue = stringifyStoryboardScript(value, draftScenes);
+    onChange(nextValue);
+    const saved = await onSave?.(nextValue);
+    if (saved !== false) setEditing(false);
+  }
 
   return (
     <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
       <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
-        <h2 className="text-sm font-bold">{title}</h2>
-        <span className="text-[11px] text-[var(--gray-500)]">可編輯後再繼續</span>
+        <h2 className="text-sm">{title}</h2>
+        {storyboardScript && (
+          editing ? (
+            <button className="btn btn-primary h-8 px-3 text-xs" disabled={saving} onClick={saveDraft} type="button">
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              儲存
+            </button>
+          ) : (
+            <button className="grid h-8 w-8 place-items-center rounded-full border border-[var(--border)] text-orange hover:bg-orange-bg" onClick={() => setEditing(true)} title="編輯分鏡細節" type="button">
+              <Pencil size={14} />
+            </button>
+          )
+        )}
       </div>
       {storyboardScript && (
-        <div className="mb-3 grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {storyboardScript.map((scene) => (
+        <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
+          {(editing ? draftScenes : storyboardScript).map((scene) => (
             <article className="rounded-xl border border-[var(--border)] bg-[var(--warm-white)] p-3" key={scene.sceneNumber}>
               <div className="mb-2 text-xs tabular-nums text-orange">{String(scene.sceneNumber).padStart(2, "0")}</div>
-              <h3 className="text-sm font-bold">{scene.title}</h3>
-              <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">{scene.visualGoal}</p>
+              {editing ? (
+                <div className="space-y-2">
+                  <input
+                    className="w-full rounded-lg border border-[var(--border-strong)] bg-white px-2.5 py-2 text-sm outline-none focus:border-orange"
+                    value={scene.title}
+                    onChange={(event) => updateDraftScene(scene.sceneNumber, "title", event.target.value)}
+                    placeholder="分鏡標題"
+                  />
+                  <textarea
+                    className="min-h-[120px] w-full resize-none rounded-lg border border-[var(--border-strong)] bg-white px-2.5 py-2 text-xs leading-5 outline-none focus:border-orange"
+                    value={scene.visualGoal}
+                    onChange={(event) => updateDraftScene(scene.sceneNumber, "visualGoal", event.target.value)}
+                    placeholder="分鏡細節"
+                  />
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-sm">{scene.title}</h3>
+                  <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">{scene.visualGoal}</p>
+                </>
+              )}
             </article>
           ))}
         </div>
       )}
-      <textarea
-        className="min-h-[220px] w-full flex-1 resize-none overflow-y-auto rounded-xl border border-[var(--border-strong)] bg-white p-3 text-sm leading-7 outline-none focus:border-orange md:min-h-0 md:p-4"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      {!storyboardScript && (
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-white p-3 text-sm leading-7 text-[var(--gray-500)] md:p-4">
+          {value}
+        </div>
+      )}
     </div>
   );
 }

@@ -65,7 +65,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-[var(--warm-white)]">
       <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 pb-10 pt-[clamp(56px,14dvh,120px)] md:min-h-screen md:items-center md:p-8">
         <section className="w-full max-w-xl md:-translate-y-12">
-          <h2 className="mb-5 text-center text-[1.55rem] font-bold leading-tight tracking-normal text-[var(--black)] md:text-2xl">
+          <h2 className="mb-5 text-center text-[1.55rem] leading-tight tracking-normal text-[var(--black)] md:text-2xl">
             今天想分析哪支影片呢 👀
           </h2>
           <div className="rounded-2xl border border-[var(--border-strong)] bg-white p-2 shadow-[0_14px_48px_rgb(26_26_26/0.04)] transition focus-within:border-orange md:rounded-full">
@@ -83,7 +83,7 @@ export default function HomePage() {
                 }}
               />
               <button
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 text-sm font-semibold text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-9 md:w-9 md:rounded-full md:px-0"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 text-sm text-white transition hover:bg-[var(--orange-dark)] disabled:cursor-not-allowed disabled:bg-[var(--gray-200)] md:h-9 md:w-9 md:rounded-full md:px-0"
                 disabled={!canSubmit}
                 onClick={start}
                 title={loading ? "建立中" : "開始分析"}

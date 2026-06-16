@@ -22,6 +22,7 @@ export type SeedanceTask = {
 };
 
 const BYTEPLUS_BASE_URL = "https://ark.ap-southeast.bytepluses.com/api/v3";
+const DEFAULT_SEEDANCE_MODEL = "dreamina-seedance-2-0-260128";
 
 export class SeedanceApiError extends Error {
   constructor(
@@ -42,6 +43,12 @@ function seedanceError(data: unknown, fallback: string) {
   return fallback;
 }
 
+function seedanceModel(value: string | undefined) {
+  const model = value?.trim();
+  if (!model || model === "dreamina-seedance-2-0-fast-260128") return DEFAULT_SEEDANCE_MODEL;
+  return model;
+}
+
 export async function createSeedanceTask(
   prompt: string,
   settings: SeedanceSettings,
@@ -59,10 +66,10 @@ export async function createSeedanceTask(
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: appSettings.SEEDANCE_MODEL || "dreamina-seedance-2-0-fast-260128",
+      model: seedanceModel(appSettings.SEEDANCE_MODEL),
       content: [
         { type: "text", text: prompt },
-        ...images.map((url) => ({ type: "image", url }))
+        ...images.map((url) => ({ type: "image_url", image_url: { url }, role: "reference_image" }))
       ],
       ratio: settings.ratio,
       resolution: settings.resolution,

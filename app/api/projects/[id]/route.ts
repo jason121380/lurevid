@@ -7,7 +7,8 @@ import { projectWithScenesInclude } from "@/lib/project-access";
 export const runtime = "nodejs";
 
 const updateProjectSchema = z.object({
-  title: z.string().trim().min(1, "專案名稱不能空白").max(80, "專案名稱太長").optional()
+  title: z.string().trim().min(1, "專案名稱不能空白").max(80, "專案名稱太長").optional(),
+  adaptedScript: z.string().trim().min(1, "改編腳本不能空白").max(50000, "改編腳本太長").optional()
 });
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -42,7 +43,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const project = await prisma.project.update({
     where: { id: owned.id },
-    data: body.title ? { title: body.title } : {},
+    data: {
+      ...(body.title ? { title: body.title } : {}),
+      ...(body.adaptedScript ? { adaptedScript: body.adaptedScript } : {})
+    },
     include: projectWithScenesInclude
   });
 
