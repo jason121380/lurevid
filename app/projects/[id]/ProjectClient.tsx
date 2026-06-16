@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Loader2, Play, RotateCcw, XCircle } from "lucide-react";
+import { Check, Download, Loader2, Play, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 
@@ -43,13 +43,6 @@ export type Project = {
 
 const BUSY = ["QUEUED", "ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING", "GENERATING", "MERGING"];
 type StepState = "done" | "active" | "waiting" | "failed";
-
-function stepStateClass(state: StepState) {
-  if (state === "done") return "border-orange bg-orange text-white";
-  if (state === "active") return "border-orange bg-orange-bg text-orange";
-  if (state === "failed") return "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]";
-  return "border-[var(--gray-200)] bg-white text-[var(--gray-300)]";
-}
 
 type StepInfo = { title: string; description: string; state: StepState; progress: number };
 
@@ -752,8 +745,8 @@ function ProcessTimeline({
           const isActive = step.state === "active";
           const isFailed = step.state === "failed";
           const sectionLabel = stepNumber === 1 ? "分析" : stepNumber === 6 ? "再行銷" : null;
-          const barColor = isFailed ? "bg-[var(--red)]" : "bg-orange";
-          const barPct = Math.round(Math.max(0, Math.min(1, step.progress)) * 100);
+          const selected = activeStep === stepNumber;
+          const stateLabel = isFailed ? "失敗" : isActive ? "進行中" : isDone ? "完成" : "待處理";
 
           return (
             <div className="contents" key={step.title}>
@@ -763,28 +756,38 @@ function ProcessTimeline({
                 </div>
               )}
               <div
-                className={`process-step min-w-[260px] rounded-lg px-2 py-1.5 md:min-w-0 ${
-                  activeStep === stepNumber
+                className={`process-step min-w-[220px] rounded-lg px-2 py-1.5 md:min-w-0 ${
+                  selected
                     ? "bg-orange-bg text-orange"
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
                 }`}
-                data-active={activeStep === stepNumber}
+                data-active={selected}
                 data-running={isActive}
               >
                 <div className="flex items-center gap-2">
-                  {/* 數字圈：只當狀態指示與選取，不再是執行按鈕 */}
                   <button
-                    className={`process-dot grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] ${stepStateClass(step.state)}`}
+                    className={`process-tab flex min-w-0 flex-1 items-center gap-2.5 rounded-md py-1 text-left`}
                     onClick={() => onSelectStep(stepNumber)}
                     type="button"
                   >
-                    {isActive ? <Loader2 size={13} className="animate-spin" /> : isFailed ? <XCircle size={13} /> : stepNumber}
+                    <span
+                      className={`process-status grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
+                        isFailed
+                          ? "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]"
+                          : isDone
+                            ? "border-orange bg-orange text-white"
+                            : isActive
+                              ? "border-orange bg-orange-bg text-orange"
+                              : "border-[var(--gray-200)] bg-white text-[var(--gray-300)]"
+                      }`}
+                      title={stateLabel}
+                    >
+                      {isActive ? <Loader2 size={11} className="animate-spin" /> : isFailed ? <X size={11} /> : isDone ? <Check size={11} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium leading-5">{step.title}</span>
+                    </span>
                   </button>
-                  <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => onSelectStep(stepNumber)} type="button">
-                    <div className="text-xs font-medium leading-5">{step.title}</div>
-                  </button>
-                  {isActive && <span className="shrink-0 text-[11px] tabular-nums text-orange">{barPct}%</span>}
-                  {/* 執行/重跑按鈕：單獨放右邊 */}
                   <button
                     className={`process-action grid h-6 w-6 shrink-0 place-items-center rounded-full border ${canRun ? "border-[var(--border-strong)] text-orange hover:bg-orange hover:text-white" : "border-[var(--border)] text-[var(--gray-300)]"}`}
                     disabled={!canRun}
@@ -797,9 +800,6 @@ function ProcessTimeline({
                   >
                     {isActive ? <Loader2 size={13} className="animate-spin" /> : isDone || isFailed ? <RotateCcw size={12} /> : <Play size={11} fill="currentColor" />}
                   </button>
-                </div>
-                <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-[var(--gray-200)]">
-                  <div className={`process-bar h-full w-full ${barColor}`} style={{ transform: `scaleX(${barPct / 100})` }} />
                 </div>
               </div>
             </div>

@@ -154,7 +154,7 @@ textarea {
   transform: translateX(0) scaleX(1);
 }
 
-.process-dot,
+.process-status,
 .process-action {
   transition:
     background-color 180ms ease,
@@ -164,7 +164,7 @@ textarea {
     transform 160ms ease;
 }
 
-.process-step:hover .process-dot {
+.process-step:hover .process-status {
   transform: scale(1.04);
 }
 
@@ -174,7 +174,7 @@ textarea {
 }
 
 .process-action:active:not(:disabled),
-.process-dot:active {
+.process-status:active {
   transform: scale(0.96);
 }
 
@@ -193,14 +193,14 @@ textarea {
   }
 }
 
-.process-step[data-running="true"] .process-dot {
+.process-step[data-running="true"] .process-status {
   animation: process-active-pulse 1.35s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .process-step,
   .process-step::before,
-  .process-dot,
+  .process-status,
   .process-action,
   .process-bar {
     animation: none !important;
@@ -208,10 +208,10 @@ textarea {
   }
 
   .process-step:hover,
-  .process-step:hover .process-dot,
+  .process-step:hover .process-status,
   .process-action:hover:not(:disabled),
   .process-action:active:not(:disabled),
-  .process-dot:active {
+  .process-status:active {
     transform: none;
   }
 }
