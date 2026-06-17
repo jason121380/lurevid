@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { join } from "node:path";
+import { spawn } from "node:child_process";
 import { Worker } from "bullmq";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -579,5 +580,32 @@ async function sendHeartbeat() {
 }
 sendHeartbeat();
 setInterval(sendHeartbeat, 15000);
+
+// 啟動時盡力把 yt-dlp 更新到最新 nightly，跟上 IG/TikTok 改版（失敗不影響啟動）。
+// 設 YTDLP_AUTO_UPDATE=0/false 可關閉（例如網路無法連到 GitHub 時）。
+function autoUpdateYtDlp() {
+  const flag = (process.env.YTDLP_AUTO_UPDATE || "").toLowerCase();
+  if (flag === "0" || flag === "false" || flag === "off") return;
+  try {
+    const child = spawn("yt-dlp", ["-U", "--update-to", "nightly"]);
+    let out = "";
+    child.stdout?.on("data", (chunk) => {
+      out += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk) => {
+      out += chunk.toString();
+    });
+    child.on("error", (error) => {
+      console.error("yt-dlp 自動更新失敗（略過）", error instanceof Error ? error.message : error);
+    });
+    child.on("close", () => {
+      const line = out.trim().split("\n").filter(Boolean).pop();
+      console.log("yt-dlp 自動更新：", line || "完成");
+    });
+  } catch (error) {
+    console.error("yt-dlp 自動更新失敗（略過）", error instanceof Error ? error.message : error);
+  }
+}
+autoUpdateYtDlp();
 
 console.log("Seedance worker started");

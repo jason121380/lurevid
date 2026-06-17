@@ -31,6 +31,8 @@ Manual transcript input is only a fallback when platform download or transcripti
 
 - Supported source hosts: `instagram.com`, `tiktok.com`, `douyin.com`/`iesdouyin.com` (allowlist + `new URL` validation in `lib/transcribe.ts`).
 - yt-dlp is installed in the Docker image from the **nightly** channel by default (`YTDLP_CHANNEL=nightly|stable|<tag>`); platforms change often and nightly tracks extractor fixes.
+- The worker self-updates yt-dlp to the latest nightly on startup (best-effort, non-fatal, in `scripts/worker.ts`). Disable with `YTDLP_AUTO_UPDATE=0` when the deploy network can't reach GitHub. This keeps extractors current between image rebuilds.
+- Download failures surface a friendly Traditional Chinese message via `describeDownloadError` (`lib/transcribe.ts`); raw yt-dlp stderr / video ids / URLs are never shown to users.
 - Datacenter IPs (e.g. Zeabur) are frequently rate-limited/blocked by Instagram (HTTP 429). That is IP blocking, not a code bug; the manual-transcript fallback or a proxy/cookies is the workaround.
 
 ## Monitoring
