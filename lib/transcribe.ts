@@ -84,6 +84,24 @@ function formatTimestampedTranscript(result: {
 }
 
 /**
+ * 把 yt-dlp／下載失敗的原始錯誤轉成乾淨的使用者訊息，
+ * 不外洩原始 stderr、影片 ID 或網址（符合專案的錯誤訊息規範）。
+ */
+export function describeDownloadError(error: unknown): Error {
+  const text = (error instanceof Error ? error.message : String(error || "")).toLowerCase();
+  if (/rehydration|unable to extract|extractor|unable to download webpage/.test(text)) {
+    return new Error("TikTok 暫時無法下載（可能是平台改版或此伺服器 IP 被限制）。請稍後再試，或改用手動輸入逐字稿。");
+  }
+  if (/429|too many requests|rate.?limit/.test(text)) {
+    return new Error("來源平台暫時限流（429）。請稍後再試，或改用手動輸入逐字稿。");
+  }
+  if (/login|sign in|private|verification|captcha|robot|forbidden|403/.test(text)) {
+    return new Error("此影片需要登入或被來源平台阻擋，無法自動下載。請改用公開影片連結，或手動輸入逐字稿。");
+  }
+  return new Error("影片下載失敗。請確認連結有效且為公開影片，稍後再試，或改用手動輸入逐字稿。");
+}
+
+/**
  * 用 yt-dlp 下載影片音訊，再用 OpenAI 轉成逐字稿。
  * 優先下載原始音訊格式，避免本機分析階段依賴 ffmpeg。
  * 下載失敗時拋錯，由 worker 顯示重試或換公開連結。
@@ -93,18 +111,22 @@ export async function fetchTranscript(url: string): Promise<string> {
   const normalizedUrl = normalizeSourceUrl(url);
   const dir = await mkdtemp(join(tmpdir(), "lurevid-"));
   try {
-    await run("yt-dlp", [
-      "-f",
-      "bestaudio/best",
-      "--no-playlist",
-      "--no-warnings",
-      "--ffmpeg-location",
-      ffmpegPath(),
-      "-o",
-      join(dir, "source.%(ext)s"),
-      "--",
-      normalizedUrl
-    ]);
+    try {
+      await run("yt-dlp", [
+        "-f",
+        "bestaudio/best",
+        "--no-playlist",
+        "--no-warnings",
+        "--ffmpeg-location",
+        ffmpegPath(),
+        "-o",
+        join(dir, "source.%(ext)s"),
+        "--",
+        normalizedUrl
+      ]);
+    } catch (error) {
+      throw describeDownloadError(error);
+    }
 
     const files = await readdir(dir);
     const audio = files.find((file) => TRANSCRIBABLE_EXTENSIONS.has(file.split(".").pop()?.toLowerCase() || ""));

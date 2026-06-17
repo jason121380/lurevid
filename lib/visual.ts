@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 import { ffmpegPath } from "@/lib/ffmpeg";
-import { isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
+import { describeDownloadError, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
 
 function run(command: string, args: string[]) {
   return new Promise<void>((resolvePromise, reject) => {
@@ -28,20 +28,24 @@ export async function downloadSourceVideo(url: string) {
   const normalizedUrl = normalizeSourceUrl(url);
   const dir = await mkdtemp(join(tmpdir(), "lurevid-video-"));
   const output = join(dir, "source.%(ext)s");
-  await run("yt-dlp", [
-    "-f",
-    "bv*+ba/best",
-    "--merge-output-format",
-    "mp4",
-    "--no-playlist",
-    "--no-warnings",
-    "--ffmpeg-location",
-    ffmpegPath(),
-    "-o",
-    output,
-    "--",
-    normalizedUrl
-  ]);
+  try {
+    await run("yt-dlp", [
+      "-f",
+      "bv*+ba/best",
+      "--merge-output-format",
+      "mp4",
+      "--no-playlist",
+      "--no-warnings",
+      "--ffmpeg-location",
+      ffmpegPath(),
+      "-o",
+      output,
+      "--",
+      normalizedUrl
+    ]);
+  } catch (error) {
+    throw describeDownloadError(error);
+  }
 
   const files = await readdir(dir);
   const video = files.find((file) => /^source\.(mp4|webm|mov|mkv|m4v)$/i.test(file));
