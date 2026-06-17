@@ -793,7 +793,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const mergeStoryboardPanel = (
     <div className="card p-3 md:p-4">
       {project.scenes.length > 0 ? (
-        <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)] md:w-[60%]">
+        <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)] md:w-[30%] md:min-w-[320px] md:max-w-[520px]">
           {project.storyboardImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={project.storyboardImageUrl} alt="Seedance 單張腳本分鏡圖" className="h-full w-full object-contain" />
@@ -817,12 +817,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <div className="space-y-2">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,360px)_minmax(0,360px)] 2xl:grid-cols-[minmax(0,400px)_minmax(0,400px)]">
             <div>
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-xs md:text-sm">Seedance 單張腳本分鏡圖</h3>
-                  <p className="mt-0.5 text-[11px] text-[var(--gray-500)]">搭配 prompt 送給 Seedance</p>
-                </div>
-              </div>
               <div className="grid aspect-[9/16] w-full max-w-[400px] place-items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={project.storyboardImageUrl} alt="Seedance 單張腳本分鏡圖" className="h-full w-full object-contain" />
@@ -850,7 +844,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               </div>
 
               <details className="rounded-lg border border-[var(--border)] bg-white p-2">
-                <summary className="cursor-pointer text-xs text-[var(--gray-500)]">合併 prompt</summary>
+                <summary className="cursor-pointer text-xs text-[var(--gray-500)]">提示詞</summary>
                 <pre className="mt-2 max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--warm-white)] p-2 text-[11px] leading-5 text-[var(--gray-500)]">{seedancePrompt}</pre>
               </details>
             </div>
