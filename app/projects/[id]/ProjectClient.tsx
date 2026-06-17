@@ -1024,6 +1024,48 @@ function ProcessTimeline({
 }) {
   const steps = buildProcessSteps(project);
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  type MenuItem = { key: ActivePanel; label: string; Icon: typeof Link2; state?: StepState };
+  const menuItems: MenuItem[] = [
+    { key: "project", label: "專案資料", Icon: Link2 },
+    ...steps.map((step, index) => ({
+      key: (index + 1) as ActivePanel,
+      label: `${index + 1}. ${step.title}`,
+      Icon: STEP_META[(index + 1) as keyof typeof STEP_META].icon,
+      state: step.state
+    }))
+  ];
+  const activeItem = menuItems.find((item) => item.key === activeStep) ?? menuItems[0];
+
+  const renderStatus = (item: MenuItem) => {
+    if (item.key === "project") {
+      return (
+        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-orange bg-orange text-white">
+          <Link2 size={11} />
+        </span>
+      );
+    }
+    const isDone = item.state === "done";
+    const isActive = item.state === "active";
+    const isFailed = item.state === "failed";
+    const Icon = item.Icon;
+    return (
+      <span
+        className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
+          isFailed
+            ? "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]"
+            : isDone
+              ? "border-orange bg-orange text-white"
+              : isActive
+                ? "border-orange bg-orange-bg text-orange"
+                : "border-[var(--gray-200)] bg-white text-[var(--gray-300)]"
+        }`}
+      >
+        {isActive ? <Loader2 size={11} className="animate-spin" /> : isFailed ? <X size={11} /> : isDone ? <Check size={11} /> : <Icon size={11} />}
+      </span>
+    );
+  };
 
   return (
     <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5">
@@ -1032,7 +1074,50 @@ function ProcessTimeline({
           <h2 className="text-xs">功能選單</h2>
         </div>
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
+      {/* 手機版：下拉選單 */}
+      <div className="relative md:hidden">
+        <button
+          className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--border-strong)] bg-white px-2.5 py-2 text-left"
+          onClick={() => setMenuOpen((open) => !open)}
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={menuOpen}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {renderStatus(activeItem)}
+            <span className="truncate text-sm text-[var(--black)]">{activeItem.label}</span>
+          </span>
+          <ChevronDown className={`shrink-0 text-[var(--gray-400)] transition-transform ${menuOpen ? "rotate-180" : ""}`} size={16} />
+        </button>
+        {menuOpen && (
+          <>
+            <button className="fixed inset-0 z-30 cursor-default" aria-label="關閉選單" onClick={() => setMenuOpen(false)} type="button" />
+            <div className="absolute inset-x-0 z-40 mt-1 max-h-[60vh] space-y-0.5 overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-1 shadow-[0_18px_48px_rgb(26_26_26/0.12)]" role="listbox">
+              {menuItems.map((item) => {
+                const selected = item.key === activeStep;
+                return (
+                  <button
+                    key={String(item.key)}
+                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left ${selected ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"}`}
+                    onClick={() => {
+                      onSelectStep(item.key);
+                      setMenuOpen(false);
+                    }}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                  >
+                    {renderStatus(item)}
+                    <span className="truncate text-sm">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+      {/* 桌機版：側邊步驟列表 */}
+      <div className="hidden md:block md:space-y-0.5">
         <div className="min-w-[220px] md:min-w-0">
           <div
             className={`process-step rounded-lg border px-2 py-1 ${

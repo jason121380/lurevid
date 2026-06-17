@@ -62,7 +62,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--warm-white)]">
+    <div className="min-h-[calc(100dvh-3.5rem)] bg-[var(--warm-white)] md:min-h-screen">
       <div className="flex min-h-[calc(100dvh-3.5rem)] items-start justify-center px-4 pb-10 pt-[clamp(56px,14dvh,120px)] md:min-h-screen md:items-center md:p-8">
         <section className="w-full max-w-xl md:-translate-y-12">
           <h2 className="mb-5 text-center text-[1.55rem] leading-tight tracking-normal text-[var(--black)] md:text-2xl">
