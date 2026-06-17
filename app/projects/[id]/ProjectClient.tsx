@@ -66,6 +66,17 @@ const STEP_META: Record<number, StepMeta> = {
   7: { icon: ImageIcon, group: "影片生成", dependency: "9 張分鏡圖", output: "單張分鏡圖" },
   8: { icon: Video, group: "影片生成", dependency: "單張分鏡圖", output: "最終影片" }
 };
+type StepKey = "source" | "transcribe" | "frames" | "analyze" | "adapt" | "storyboard" | "mergeStoryboard" | "video";
+const OPTIMISTIC_STEP_META: Record<number, { key: StepKey; status: string; message: string; progress: number }> = {
+  1: { key: "source", status: "ANALYZING", message: "正在下載來源影片", progress: 0.05 },
+  2: { key: "transcribe", status: "ANALYZING", message: "正在轉錄音訊", progress: 0.12 },
+  3: { key: "frames", status: "ANALYZING", message: "正在抽取影片影格", progress: 0.18 },
+  4: { key: "analyze", status: "ANALYZING", message: "正在做影片分析", progress: 0.28 },
+  5: { key: "adapt", status: "ADAPTING", message: "正在改編腳本", progress: 0.38 },
+  6: { key: "storyboard", status: "STORYBOARDING", message: "正在產生分鏡與 9 張分鏡圖", progress: 0.45 },
+  7: { key: "mergeStoryboard", status: "STORYBOARDING", message: "正在把 9 張分鏡合成單張分鏡圖", progress: 0.52 },
+  8: { key: "video", status: "GENERATING", message: "正在建立 Seedance 影片任務", progress: 0.62 }
+};
 
 function buildProcessSteps(project: Project): StepInfo[] {
   const steps = (project.steps || {}) as Record<string, { status?: string; progress?: number; message?: string }>;
@@ -314,6 +325,51 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     window.dispatchEvent(new Event("lurevid:projects-changed"));
   }
 
+  function notifyProjectOptimistic(nextProject: Project) {
+    window.dispatchEvent(new CustomEvent("lurevid:project-optimistic", {
+      detail: {
+        id: nextProject.id,
+        status: nextProject.status,
+        progress: nextProject.progress,
+        steps: nextProject.steps,
+        updatedAt: new Date().toISOString()
+      }
+    }));
+  }
+
+  function optimisticProjectForStep(current: Project, stepNumber: number): Project {
+    const meta = OPTIMISTIC_STEP_META[stepNumber];
+    if (!meta) return current;
+    return {
+      ...current,
+      status: meta.status,
+      message: meta.message,
+      progress: Math.max(current.progress || 0, meta.progress),
+      error: undefined,
+      steps: {
+        ...(current.steps || {}),
+        [meta.key]: {
+          ...(current.steps?.[meta.key] || {}),
+          status: "running",
+          progress: meta.progress,
+          message: meta.message
+        }
+      }
+    };
+  }
+
+  function applyOptimisticStep(stepNumber: number) {
+    setProject((current) => {
+      if (!current) return current;
+      const next = optimisticProjectForStep(current, stepNumber);
+      taskToastProjectRef.current = next;
+      setTaskToastProject(next);
+      setTaskToastDismissed(false);
+      notifyProjectOptimistic(next);
+      return next;
+    });
+  }
+
   useEffect(() => {
     if (!initialProject) return;
     setProject(initialProject);
@@ -386,7 +442,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     };
   }, [projectId, pollVersion]);
 
-  async function post(path: string, payload?: Record<string, unknown>) {
+  async function post(path: string, payload?: Record<string, unknown>, rollbackProject?: Project) {
     setSubmitting(true);
     setError("");
     try {
@@ -397,6 +453,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       });
       const data = await res.json();
       if (!res.ok) {
+        if (rollbackProject) {
+          setProject(rollbackProject);
+          notifyProjectOptimistic(rollbackProject);
+        }
         setError(data.error || "操作失敗");
         toast(data.error || "操作失敗", "error");
         return;
@@ -408,6 +468,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       notifyProjectsChanged();
       setPollVersion((version) => version + 1);
     } catch {
+      if (rollbackProject) {
+        setProject(rollbackProject);
+        notifyProjectOptimistic(rollbackProject);
+      }
       setError("API 沒有回應");
       toast("API 沒有回應", "error");
     } finally {
@@ -500,15 +564,17 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
 
   function runStep(stepNumber: number) {
     if (!project) return;
+    const rollbackProject = project;
     setActiveStep(stepNumber as ActivePanel);
-    if (stepNumber === 1) return void post("/source");
-    if (stepNumber === 2) return void post("/transcribe");
-    if (stepNumber === 3) return void post("/frames");
-    if (stepNumber === 4) return void post("/analyze");
-    if (stepNumber === 5) return void post("/adapt", { analysis: project.analysis || analysis, structure });
-    if (stepNumber === 6) return void post("/storyboard", { adaptedScript: script });
-    if (stepNumber === 7) return void post("/merge-storyboard");
-    if (stepNumber === 8) return void post("/video", { ratio: FIXED_VIDEO_RATIO, resolution: FIXED_VIDEO_RESOLUTION, duration });
+    applyOptimisticStep(stepNumber);
+    if (stepNumber === 1) return void post("/source", undefined, rollbackProject);
+    if (stepNumber === 2) return void post("/transcribe", undefined, rollbackProject);
+    if (stepNumber === 3) return void post("/frames", undefined, rollbackProject);
+    if (stepNumber === 4) return void post("/analyze", undefined, rollbackProject);
+    if (stepNumber === 5) return void post("/adapt", { analysis: project.analysis || analysis, structure }, rollbackProject);
+    if (stepNumber === 6) return void post("/storyboard", { adaptedScript: script }, rollbackProject);
+    if (stepNumber === 7) return void post("/merge-storyboard", undefined, rollbackProject);
+    if (stepNumber === 8) return void post("/video", { ratio: FIXED_VIDEO_RATIO, resolution: FIXED_VIDEO_RESOLUTION, duration }, rollbackProject);
   }
 
   if (error && !project) return <div className="p-6 text-[var(--red)]">{error}</div>;
@@ -532,17 +598,17 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const canGenerateVideo = Boolean(project.storyboardImageUrl);
   const seedancePrompt = buildSeedancePreviewPrompt(project.scenes);
   const videoControls = canGenerateVideo ? (
-    <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-      <select className="rounded-full border border-[var(--border-strong)] px-3 py-2 text-sm sm:py-1" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
+    <div className="grid w-full grid-cols-1 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+      <select className="h-8 rounded-full border border-[var(--border-strong)] px-3 text-xs" value={duration} onChange={(event) => setDuration(Number(event.target.value))}>
         <option value={8}>每段 8 秒</option>
         <option value={15}>每段 15 秒</option>
       </select>
-      <span className="rounded-full border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--gray-500)] sm:py-1">9:16</span>
-      <span className="rounded-full border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--gray-500)] sm:py-1">720p</span>
+      <span className="grid h-8 place-items-center rounded-full border border-[var(--border)] bg-white px-3 text-xs text-[var(--gray-500)]">9:16</span>
+      <span className="grid h-8 place-items-center rounded-full border border-[var(--border)] bg-white px-3 text-xs text-[var(--gray-500)]">720p</span>
       <button
-        className="btn btn-primary"
+        className="btn btn-primary h-8 px-3 text-xs"
         disabled={busy || submitting}
-        onClick={() => post("/video", { ratio: FIXED_VIDEO_RATIO, resolution: FIXED_VIDEO_RESOLUTION, duration })}
+        onClick={() => runStep(8)}
         type="button"
       >
         <Play size={14} />
@@ -623,12 +689,12 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   );
   const sourcePreview = sourceEmbedUrl(project.sourceUrl);
   const previewPanel = (
-    <div className="w-full rounded-lg border border-[var(--border)] bg-white p-2">
-      <div className="mb-2 flex items-center justify-between px-1">
-        <span className="text-[11px] uppercase text-[var(--gray-500)]">影片預覽</span>
-        <span className="text-[11px] text-orange">{project.sourceVideoUrl ? "來源 MP4" : "來源嵌入"}</span>
+    <div className="w-full rounded-lg border border-[var(--border)] bg-white p-1.5">
+      <div className="mb-1.5 flex items-center justify-between px-1">
+        <span className="text-[10px] uppercase text-[var(--gray-500)]">影片預覽</span>
+        <span className="text-[10px] text-orange">{project.sourceVideoUrl ? "來源 MP4" : "來源嵌入"}</span>
       </div>
-      <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-lg bg-[var(--warm-white)] text-sm text-[var(--gray-500)]">
+      <div className="mx-auto grid aspect-[9/16] w-full max-w-[220px] place-items-center overflow-hidden rounded-lg bg-[var(--warm-white)] text-xs text-[var(--gray-500)]">
         <div className="relative h-full w-full overflow-hidden">
           {project.sourceVideoUrl ? (
             <video src={project.sourceVideoUrl} controls playsInline className="h-full w-full object-contain" />
@@ -746,30 +812,30 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const videoPanel = (
-    <div className="p-1 md:p-2">
+    <div>
       {project.storyboardImageUrl ? (
-        <div className="space-y-3">
-          <div className="grid gap-3 xl:grid-cols-2">
-            <div className="p-1 md:p-2">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="space-y-2">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,360px)_minmax(0,360px)] 2xl:grid-cols-[minmax(0,400px)_minmax(0,400px)]">
+            <div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-sm">Seedance 單張腳本分鏡圖</h3>
-                  <p className="mt-1 text-xs text-[var(--gray-500)]">這張圖會搭配 prompt 一起送給 Seedance。</p>
+                  <h3 className="text-xs md:text-sm">Seedance 單張腳本分鏡圖</h3>
+                  <p className="mt-0.5 text-[11px] text-[var(--gray-500)]">搭配 prompt 送給 Seedance</p>
                 </div>
               </div>
-              <div className="grid aspect-[9/16] w-full place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
+              <div className="grid aspect-[9/16] w-full max-w-[400px] place-items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={project.storyboardImageUrl} alt="Seedance 單張腳本分鏡圖" className="h-full w-full object-contain" />
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="p-1 md:p-2">
+            <div className="space-y-2">
+              <div>
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm">Seedance 回傳影片</h3>
-                  <span className="text-[11px] text-[var(--gray-500)]">1 支影片</span>
+                  <h3 className="text-xs md:text-sm">Seedance 回傳影片</h3>
+                  <span className="text-[10px] text-[var(--gray-500)]">1 支影片</span>
                 </div>
-                <div className="grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--warm-white)]">
+                <div className="grid aspect-[9/16] w-full max-w-[400px] place-items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--warm-white)]">
                   {project.finalVideoUrl ? (
                     <video src={project.finalVideoUrl} className="h-full w-full object-contain" controls playsInline />
                   ) : ["GENERATING", "MERGING"].includes(project.status) ? (
@@ -783,9 +849,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
                 </div>
               </div>
 
-              <details className="rounded-xl border border-[var(--border)] bg-white p-3" open>
-                <summary className="cursor-pointer text-sm">合併 prompt</summary>
-                <pre className="mt-3 max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--warm-white)] p-3 text-xs leading-5 text-[var(--gray-500)]">{seedancePrompt}</pre>
+              <details className="rounded-lg border border-[var(--border)] bg-white p-2">
+                <summary className="cursor-pointer text-xs text-[var(--gray-500)]">合併 prompt</summary>
+                <pre className="mt-2 max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--warm-white)] p-2 text-[11px] leading-5 text-[var(--gray-500)]">{seedancePrompt}</pre>
               </details>
             </div>
           </div>
@@ -823,17 +889,17 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
 
   return (
     <div className="min-h-screen bg-[var(--warm-white)]">
-      <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[340px_minmax(0,1fr)] md:gap-4 md:p-6">
-        <aside className="w-[60%] space-y-4 md:sticky md:top-6 md:h-fit md:w-auto">
+      <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[300px_minmax(0,1fr)] md:gap-3 md:p-4">
+        <aside className="w-[60%] space-y-3 md:sticky md:top-4 md:h-fit md:w-auto">
           <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} previewPanel={previewPanel} />
         </aside>
 
-        <section className="min-w-0 space-y-3">
-          <div className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-[0_14px_40px_rgb(26_26_26/0.03)]">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <section className="min-w-0 space-y-2.5">
+          <div className="rounded-xl border border-[var(--border)] bg-white p-3 shadow-[0_10px_30px_rgb(26_26_26/0.03)]">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <h1 className="text-lg tracking-normal text-[var(--black)] md:text-xl">{currentPanelTitle}</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--gray-500)]">{currentPanelDescription}</p>
+                <h1 className="text-base tracking-normal text-[var(--black)] md:text-lg">{currentPanelTitle}</h1>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--gray-500)]">{currentPanelDescription}</p>
               </div>
               {activeStep === "project" ? (
                 <button
@@ -862,7 +928,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
             </div>
 
             {currentMeta && (
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <RequirementCard label="依賴" value={currentMeta.dependency} />
                 <RequirementCard label="產出" value={currentMeta.output} />
                 <RequirementCard label={currentBlockedReason ? "尚不能執行" : "狀態"} value={currentBlockedReason || (currentStep?.state === "done" ? "可重跑" : currentStep?.state === "active" ? "執行中" : "可執行")} tone={currentBlockedReason ? "warn" : currentStep?.state === "done" ? "ok" : "default"} />
@@ -966,40 +1032,40 @@ function ProcessTimeline({
   const [previewOpen, setPreviewOpen] = useState(true);
 
   return (
-    <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5 md:p-2">
-      <div className="mb-1.5 flex items-center justify-between gap-3 px-1 md:mb-2">
+    <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5">
+      <div className="mb-1 flex items-center justify-between gap-3 px-1">
         <div>
-          <h2 className="text-xs md:text-sm">功能選單</h2>
+          <h2 className="text-xs">功能選單</h2>
         </div>
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1 md:block md:space-y-0.5 md:overflow-visible md:pb-0">
         <div className="min-w-[220px] md:min-w-0">
           <div
-            className={`process-step rounded-lg border px-2 py-1.5 md:px-2 md:py-1.5 ${
+            className={`process-step rounded-lg border px-2 py-1 ${
               activeStep === "project" ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"
             } ${activeStep === "project" ? "border-[var(--orange-border)]" : "border-transparent"}`}
             data-active={activeStep === "project"}
           >
             <div className="flex min-w-0 items-center gap-1">
-              <button className="process-tab flex min-w-0 flex-1 items-center gap-2 rounded-md py-0.5 text-left" onClick={() => onSelectStep("project")} type="button">
-                <span className="process-status grid h-6 w-6 shrink-0 place-items-center rounded-full border border-orange bg-orange text-white" title="專案資料">
-                  <Link2 size={13} />
+              <button className="process-tab flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-0.5 text-left" onClick={() => onSelectStep("project")} type="button">
+                <span className="process-status grid h-5 w-5 shrink-0 place-items-center rounded-full border border-orange bg-orange text-white" title="專案資料">
+                  <Link2 size={11} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-xs leading-4 md:text-sm md:leading-5">專案資料</span>
+                  <span className="block truncate text-xs leading-4">專案資料</span>
                 </span>
               </button>
               <button
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-orange hover:bg-white/70"
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-orange hover:bg-white/70"
                 onClick={() => setPreviewOpen((open) => !open)}
                 title={previewOpen ? "收合影片預覽" : "展開影片預覽"}
                 type="button"
               >
-                <ChevronDown className={`transition-transform ${previewOpen ? "rotate-180" : ""}`} size={15} />
+                <ChevronDown className={`transition-transform ${previewOpen ? "rotate-180" : ""}`} size={13} />
               </button>
             </div>
           </div>
-          {previewOpen && <div className="mt-2 hidden md:block">{previewPanel}</div>}
+          {previewOpen && <div className="mt-1.5 hidden md:block">{previewPanel}</div>}
         </div>
         {steps.map((step, index) => {
           const stepNumber = index + 1;
@@ -1015,12 +1081,12 @@ function ProcessTimeline({
           return (
             <div className="contents" key={step.title}>
               {sectionLabel && (
-                <div className={`px-1.5 pt-1 text-[10px] uppercase tracking-wide text-[var(--gray-500)] md:px-2 md:pt-1 md:text-[11px] ${stepNumber !== 1 ? "md:mt-1 md:border-t md:border-[var(--border)]" : ""}`}>
+                <div className={`px-1.5 pt-1 text-[10px] uppercase tracking-wide text-[var(--gray-500)] md:px-2 md:pt-1 ${stepNumber !== 1 ? "md:mt-0.5 md:border-t md:border-[var(--border)]" : ""}`}>
                   {sectionLabel}
                 </div>
               )}
               <div
-                className={`process-step min-w-[170px] rounded-lg border px-2 py-1.5 md:min-w-0 md:px-2 md:py-1.5 ${
+                className={`process-step min-w-[160px] rounded-lg border px-2 py-1 md:min-w-0 ${
                   selected
                     ? "bg-orange-bg text-orange"
                     : "text-[var(--black)] hover:bg-[var(--warm-white)]"
@@ -1030,12 +1096,12 @@ function ProcessTimeline({
               >
                 <div className="flex items-start">
                   <button
-                    className="process-tab flex min-w-0 flex-1 items-center gap-2 rounded-md py-0.5 text-left"
+                    className="process-tab flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-0.5 text-left"
                     onClick={() => onSelectStep(stepNumber as ActivePanel)}
                     type="button"
                   >
                     <span
-                      className={`process-status grid h-6 w-6 shrink-0 place-items-center rounded-full border ${
+                      className={`process-status grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
                         isFailed
                           ? "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]"
                         : isDone
@@ -1046,10 +1112,10 @@ function ProcessTimeline({
                       }`}
                       title={stateLabel}
                     >
-                      {isActive ? <Loader2 size={13} className="animate-spin" /> : isFailed ? <X size={13} /> : isDone ? <Check size={13} /> : <Icon size={13} />}
+                      {isActive ? <Loader2 size={11} className="animate-spin" /> : isFailed ? <X size={11} /> : isDone ? <Check size={11} /> : <Icon size={11} />}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-xs leading-4 md:text-sm md:leading-5">{stepNumber}. {step.title}</span>
+                      <span className="block truncate text-xs leading-4">{stepNumber}. {step.title}</span>
                     </span>
                   </button>
                 </div>
@@ -1075,9 +1141,9 @@ function RequirementCard({ label, value, tone = "default" }: { label: string; va
   const toneClass = tone === "ok" ? "border-[var(--green-bg)] bg-[var(--green-bg)] text-[var(--green)]" : tone === "warn" ? "border-[#fff3e0] bg-[#fff8ec] text-[#9f4a00]" : "border-[var(--border)] bg-[var(--warm-white)] text-[var(--black)]";
 
   return (
-    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
-      <span className="block text-[11px] opacity-75">{label}</span>
-      <strong className="mt-0.5 block text-sm">{value}</strong>
+    <div className={`rounded-lg border px-2.5 py-1.5 ${toneClass}`}>
+      <span className="block text-[10px] opacity-75">{label}</span>
+      <strong className="mt-0.5 block text-xs">{value}</strong>
     </div>
   );
 }

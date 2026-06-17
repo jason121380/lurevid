@@ -92,6 +92,30 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [loadProjects]);
 
   useEffect(() => {
+    function applyOptimisticProject(event: Event) {
+      const detail = (event as CustomEvent<Partial<ProjectListItem> & { id?: string }>).detail;
+      if (!detail?.id) return;
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === detail.id
+            ? {
+                ...project,
+                ...detail,
+                steps: {
+                  ...(project.steps || {}),
+                  ...(detail.steps || {})
+                }
+              }
+            : project
+        )
+      );
+    }
+
+    window.addEventListener("lurevid:project-optimistic", applyOptimisticProject);
+    return () => window.removeEventListener("lurevid:project-optimistic", applyOptimisticProject);
+  }, []);
+
+  useEffect(() => {
     setSwitchingProjectId("");
   }, [pathname]);
 
