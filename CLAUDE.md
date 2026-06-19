@@ -2,7 +2,7 @@
 
 ## Project
 
-`lurevid` is a Next.js + TypeScript app for analyzing and adapting short-form videos from Instagram Reels, TikTok, and Douyin.
+`lurevid` is a Next.js + TypeScript app for analyzing and adapting short-form videos from TikTok.
 
 The expected user experience:
 
@@ -10,7 +10,7 @@ The expected user experience:
 2. App creates a project.
 3. Worker downloads the video, extracts visual frames, transcribes audio, and runs AI analysis.
 4. User reviews/edit analysis, structure, and adapted script.
-5. App generates 9 storyboard scenes, images, Seedance clips, and a final merged video.
+5. App generates 9 storyboard scenes and images, merges them into one 3x3 reference image, and sends it to Seedance once to produce the final video.
 
 ## Important Behavior
 
@@ -25,15 +25,15 @@ The worker should analyze:
 - Visual pacing and editing rhythm
 - Scene function in the short-video structure
 
-Manual transcript input is only a fallback when platform download or transcription fails.
+When the muxed download fails, the worker falls back to an audio-only yt-dlp download for transcription (`runFull` in `scripts/worker.ts`); if both fail, the project is marked failed with a friendly message.
 
 ## Platforms & Downloads
 
-- Supported source hosts: `instagram.com`, `tiktok.com`, `douyin.com`/`iesdouyin.com` (allowlist + `new URL` validation in `lib/transcribe.ts`).
+- Supported source host: `tiktok.com` (allowlist + `new URL` validation in `lib/transcribe.ts`). The allowlist is intentionally narrow; adding a platform means extending `ALLOWED_HOSTS` and `detectPlatform` together.
 - yt-dlp is installed in the Docker image from the **nightly** channel by default (`YTDLP_CHANNEL=nightly|stable|<tag>`); platforms change often and nightly tracks extractor fixes.
 - The worker self-updates yt-dlp to the latest nightly on startup (best-effort, non-fatal, in `scripts/worker.ts`). Disable with `YTDLP_AUTO_UPDATE=0` when the deploy network can't reach GitHub. This keeps extractors current between image rebuilds.
 - Download failures surface a friendly Traditional Chinese message via `describeDownloadError` (`lib/transcribe.ts`); raw yt-dlp stderr / video ids / URLs are never shown to users.
-- Datacenter IPs (e.g. Zeabur) are frequently rate-limited/blocked by Instagram (HTTP 429). That is IP blocking, not a code bug; the manual-transcript fallback or a proxy/cookies is the workaround.
+- Datacenter IPs (e.g. Zeabur) are frequently rate-limited/blocked by the source platform (HTTP 429). That is IP blocking, not a code bug; a proxy/cookies or a more reachable network is the workaround.
 
 ## Monitoring
 
@@ -83,7 +83,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 
 ## Key Files
 
-- `app/page.tsx`: URL entry and optional transcript fallback.
+- `app/page.tsx`: TikTok URL entry that creates a project.
 - `app/login/page.tsx`, `app/register/page.tsx`: auth pages.
 - `app/settings/page.tsx`: admin settings UI.
 - `app/api/settings/route.ts`: settings API (admin-only).

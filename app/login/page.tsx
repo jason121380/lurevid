@@ -59,6 +59,11 @@ function LoginForm() {
             <input
               className="rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
               type="email"
+              inputMode="email"
+              enterKeyHint="next"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && submit()}
@@ -70,6 +75,7 @@ function LoginForm() {
             <input
               className="rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
               type="password"
+              enterKeyHint="go"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && submit()}
