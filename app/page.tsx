@@ -73,6 +73,14 @@ export default function HomePage() {
               <input
                 className="min-w-0 border-0 bg-transparent px-3 py-3 text-base outline-none placeholder:text-[var(--gray-300)] md:px-1 md:py-1 md:text-sm"
                 placeholder="貼上 TikTok 影片連結"
+                aria-label="TikTok 影片連結"
+                type="url"
+                inputMode="url"
+                enterKeyHint="go"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={sourceUrl}
                 onChange={(event) => {
                   setSourceUrl(event.target.value);

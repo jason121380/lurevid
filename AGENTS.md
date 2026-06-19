@@ -5,7 +5,7 @@
 ## 專案速覽
 
 lurevid = Next.js App Router（Web）+ BullMQ（Worker），共用同一份程式碼與 Dockerfile。
-使用者貼上 IG Reels / TikTok / 抖音連結，系統下載影片、抽影格、轉錄、AI 分析 → 拆結構 → 改編 → 9 格分鏡圖 → Seedance 影片 → ffmpeg 合成。
+使用者貼上 TikTok 連結，系統下載影片、抽影格、轉錄、AI 分析 → 拆結構 → 改編 → 9 格分鏡圖 → 合併成單張 3x3 參考圖 → Seedance 生成影片。
 
 ## 兩個進程
 
@@ -34,7 +34,7 @@ npm run worker              # 終端機 2：Worker
 - Worker 韌性：Seedance 輪詢有逾時與 per-scene 容錯；重試是冪等的（保留已成功片段）。
 - 影片合成：用 `lib/ffmpeg.ts` 的 `ffmpegPath()`，合成是重新編碼（非 `-c copy`）。
 - 監控：`scripts/worker.ts` 每 15s 寫 Redis 心跳（`WORKER_HEARTBEAT_KEY`）；`/health`（admin）讀它判斷 worker 是否存活，並顯示 DB/Redis/佇列/金鑰狀態。
-- 平台下載：yt-dlp 在 Docker 用 nightly（`YTDLP_CHANNEL`）；來源 host allowlist 在 `lib/transcribe.ts`（IG/TikTok/抖音）。IG 429 是機房 IP 被擋，非程式問題。
+- 平台下載：yt-dlp 在 Docker 用 nightly（`YTDLP_CHANNEL`）；來源 host allowlist 在 `lib/transcribe.ts`（目前只開放 TikTok）。429 是機房 IP 被平台擋，非程式問題。
 - 物件儲存：設定頁文案是 R2 導向，但 env 鍵名仍是 `S3_*`、`lib/storage.ts` 不變。沒設好物件儲存時，跨服務本機磁碟不共用會導致分鏡圖破圖。
 
 ## 驗證

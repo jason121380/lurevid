@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-lurevid is a public multi-user short-video analysis and adaptation app. Users register/login, paste an Instagram Reels, TikTok, or Douyin URL, and the system analyzes not only transcript text, but also video frames, captions/on-screen text, shot composition, editing rhythm, and visual storytelling.
+lurevid is a public multi-user short-video analysis and adaptation app. Users register/login, paste a TikTok URL, and the system analyzes not only transcript text, but also video frames, captions/on-screen text, shot composition, editing rhythm, and visual storytelling.
 
 ## Runtime Setup
 
@@ -50,7 +50,7 @@ Secret fields are not returned in full by `/api/settings`; the API returns confi
 - Prompt model: `gpt-5.4-mini`
 - Image generation model: `gpt-image-2`
 - File transcription model: `gpt-4o-transcribe`
-- Seedance model: `dreamina-seedance-2-0-fast-260128`
+- Seedance model: `dreamina-seedance-2-0-260128` (the legacy `...-fast-...` value is remapped to this in `lib/seedance.ts`)
 
 Note: `whisper-1` yields segment-timestamped transcripts; `gpt-4o-transcribe` (default) yields plain-text transcripts. `gpt-realtime-whisper` is a realtime model that 404s on the file endpoint, so `lib/transcribe.ts` maps it to `gpt-4o-transcribe`.
 
@@ -84,7 +84,7 @@ Supported providers include Cloudflare R2 (recommended; the `/settings` labels a
 - `/health` is an admin-only dashboard: PostgreSQL, Redis, worker liveness, queue depth, and OpenAI/Seedance/R2 config. Checks are timeout-bounded so the endpoint never hangs.
 - Worker liveness is detected via a Redis heartbeat (`WORKER_HEARTBEAT_KEY`, EX 60, written every 15s in `scripts/worker.ts`).
 - `/api/health/clean-failed` (admin) clears accumulated failed/completed job records; jobs are enqueued with `removeOnComplete` + `removeOnFail: 50` to cap accumulation.
-- Platform downloads: yt-dlp comes from the **nightly** channel in Docker (`YTDLP_CHANNEL`); Instagram 429 from datacenter IPs is IP blocking (not a bug).
+- Platform downloads: yt-dlp comes from the **nightly** channel in Docker (`YTDLP_CHANNEL`); a 429 from datacenter IPs is platform IP blocking (not a bug).
 
 ## Local Tools
 

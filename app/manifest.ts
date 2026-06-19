@@ -2,12 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "lurevid",
     short_name: "lurevid",
     description: "貼上 TikTok 連結，自動分析、改編、分鏡並生成影片。",
     start_url: "/",
     scope: "/",
     display: "standalone",
+    display_override: ["standalone", "minimal-ui"],
     orientation: "portrait",
     background_color: "#fafafa",
     theme_color: "#ff6b2c",

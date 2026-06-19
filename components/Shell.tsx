@@ -172,7 +172,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <div className="text-[11px] uppercase tracking-wide text-[var(--gray-500)]">專案</div>
               <span className="text-[11px] text-[var(--gray-300)]">{projects.length}</span>
             </div>
-            <div className="max-h-[calc(100vh-146px)] space-y-0.5 overflow-y-auto pr-1">
+            <div className="max-h-[calc(100dvh-146px)] space-y-0.5 overflow-y-auto pr-1">
               {projects.length === 0 && <div className="rounded-lg bg-[var(--warm-white)] px-3 py-2 text-xs leading-5 text-[var(--gray-500)]">開始分析後，專案會自動存到這裡。</div>}
               {projects.map((project) => {
                 const active = activeProjectId === project.id;
