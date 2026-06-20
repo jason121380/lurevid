@@ -884,7 +884,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   return (
     <div className="min-h-screen bg-[var(--warm-white)]">
       <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[300px_minmax(0,1fr)] md:gap-3 md:p-4">
-        <aside className="w-[60%] space-y-3 md:sticky md:top-4 md:h-fit md:w-auto">
+        <aside className="w-full space-y-3 md:sticky md:top-4 md:h-fit md:w-auto">
           <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} previewPanel={previewPanel} />
         </aside>
 
