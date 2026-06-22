@@ -3,6 +3,7 @@
 import { Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
+import { TopAppBar } from "@/components/ui/TopAppBar";
 
 type CheckStatus = "ok" | "warn" | "error";
 type Check = { key: string; label: string; status: CheckStatus; detail: string };
@@ -83,24 +84,29 @@ export default function HealthPage() {
   }, [load]);
 
   return (
-    <div className="min-h-screen bg-[var(--warm-white)]">
-      <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:h-[60px] md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
-        <h1 className="text-base">系統健康檢查</h1>
-        <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
-          <button className="btn btn-ghost" disabled={cleaning || loading} onClick={cleanFailed} type="button">
-            {cleaning ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-            清除失敗紀錄
-          </button>
-          <button className="btn btn-primary" disabled={loading} onClick={() => load(true)} type="button">
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+    <div className="min-h-dvh bg-[var(--warm-white)]">
+      <TopAppBar
+        title="系統健康檢查"
+        align="left"
+        right={
+          <button className="btn btn-primary h-9 px-4 text-[13px]" disabled={loading} onClick={() => load(true)} type="button">
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
             重新檢查
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="mx-auto max-w-4xl space-y-4 p-4 lg:p-6">
-        {error && <div className="rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}
-        {checkedAt && <p className="text-xs text-[var(--gray-500)]">最後檢查：{new Date(checkedAt).toLocaleString("zh-TW")}（每 15 秒自動更新）</p>}
+      <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:p-6">
+        {error && <div className="rounded-md border border-[var(--red)]/30 bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {checkedAt ? (
+            <p className="text-xs text-[var(--gray-500)]">最後檢查：{new Date(checkedAt).toLocaleString("zh-TW")}（每 15 秒自動更新）</p>
+          ) : <span />}
+          <button className="btn btn-soft h-8 px-3 text-[12px]" disabled={cleaning || loading} onClick={cleanFailed} type="button">
+            {cleaning ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            清除失敗紀錄
+          </button>
+        </div>
 
         {loading && checks.length === 0 && metrics.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--gray-500)]">檢查中…</div>
