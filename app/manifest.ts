@@ -39,15 +39,15 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: "新增專案",
         short_name: "新增",
-        description: "建立新的 TikTok 分析專案",
+        description: "建立新的影片分析專案",
         url: "/",
         icons: [{ src: "/app-icon.png", sizes: "512x512", type: "image/png" }]
       },
       {
-        name: "健康檢查",
-        short_name: "健康",
-        description: "查看系統與資源狀態",
-        url: "/health",
+        name: "我的專案",
+        short_name: "專案",
+        description: "查看所有分析專案",
+        url: "/projects",
         icons: [{ src: "/app-icon.png", sizes: "512x512", type: "image/png" }]
       }
     ]

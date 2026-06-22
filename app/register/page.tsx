@@ -58,26 +58,27 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="grid min-h-dvh place-items-start bg-[var(--warm-white)] p-4 pt-[clamp(48px,10dvh,96px)] sm:place-items-center sm:pt-4">
+    <div className="grid min-h-dvh place-items-start bg-[var(--warm-white)] p-5 pt-[clamp(56px,12dvh,120px)] sm:place-items-center sm:pt-5">
       <section className="w-full max-w-sm">
-        <div className="mb-6 text-center">
+        <div className="mb-7 text-center">
           <Image className="mx-auto h-7 w-auto" src="/logo.svg" alt="lurevid" width={132} height={28} priority />
-          <h1 className="mt-4 text-lg text-[var(--black)]">註冊 lurevid</h1>
+          <h1 className="mt-5 text-xl font-semibold tracking-tight text-[var(--black)]">註冊 lurevid</h1>
+          <p className="mt-1.5 text-[13px] text-[var(--gray-500)]">建立帳號，開始分析你的第一支影片</p>
         </div>
-        <div className="card space-y-3 p-5">
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--gray-500)]">名稱（選填）</span>
+        <div className="surface space-y-3.5 p-5 shadow-md">
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[13px] text-[var(--gray-500)]">名稱（選填）</span>
             <input
-              className="rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
+              className="field"
               value={name}
               onChange={(event) => setName(event.target.value)}
               autoComplete="name"
             />
           </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--gray-500)]">Email</span>
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[13px] text-[var(--gray-500)]">Email</span>
             <input
-              className="rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
+              className="field"
               type="email"
               inputMode="email"
               enterKeyHint="next"
@@ -89,10 +90,10 @@ export default function RegisterPage() {
               autoComplete="email"
             />
           </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-[var(--gray-500)]">密碼（至少 8 字元）</span>
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[13px] text-[var(--gray-500)]">密碼（至少 8 字元）</span>
             <input
-              className="rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
+              className="field"
               type="password"
               enterKeyHint="go"
               value={password}
@@ -101,14 +102,14 @@ export default function RegisterPage() {
               autoComplete="new-password"
             />
           </label>
-          {error && <p className="rounded-lg bg-[var(--red-bg)] px-3 py-2 text-xs text-[var(--red)]">{error}</p>}
-          <button className="btn btn-primary w-full justify-center" disabled={loading} onClick={submit} type="button">
+          {error && <p className="rounded-md bg-[var(--red-bg)] px-3 py-2 text-[12px] text-[var(--red)]">{error}</p>}
+          <button className="btn btn-primary w-full" disabled={loading} onClick={submit} type="button">
             {loading ? <Loader2 size={16} className="animate-spin" /> : null}
             {loading ? "註冊中" : "註冊"}
           </button>
-          <p className="text-center text-xs text-[var(--gray-500)]">
+          <p className="text-center text-[13px] text-[var(--gray-500)]">
             已經有帳號？{" "}
-            <Link className="text-orange underline" href="/login">
+            <Link className="font-medium text-orange" href="/login">
               登入
             </Link>
           </p>

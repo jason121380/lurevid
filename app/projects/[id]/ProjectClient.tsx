@@ -1,18 +1,19 @@
 "use client";
 
-import { Check, ChevronDown, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, Pencil, Play, RotateCcw, Save, Sparkles, Trash2, Video, X } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronLeft, Clapperboard, Download, FileText, Film, ImageIcon, Layers3, Link2, Loader2, MoreVertical, Pencil, Play, RotateCcw, Save, Sparkles, Trash2, Video, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
+import { Stepper, type StepperItem } from "@/components/ui/Stepper";
+import { Modal } from "@/components/ui/Modal";
 import {
   activeStepError,
   buildProcessSteps,
-  hasNineStoryboardImages,
   stepActionLabel,
   stepBlockedReason,
   stepCanRun,
   type Project,
-  type Scene,
-  type StepState
+  type Scene
 } from "@/lib/project-state";
 
 const BUSY = ["QUEUED", "ANALYZING", "STRUCTURING", "ADAPTING", "STORYBOARDING", "GENERATING", "MERGING"];
@@ -154,11 +155,13 @@ function sourceEmbedUrl(url?: string) {
 
 export function ProjectClient({ projectId, initialProject }: { projectId: string; initialProject?: Project }) {
   const toast = useToast();
+  const router = useRouter();
   const [project, setProject] = useState<Project | null>(initialProject || null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [projectTitle, setProjectTitle] = useState(initialProject?.title || "");
   const [analysis, setAnalysis] = useState(initialProject?.analysis || "");
@@ -487,44 +490,25 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       尚未取得 MP4
     </button>
   );
-  const namePanel = (
-    <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
-      <p className="mb-2 text-[11px] uppercase text-orange">專案命名</p>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          className="min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
-          value={projectTitle}
-          onChange={(event) => setProjectTitle(event.target.value)}
-          onBlur={saveProjectTitle}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") saveProjectTitle();
-          }}
-          placeholder="命名專案名稱"
-        />
-        <button className="btn btn-primary" disabled={submitting || !projectTitle.trim() || projectTitle.trim() === project.title} onClick={saveProjectTitle} type="button">
-          儲存
-        </button>
-      </div>
-    </div>
-  );
   const projectDataPanel = (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2.5">
         <MetricCard label="流程進度" value={`${doneSteps}/8`} />
         <MetricCard label="影格" value={`${project.sourceFrameUrls?.length || 0} 張`} />
         <MetricCard label="分鏡" value={`${seedanceScenes.length}/9`} />
       </div>
-      {namePanel}
-      <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
+      <div className="surface p-4 text-sm">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-[11px] uppercase text-orange">來源 · {project.sourcePlatform || "影片"}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-orange">來源 · {project.sourcePlatform || "影片"}</p>
           {projectStatusBadge}
         </div>
-        {project.sourceUrl && (
-          <a className="flex items-start gap-2 break-all rounded-lg border border-[var(--border)] bg-[var(--warm-white)] p-3 text-xs leading-5 text-orange underline" href={project.sourceUrl} target="_blank" rel="noreferrer">
+        {project.sourceUrl ? (
+          <a className="flex items-start gap-2 break-all rounded-md border border-[var(--border)] bg-[var(--warm-white)] p-3 text-xs leading-5 text-orange" href={project.sourceUrl} target="_blank" rel="noreferrer">
             <Link2 className="mt-0.5 shrink-0" size={14} />
             {project.sourceUrl}
           </a>
+        ) : (
+          <p className="text-xs text-[var(--gray-500)]">此專案為上傳影片來源。</p>
         )}
       </div>
     </div>
@@ -717,7 +701,13 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     </div>
   );
   const selectedPanel = (() => {
-    if (activeStep === "project") return projectDataPanel;
+    if (activeStep === "project")
+      return (
+        <div className="space-y-3">
+          {projectDataPanel}
+          <div className="mx-auto w-full max-w-[240px]">{previewPanel}</div>
+        </div>
+      );
     if (activeStep === 1) return downloadPanel;
     if (activeStep === 2) return transcriptPanel;
     if (activeStep === 3) return framePanel;
@@ -742,99 +732,169 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   })();
   const currentStepError = typeof activeStep === "number" ? activeStepError(project, activeStep) : "";
 
-  return (
-    <div className="min-h-screen bg-[var(--warm-white)]">
-      <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-[300px_minmax(0,1fr)] md:gap-3 md:p-4">
-        <aside className="w-full space-y-3 md:sticky md:top-4 md:h-fit md:w-auto">
-          <ProcessTimeline project={project} activeStep={activeStep} onSelectStep={setActiveStep} previewPanel={previewPanel} />
-        </aside>
+  const stepperItems: StepperItem[] = [
+    { key: "project", label: "專案", icon: Link2, state: "project" },
+    ...processSteps.map((step, index) => ({
+      key: index + 1,
+      label: step.title,
+      number: index + 1,
+      icon: STEP_META[index + 1].icon,
+      state: step.state
+    }))
+  ];
 
-        <section className="min-w-0 space-y-2.5">
-          <div className="rounded-xl border border-[var(--border)] bg-white p-3 shadow-[0_10px_30px_rgb(26_26_26/0.03)]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <h1 className="text-base tracking-normal text-[var(--black)] md:text-lg">{currentPanelTitle}</h1>
-                <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--gray-500)]">{currentPanelDescription}</p>
-              </div>
-              {activeStep === "project" ? (
-                <button
-                  className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--border)] bg-white px-4 text-sm text-[var(--gray-400)] transition hover:border-[var(--border-strong)] hover:bg-[var(--warm-white)] hover:text-[var(--gray-500)] disabled:opacity-60 lg:w-auto"
-                  disabled={deletingProject}
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  type="button"
-                >
-                  {deletingProject ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                  刪除專案
-                </button>
-              ) : activeStep === 8 && videoControls ? (
-                <div className="w-full shrink-0 lg:w-auto">{videoControls}</div>
-              ) : typeof activeStep === "number" && (
-                <button
-                  className="btn btn-primary h-10 w-full shrink-0 lg:w-auto"
-                  disabled={!currentCanRun}
-                  onClick={() => runStep(activeStep)}
-                  title={currentBlockedReason || stepActionLabel(project, activeStep)}
-                  type="button"
-                >
-                  {currentStep?.state === "active" ? <Loader2 size={15} className="animate-spin" /> : currentStep?.state === "done" || currentStep?.state === "failed" ? <RotateCcw size={15} /> : <Play size={15} fill="currentColor" />}
-                  {stepActionLabel(project, activeStep)}
-                </button>
+  const runButton =
+    typeof activeStep === "number" ? (
+      <button
+        className="btn btn-primary w-full"
+        disabled={!currentCanRun}
+        onClick={() => runStep(activeStep)}
+        title={currentBlockedReason || stepActionLabel(project, activeStep)}
+        type="button"
+      >
+        {currentStep?.state === "active" ? <Loader2 size={16} className="animate-spin" /> : currentStep?.state === "done" || currentStep?.state === "failed" ? <RotateCcw size={16} /> : <Play size={15} fill="currentColor" />}
+        {stepActionLabel(project, activeStep)}
+      </button>
+    ) : null;
+
+  const bottomBar = (() => {
+    if (activeStep === "project") return null;
+    if (activeStep === 8 && videoControls) return videoControls;
+    return (
+      <div className="space-y-1.5">
+        {currentBlockedReason && <p className="text-center text-[12px] text-[var(--gray-400)]">{currentBlockedReason}</p>}
+        {runButton}
+      </div>
+    );
+  })();
+
+  return (
+    <div className="min-h-dvh bg-[var(--warm-white)]">
+      {/* 頂部：返回 + 可編輯標題 + 狀態 + 更多選單，並接著步驟列 */}
+      <div className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-md pt-safe-top">
+        <div className="mx-auto max-w-content px-2">
+          <div className="flex h-appbar items-center gap-1">
+            <button
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--gray-600)] transition hover:bg-[var(--surface-muted)]"
+              onClick={() => router.push("/projects")}
+              title="返回專案列表"
+              type="button"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <input
+              className="min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 text-[15px] font-semibold text-[var(--black)] outline-none transition focus:bg-[var(--surface-muted)]"
+              value={projectTitle}
+              onChange={(event) => setProjectTitle(event.target.value)}
+              onBlur={saveProjectTitle}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+              }}
+              placeholder="命名專案"
+              aria-label="專案名稱"
+            />
+            {projectStatusBadge}
+            <div className="relative shrink-0">
+              <button
+                className="grid h-9 w-9 place-items-center rounded-full text-[var(--gray-600)] transition hover:bg-[var(--surface-muted)]"
+                onClick={() => setMenuOpen((open) => !open)}
+                title="更多"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+              >
+                <MoreVertical size={18} />
+              </button>
+              {menuOpen && (
+                <>
+                  <button className="fixed inset-0 z-40 cursor-default" aria-label="關閉選單" onClick={() => setMenuOpen(false)} type="button" />
+                  <div className="absolute right-0 z-50 mt-1 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-float" role="menu">
+                    {project.sourceUrl && (
+                      <a
+                        className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--gray-600)] hover:bg-[var(--surface-muted)]"
+                        href={project.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setMenuOpen(false)}
+                        role="menuitem"
+                      >
+                        <Link2 size={15} /> 開啟來源連結
+                      </a>
+                    )}
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--red)] hover:bg-[var(--red-bg)]"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setDeleteConfirmOpen(true);
+                      }}
+                      type="button"
+                      role="menuitem"
+                    >
+                      <Trash2 size={15} /> 刪除專案
+                    </button>
+                  </div>
+                </>
               )}
             </div>
-
-            {currentMeta && (
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <RequirementCard label="依賴" value={currentMeta.dependency} />
-                <RequirementCard label="產出" value={currentMeta.output} />
-                <RequirementCard label={currentBlockedReason ? "尚不能執行" : "狀態"} value={currentBlockedReason || (currentStep?.state === "done" ? "可重跑" : currentStep?.state === "active" ? "執行中" : "可執行")} tone={currentBlockedReason ? "warn" : currentStep?.state === "done" ? "ok" : "default"} />
-              </div>
-            )}
           </div>
-          {currentStepError && (
-            <div className="mb-3 rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm leading-6 text-[var(--red)]">
-              {currentStepError}
+          <Stepper items={stepperItems} activeKey={activeStep} onSelect={(key) => setActiveStep(key as ActivePanel)} />
+        </div>
+      </div>
+
+      {/* 內容 */}
+      <main className="mx-auto max-w-content px-3 pb-[calc(var(--safe-bottom)+124px)] pt-3">
+        <div className="mb-3">
+          <h2 className="text-lg font-semibold tracking-tight text-[var(--black)]">{currentPanelTitle}</h2>
+          {currentPanelDescription && <p className="mt-1 text-[13px] leading-5 text-[var(--gray-500)]">{currentPanelDescription}</p>}
+          {currentMeta && (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <RequirementCard label="依賴" value={currentMeta.dependency} />
+              <RequirementCard label="產出" value={currentMeta.output} />
+              <RequirementCard
+                label={currentBlockedReason ? "尚不能執行" : "狀態"}
+                value={currentBlockedReason || (currentStep?.state === "done" ? "可重跑" : currentStep?.state === "active" ? "執行中" : "可執行")}
+                tone={currentBlockedReason ? "warn" : currentStep?.state === "done" ? "ok" : "default"}
+              />
             </div>
           )}
-          {selectedPanel}
-        </section>
-      </div>
+        </div>
+        {currentStepError && (
+          <div className="mb-3 rounded-md border border-[var(--red)]/30 bg-[var(--red-bg)] p-3 text-sm leading-6 text-[var(--red)]">
+            {currentStepError}
+          </div>
+        )}
+        {selectedPanel}
+      </main>
+
+      {/* 底部主動作列（蓋在內容上方、尊重安全區） */}
+      {bottomBar && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md pb-safe-bottom">
+          <div className="mx-auto max-w-content px-3 py-3">{bottomBar}</div>
+        </div>
+      )}
+
       {taskToastProject && !taskToastDismissed && (
         <ProjectProgressToast project={taskToastProject} running={BUSY.includes(taskToastProject.status)} onClose={() => setTaskToastDismissed(true)} />
       )}
-      {deleteConfirmOpen && (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/20 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[0_22px_70px_rgb(26_26_26/0.18)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base text-[var(--black)]">刪除專案</h2>
-                <p className="mt-2 text-sm leading-6 text-[var(--gray-500)]">確定要刪除「{project.title || "未命名專案"}」嗎？這個動作無法復原。</p>
-              </div>
-              <button className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--gray-400)] hover:bg-[var(--warm-white)] hover:text-[var(--gray-500)]" onClick={() => setDeleteConfirmOpen(false)} type="button">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                className="h-10 rounded-full border border-[var(--border)] bg-white px-4 text-sm text-[var(--gray-500)] hover:border-[var(--border-strong)] hover:bg-[var(--warm-white)] hover:text-[var(--gray-500)]"
-                disabled={deletingProject}
-                onClick={() => setDeleteConfirmOpen(false)}
-                type="button"
-              >
-                取消
-              </button>
-              <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--warm-white)] px-4 text-sm text-[var(--gray-500)] hover:border-[var(--border-strong)] hover:bg-[var(--warm-white)] hover:text-[var(--gray-500)] disabled:opacity-60"
-                disabled={deletingProject}
-                onClick={deleteProject}
-                type="button"
-              >
-                {deletingProject ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                確認刪除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
+      <Modal
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        title="刪除專案"
+        footer={
+          <>
+            <button className="btn btn-soft" disabled={deletingProject} onClick={() => setDeleteConfirmOpen(false)} type="button">
+              取消
+            </button>
+            <button className="btn btn-primary !bg-[var(--red)] !shadow-none" disabled={deletingProject} onClick={deleteProject} type="button">
+              {deletingProject ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              確認刪除
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm leading-6 text-[var(--gray-500)]">確定要刪除「{project.title || "未命名專案"}」嗎？這個動作無法復原。</p>
+      </Modal>
     </div>
   );
 }
@@ -847,7 +907,7 @@ function ProjectProgressToast({ project, running, onClose }: { project: Project;
   const message = project.message || activeStep?.description || "正在處理專案";
 
   return (
-    <div className="fixed bottom-5 right-5 z-[90] w-[min(360px,calc(100vw-32px))] rounded-2xl border border-[var(--border)] bg-white p-4 shadow-[0_18px_60px_rgb(26_26_26/0.16)]">
+    <div className="fixed inset-x-4 bottom-[calc(var(--safe-bottom)+92px)] z-[90] mx-auto w-auto max-w-[360px] rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-float sm:inset-x-auto sm:right-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -867,202 +927,6 @@ function ProjectProgressToast({ project, running, onClose }: { project: Project;
             <X size={15} />
           </button>
         )}
-      </div>
-    </div>
-  );
-}
-
-function ProcessTimeline({
-  project,
-  activeStep,
-  onSelectStep,
-  previewPanel
-}: {
-  project: Project;
-  activeStep: ActivePanel;
-  onSelectStep: (step: ActivePanel) => void;
-  previewPanel: ReactNode;
-}) {
-  const steps = buildProcessSteps(project);
-  const [previewOpen, setPreviewOpen] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  type MenuItem = { key: ActivePanel; label: string; Icon: typeof Link2; state?: StepState };
-  const menuItems: MenuItem[] = [
-    { key: "project", label: "專案資料", Icon: Link2 },
-    ...steps.map((step, index) => ({
-      key: (index + 1) as ActivePanel,
-      label: `${index + 1}. ${step.title}`,
-      Icon: STEP_META[(index + 1) as keyof typeof STEP_META].icon,
-      state: step.state
-    }))
-  ];
-  const activeItem = menuItems.find((item) => item.key === activeStep) ?? menuItems[0];
-
-  const renderStatus = (item: MenuItem) => {
-    if (item.key === "project") {
-      return (
-        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-orange bg-orange text-white">
-          <Link2 size={11} />
-        </span>
-      );
-    }
-    const isDone = item.state === "done";
-    const isActive = item.state === "active";
-    const isFailed = item.state === "failed";
-    const Icon = item.Icon;
-    return (
-      <span
-        className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
-          isFailed
-            ? "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]"
-            : isDone
-              ? "border-orange bg-orange text-white"
-              : isActive
-                ? "border-orange bg-orange-bg text-orange"
-                : "border-[var(--gray-200)] bg-white text-[var(--gray-300)]"
-        }`}
-      >
-        {isActive ? <Loader2 size={11} className="animate-spin" /> : isFailed ? <X size={11} /> : isDone ? <Check size={11} /> : <Icon size={11} />}
-      </span>
-    );
-  };
-
-  return (
-    <div className="process-card rounded-xl border border-[var(--border)] bg-white p-1.5">
-      <div className="mb-1 flex items-center justify-between gap-3 px-1">
-        <div>
-          <h2 className="text-xs">功能選單</h2>
-        </div>
-      </div>
-      {/* 手機版：下拉選單 */}
-      <div className="relative md:hidden">
-        <button
-          className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--border-strong)] bg-white px-2.5 py-2 text-left"
-          onClick={() => setMenuOpen((open) => !open)}
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={menuOpen}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {renderStatus(activeItem)}
-            <span className="truncate text-sm text-[var(--black)]">{activeItem.label}</span>
-          </span>
-          <ChevronDown className={`shrink-0 text-[var(--gray-400)] transition-transform ${menuOpen ? "rotate-180" : ""}`} size={16} />
-        </button>
-        {menuOpen && (
-          <>
-            <button className="fixed inset-0 z-30 cursor-default" aria-label="關閉選單" onClick={() => setMenuOpen(false)} type="button" />
-            <div className="absolute inset-x-0 z-40 mt-1 max-h-[60vh] space-y-0.5 overflow-y-auto rounded-xl border border-[var(--border)] bg-white p-1 shadow-[0_18px_48px_rgb(26_26_26/0.12)]" role="listbox">
-              {menuItems.map((item) => {
-                const selected = item.key === activeStep;
-                return (
-                  <button
-                    key={String(item.key)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left ${selected ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"}`}
-                    onClick={() => {
-                      onSelectStep(item.key);
-                      setMenuOpen(false);
-                    }}
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                  >
-                    {renderStatus(item)}
-                    <span className="truncate text-sm">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-      {/* 桌機版：側邊步驟列表 */}
-      <div className="hidden md:block md:space-y-0.5">
-        <div className="min-w-[220px] md:min-w-0">
-          <div
-            className={`process-step rounded-lg border px-2 py-1 ${
-              activeStep === "project" ? "bg-orange-bg text-orange" : "text-[var(--black)] hover:bg-[var(--warm-white)]"
-            } ${activeStep === "project" ? "border-[var(--orange-border)]" : "border-transparent"}`}
-            data-active={activeStep === "project"}
-          >
-            <div className="flex min-w-0 items-center gap-1">
-              <button className="process-tab flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-0.5 text-left" onClick={() => onSelectStep("project")} type="button">
-                <span className="process-status grid h-5 w-5 shrink-0 place-items-center rounded-full border border-orange bg-orange text-white" title="專案資料">
-                  <Link2 size={11} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-xs leading-4">專案資料</span>
-                </span>
-              </button>
-              <button
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-orange hover:bg-white/70"
-                onClick={() => setPreviewOpen((open) => !open)}
-                title={previewOpen ? "收合影片預覽" : "展開影片預覽"}
-                type="button"
-              >
-                <ChevronDown className={`transition-transform ${previewOpen ? "rotate-180" : ""}`} size={13} />
-              </button>
-            </div>
-          </div>
-          {previewOpen && <div className="mt-1.5 hidden md:block">{previewPanel}</div>}
-        </div>
-        {steps.map((step, index) => {
-          const stepNumber = index + 1;
-          const isDone = step.state === "done";
-          const isActive = step.state === "active";
-          const isFailed = step.state === "failed";
-          const sectionLabel = stepNumber === 1 ? "影片處理" : stepNumber === 4 ? "影片分析" : stepNumber === 5 ? "影片生成" : null;
-          const selected = activeStep === stepNumber;
-          const stateLabel = isFailed ? "失敗" : isActive ? "進行中" : isDone ? "完成" : "待處理";
-          const meta = STEP_META[stepNumber];
-          const Icon = meta.icon;
-
-          return (
-            <div className="contents" key={step.title}>
-              {sectionLabel && (
-                <div className={`px-1.5 pt-1 text-[10px] uppercase tracking-wide text-[var(--gray-500)] md:px-2 md:pt-1 ${stepNumber !== 1 ? "md:mt-0.5 md:border-t md:border-[var(--border)]" : ""}`}>
-                  {sectionLabel}
-                </div>
-              )}
-              <div
-                className={`process-step min-w-[160px] rounded-lg border px-2 py-1 md:min-w-0 ${
-                  selected
-                    ? "bg-orange-bg text-orange"
-                    : "text-[var(--black)] hover:bg-[var(--warm-white)]"
-                } ${selected ? "border-[var(--orange-border)]" : "border-transparent"}`}
-                data-active={selected}
-                data-running={isActive}
-              >
-                <div className="flex items-start">
-                  <button
-                    className="process-tab flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-0.5 text-left"
-                    onClick={() => onSelectStep(stepNumber as ActivePanel)}
-                    type="button"
-                  >
-                    <span
-                      className={`process-status grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
-                        isFailed
-                          ? "border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)]"
-                        : isDone
-                            ? "border-orange bg-orange text-white"
-                            : isActive
-                              ? "border-orange bg-orange-bg text-orange"
-                              : "border-[var(--gray-200)] bg-white text-[var(--gray-300)]"
-                      }`}
-                      title={stateLabel}
-                    >
-                      {isActive ? <Loader2 size={11} className="animate-spin" /> : isFailed ? <X size={11} /> : isDone ? <Check size={11} /> : <Icon size={11} />}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs leading-4">{stepNumber}. {step.title}</span>
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );

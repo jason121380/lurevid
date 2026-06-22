@@ -4,6 +4,7 @@ import { ChevronDown, Eye, EyeOff, Save } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
+import { TopAppBar } from "@/components/ui/TopAppBar";
 
 type SettingField = {
   key: string;
@@ -178,16 +179,19 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--warm-white)]">
-        <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:h-[60px] md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
-          <h1 className="text-base">設定</h1>
-          <button className="btn btn-primary w-full md:w-auto" disabled={saving || loading} onClick={save}>
-            <Save size={16} />
-            {saving ? "儲存中" : "儲存"}
-          </button>
-        </div>
+    <div className="min-h-dvh bg-[var(--warm-white)]">
+        <TopAppBar
+          title="設定"
+          align="left"
+          right={
+            <button className="btn btn-primary h-9 px-4 text-[13px]" disabled={saving || loading} onClick={save}>
+              <Save size={15} />
+              {saving ? "儲存中" : "儲存"}
+            </button>
+          }
+        />
 
-        <div className="mx-auto max-w-5xl space-y-4 p-4 lg:p-6">
+        <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:p-6">
           <section className="card p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -238,7 +242,7 @@ export default function SettingsPage() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <input
-                                    className="min-w-0 flex-1 rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 text-sm outline-none focus:border-orange"
+                                    className="field min-w-0 flex-1"
                                     placeholder={field.secret && field.configured ? field.maskedValue : field.placeholder || field.defaultValue || field.key}
                                     type={inputType}
                                     value={values[key] || ""}
@@ -246,7 +250,7 @@ export default function SettingsPage() {
                                   />
                                   {field.secret && (
                                     <button
-                                      className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--border-strong)] bg-white text-[var(--gray-500)]"
+                                      className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-md border border-[var(--border-strong)] bg-white text-[var(--gray-500)] hover:text-orange"
                                       onClick={(event) => {
                                         event.preventDefault();
                                         setRevealed((current) => ({ ...current, [key]: !current[key] }));

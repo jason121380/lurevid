@@ -1,8 +1,9 @@
 "use client";
 
-import { Calculator, Loader2, RefreshCcw } from "lucide-react";
+import { Loader2, RefreshCcw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
+import { TopAppBar } from "@/components/ui/TopAppBar";
 
 type UsageData = {
   generatedAt: string;
@@ -126,19 +127,19 @@ export default function UsagePage() {
   }, [load]);
 
   return (
-    <div className="min-h-screen bg-[var(--warm-white)]">
-      <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-white px-4 py-3 md:h-[60px] md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
-        <div className="flex items-center gap-2">
-          <Calculator size={18} className="text-orange" />
-          <h1 className="text-base">用量與預估花費</h1>
-        </div>
-        <button className="btn btn-primary" disabled={loading} onClick={() => load(true)} type="button">
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
-          重新計算
-        </button>
-      </div>
+    <div className="min-h-dvh bg-[var(--warm-white)]">
+      <TopAppBar
+        title="用量與預估花費"
+        align="left"
+        right={
+          <button className="btn btn-primary h-9 px-4 text-[13px]" disabled={loading} onClick={() => load(true)} type="button">
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCcw size={15} />}
+            重新計算
+          </button>
+        }
+      />
 
-      <div className="mx-auto max-w-5xl space-y-4 p-4 lg:p-6">
+      <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:p-6">
         {error && <div className="rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}
         {loading && !data ? (
           <div className="card p-4 text-sm text-[var(--gray-500)]">計算中…</div>
