@@ -2,11 +2,11 @@
 
 ## Project
 
-`lurevid` is a Next.js + TypeScript app for analyzing and adapting short-form videos from TikTok.
+`lurevid` is a Next.js + TypeScript app for analyzing and adapting short-form videos from TikTok and Instagram Reels (or a directly uploaded video file).
 
 The expected user experience:
 
-1. User pastes a video URL.
+1. User pastes a TikTok / Instagram Reels URL, or uploads a video file.
 2. App creates a project.
 3. Worker downloads the video, extracts visual frames, transcribes audio, and runs AI analysis.
 4. User reviews/edit analysis, structure, and adapted script.
@@ -29,7 +29,8 @@ When the muxed download fails, the worker falls back to an audio-only yt-dlp dow
 
 ## Platforms & Downloads
 
-- Supported source host: `tiktok.com` (allowlist + `new URL` validation in `lib/transcribe.ts`). The allowlist is intentionally narrow; adding a platform means extending `ALLOWED_HOSTS` and `detectPlatform` together.
+- Supported source hosts: `tiktok.com` and `instagram.com` (allowlist + `new URL` validation in `lib/transcribe.ts`). Instagram is further restricted to `/reel(s)/` paths. The allowlist is intentionally narrow; adding a platform means extending `ALLOWED_HOSTS` and `detectPlatform` together (and the mirror check in `app/page.tsx`).
+- Users can also upload a video file directly (`app/api/projects/upload/route.ts`, accepts MP4 / MOV / WebM up to `DEFAULT_MAX_DOWNLOAD_BYTES`). Uploads skip yt-dlp; the worker analyzes the file in place and an upload is only available for the first analysis (re-analysis needs a re-upload).
 - yt-dlp is installed in the Docker image from the **nightly** channel by default (`YTDLP_CHANNEL=nightly|stable|<tag>`); platforms change often and nightly tracks extractor fixes.
 - The worker self-updates yt-dlp to the latest nightly on startup (best-effort, non-fatal, in `scripts/worker.ts`). Disable with `YTDLP_AUTO_UPDATE=0` when the deploy network can't reach GitHub. This keeps extractors current between image rebuilds.
 - Download failures surface a friendly Traditional Chinese message via `describeDownloadError` (`lib/transcribe.ts`); raw yt-dlp stderr / video ids / URLs are never shown to users.
@@ -83,7 +84,8 @@ Transcription model behavior (`lib/transcribe.ts`):
 
 ## Key Files
 
-- `app/page.tsx`: TikTok URL entry that creates a project.
+- `app/page.tsx`: TikTok / IG Reels URL entry + video upload that creates a project.
+- `app/api/projects/route.ts`, `app/api/projects/upload/route.ts`: create-project (URL) and upload-video endpoints.
 - `app/login/page.tsx`, `app/register/page.tsx`: auth pages.
 - `app/settings/page.tsx`: admin settings UI.
 - `app/api/settings/route.ts`: settings API (admin-only).

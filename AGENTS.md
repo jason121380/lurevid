@@ -5,12 +5,12 @@
 ## 專案速覽
 
 lurevid = Next.js App Router（Web）+ BullMQ（Worker），共用同一份程式碼與 Dockerfile。
-使用者貼上 TikTok 連結，系統下載影片、抽影格、轉錄、AI 分析 → 拆結構 → 改編 → 9 格分鏡圖 → 合併成單張 3x3 參考圖 → Seedance 生成影片。
+使用者貼上 TikTok／Instagram Reels 連結（或上傳影片檔），系統下載影片、抽影格、轉錄、AI 分析 → 拆結構 → 改編 → 9 格分鏡圖 → 合併成單張 3x3 參考圖 → Seedance 生成影片。
 
 ## 兩個進程
 
 - **Web**：`npm run dev`（或 `npm run start`）。提供 UI 與 API，把任務丟進 Redis queue。
-- **Worker**：`npm run worker`。處理 `analyze / structure / adapt / storyboard / video` 五種 job（見 `scripts/worker.ts`）。
+- **Worker**：`npm run worker`。處理 `full / source / transcribe / frames / analyze / structure / adapt / storyboard / mergeStoryboard / video` 等 job（見 `scripts/worker.ts`）。建立專案／上傳影片會送 `full`。
 
 兩者都會從 `AppSetting`（DB）讀 OpenAI / Seedance / S3 設定，env 為後備。本機要同時開 Web 與 Worker 才能跑完整流程。
 
@@ -34,7 +34,7 @@ npm run worker              # 終端機 2：Worker
 - Worker 韌性：Seedance 輪詢有逾時與 per-scene 容錯；重試是冪等的（保留已成功片段）。
 - 影片合成：用 `lib/ffmpeg.ts` 的 `ffmpegPath()`，合成是重新編碼（非 `-c copy`）。
 - 監控：`scripts/worker.ts` 每 15s 寫 Redis 心跳（`WORKER_HEARTBEAT_KEY`）；`/health`（admin）讀它判斷 worker 是否存活，並顯示 DB/Redis/佇列/金鑰狀態。
-- 平台下載：yt-dlp 在 Docker 用 nightly（`YTDLP_CHANNEL`）；來源 host allowlist 在 `lib/transcribe.ts`（目前只開放 TikTok）。429 是機房 IP 被平台擋，非程式問題。
+- 平台下載：yt-dlp 在 Docker 用 nightly（`YTDLP_CHANNEL`）；來源 host allowlist 在 `lib/transcribe.ts`（目前開放 TikTok 與 Instagram Reels，IG 僅限 `/reel(s)/`），改平台要連同 `app/page.tsx` 的對應檢查一起改。另支援直接上傳影片檔（`app/api/projects/upload/route.ts`）。429 是機房 IP 被平台擋，非程式問題。
 - 物件儲存：設定頁文案是 R2 導向，但 env 鍵名仍是 `S3_*`、`lib/storage.ts` 不變。沒設好物件儲存時，跨服務本機磁碟不共用會導致分鏡圖破圖。
 
 ## 驗證

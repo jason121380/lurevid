@@ -52,20 +52,37 @@ function jsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
-function combinedSeedancePrompt(scenes: Array<{ sceneNumber: number; title: string; visualGoal: string; seedancePrompt: string }>) {
+/** 把秒數格式化成最精簡的標記：整數不帶小數，否則保留一位小數。 */
+function formatSeconds(value: number) {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function combinedSeedancePrompt(
+  scenes: Array<{ sceneNumber: number; title: string; visualGoal: string; seedancePrompt: string }>,
+  duration: number
+) {
+  const total = duration > 0 ? duration : scenes.length;
   const sequence = scenes
-    .map(
-      (scene) =>
-        `${scene.sceneNumber}. ${scene.title}\nVisual goal: ${scene.visualGoal}\nMotion prompt: ${scene.seedancePrompt}`
-    )
+    .map((scene, index) => {
+      const start = (index * total) / scenes.length;
+      const end = ((index + 1) * total) / scenes.length;
+      return (
+        `${scene.sceneNumber}. ${scene.title}\n` +
+        `Visual goal: ${scene.visualGoal}\n` +
+        `Motion prompt: ${scene.seedancePrompt}\n` +
+        `${formatSeconds(start)}-${formatSeconds(end)}秒`
+      );
+    })
     .join("\n\n");
 
   return [
-    "Create one continuous short-form vertical video by following the attached single reference image exactly as a 3x3 storyboard.",
+    `Create one continuous ${formatSeconds(total)}-second short-form vertical video by following the attached single reference image exactly as a 3x3 storyboard.`,
     "Read the storyboard panels in normal order: top-left to top-right, middle-left to middle-right, bottom-left to bottom-right. Treat them as scene 1 through scene 9.",
     "Preserve the main model's face, identity, hairstyle, hair length, wardrobe, body type, and overall appearance from the reference image. Do not replace the model, do not change facial features, and do not redesign the character.",
     "Use each storyboard panel as the visual anchor for its matching scene. Follow the composition, camera angle, pose, salon environment, hair details, lighting, and progression shown in that panel.",
     "Use the scene descriptions below as the motion/story guidance from step 6. The reference image is the source of visual truth; the text is only to clarify movement and sequence.",
+    "Each scene is marked with its time range (例如 0-2秒). Pace the motion so every scene plays within its marked seconds, in order, filling the full duration.",
     "Do not add subtitles, captions, logos, watermarks, UI, labels, frame numbers, or readable on-screen text.",
     "Make transitions smooth and cinematic while keeping the sequence faithful to the 9 panels.",
     "Step 6 storyboard sequence:",
@@ -464,7 +481,7 @@ async function generateVideo(projectId: string) {
   let task;
   try {
     task = await createSeedanceTask(
-      combinedSeedancePrompt(project.scenes),
+      combinedSeedancePrompt(project.scenes, project.duration),
       {
         ratio: project.ratio,
         resolution: project.resolution,

@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-lurevid is a public multi-user short-video analysis and adaptation app. Users register/login, paste a TikTok URL, and the system analyzes not only transcript text, but also video frames, captions/on-screen text, shot composition, editing rhythm, and visual storytelling.
+lurevid is a public multi-user short-video analysis and adaptation app. Users register/login, paste a TikTok or Instagram Reels URL (or upload a video file), and the system analyzes not only transcript text, but also video frames, captions/on-screen text, shot composition, editing rhythm, and visual storytelling.
 
 ## Runtime Setup
 
