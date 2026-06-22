@@ -8,7 +8,7 @@ import { openaiClient } from "@/lib/openai";
 import { ffmpegPath } from "@/lib/ffmpeg";
 import { getAppSettings } from "@/lib/settings";
 
-const ALLOWED_HOSTS = ["tiktok.com"];
+const ALLOWED_HOSTS = ["tiktok.com", "instagram.com"];
 
 function parseAllowedUrl(url: string): URL | null {
   let parsed: URL;
@@ -20,7 +20,9 @@ function parseAllowedUrl(url: string): URL | null {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
   const host = parsed.hostname.toLowerCase();
   const allowed = ALLOWED_HOSTS.some((base) => host === base || host.endsWith(`.${base}`));
-  return allowed ? parsed : null;
+  if (!allowed) return null;
+  if ((host === "instagram.com" || host.endsWith(".instagram.com")) && !/^\/reels?\//i.test(parsed.pathname)) return null;
+  return parsed;
 }
 
 export function detectPlatform(url: string) {
@@ -28,11 +30,12 @@ export function detectPlatform(url: string) {
   if (!parsed) return "Unknown";
   const host = parsed.hostname.toLowerCase();
   if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return "TikTok";
+  if (host === "instagram.com" || host.endsWith(".instagram.com")) return "Instagram";
   return "Unknown";
 }
 
 /**
- * 只接受 http(s) 的 TikTok 連結。
+ * 只接受 http(s) 的短影音來源連結。
  * 用 URL 解析（而非寬鬆 regex）以擋掉內網 SSRF 與 yt-dlp 參數注入（例如 `-` 開頭）。
  */
 export function isSupportedSourceUrl(url: string) {
@@ -90,7 +93,7 @@ function formatTimestampedTranscript(result: {
 export function describeDownloadError(error: unknown): Error {
   const text = (error instanceof Error ? error.message : String(error || "")).toLowerCase();
   if (/rehydration|unable to extract|extractor|unable to download webpage/.test(text)) {
-    return new Error("TikTok 暫時無法下載（可能是平台改版或此伺服器 IP 被限制）。請稍後再試，或改用手動輸入逐字稿。");
+    return new Error("來源平台暫時無法下載（可能是平台改版或此伺服器 IP 被限制）。請稍後再試，或改用手動輸入逐字稿。");
   }
   if (/429|too many requests|rate.?limit/.test(text)) {
     return new Error("來源平台暫時限流（429）。請稍後再試，或改用手動輸入逐字稿。");

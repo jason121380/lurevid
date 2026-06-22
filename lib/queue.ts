@@ -16,6 +16,10 @@ export type ProjectAction =
   | "mergeStoryboard"
   | "video";
 
+export type ProjectJobData = {
+  uploadedVideoPath?: string;
+};
+
 export function redisConnectionOptions() {
   return {
     connectTimeout: 5000,
@@ -40,12 +44,12 @@ export function createProjectQueue() {
   });
 }
 
-export async function enqueueProjectJob(projectId: string, action: ProjectAction, opts?: JobsOptions) {
+export async function enqueueProjectJob(projectId: string, action: ProjectAction, opts?: JobsOptions, data?: ProjectJobData) {
   const queue = createProjectQueue();
   try {
     await queue.add(
       `${action}-${projectId}`,
-      { projectId, action },
+      { projectId, action, ...(data ?? {}) },
       { removeOnComplete: true, removeOnFail: 50, attempts: 1, ...(opts ?? {}) }
     );
   } finally {

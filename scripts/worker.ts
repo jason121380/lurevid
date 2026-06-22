@@ -1,5 +1,7 @@
 import "dotenv/config";
-import { join } from "node:path";
+import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { extname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { Worker } from "bullmq";
 import type { Prisma } from "@prisma/client";
@@ -15,7 +17,7 @@ import {
   generateStoryboardWithTwoModels
 } from "@/lib/openai";
 import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
-import { SeedanceApiError, createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask, isSeedancePrivacyImageError } from "@/lib/seedance";
+import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask, toSeedanceTaskCreationError } from "@/lib/seedance";
 import { analyzeVideoFrames, extractVideoFrames, withDownloadedVideo } from "@/lib/visual";
 import { downloadVideo, storageRoot } from "@/lib/video";
 import { uploadFileObject, uploadObject } from "@/lib/storage";
@@ -71,18 +73,56 @@ function combinedSeedancePrompt(scenes: Array<{ sceneNumber: number; title: stri
   ].join("\n\n");
 }
 
-function promptOnlySeedancePrompt(scenes: Array<{ sceneNumber: number; title: string; visualGoal: string; seedancePrompt: string }>) {
-  return [
-    combinedSeedancePrompt(scenes),
-    "No reference image is attached because the provider rejected the visual reference for safety. Generate from the step 6 storyboard text only.",
-    "Keep one consistent fictional commercial model across all scenes. Preserve the same face, hairstyle, wardrobe category, and character identity from scene to scene."
-  ].join("\n\n");
-}
-
 async function uploadSourceVideo(projectId: string, videoPath: string, current?: string | null) {
   if (current && /^https?:\/\//i.test(current)) return;
   const sourceVideoUrl = await uploadFileObject(`projects/${projectId}/source.mp4`, videoPath, "video/mp4");
   await prisma.project.update({ where: { id: projectId }, data: { sourceVideoUrl, message: "來源影片已下載，可下載 MP4" } });
+}
+
+function localGeneratedPath(publicUrl: string) {
+  const prefix = `/${(process.env.LOCAL_PUBLIC_STORAGE_PREFIX || "generated").replace(/^\/+|\/+$/g, "")}/`;
+  if (!publicUrl.startsWith(prefix)) return "";
+  const root = resolve(process.env.LOCAL_PUBLIC_STORAGE_DIR || "public/generated");
+  const path = resolve(root, publicUrl.slice(prefix.length));
+  if (!path.startsWith(root)) return "";
+  return path;
+}
+
+async function frameUrlToOpenAiImage(url: string) {
+  if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
+  const localPath = localGeneratedPath(url);
+  if (!localPath) return "";
+  const bytes = await readFile(localPath);
+  const mime = /\.(png)$/i.test(localPath) ? "image/png" : "image/jpeg";
+  return `data:${mime};base64,${bytes.toString("base64")}`;
+}
+
+async function withProjectSourceVideo<T>(
+  project: { sourceUrl: string | null; sourceVideoUrl: string | null },
+  callback: (videoPath: string, dir: string, uploaded: boolean) => Promise<T>,
+  uploadedVideoPath?: string
+) {
+  if (project.sourceUrl) return withDownloadedVideo(project.sourceUrl, (videoPath, dir) => callback(videoPath, dir, false));
+  if (!uploadedVideoPath && !project.sourceVideoUrl) throw new Error("上傳影片只供首次分析使用；如需重新分析，請重新上傳影片");
+
+  const dir = await mkdtemp(join(tmpdir(), "lurevid-uploaded-video-"));
+  try {
+    const source = uploadedVideoPath || project.sourceVideoUrl || "";
+    const extension = extname(source.split("?")[0] || "") || ".mp4";
+    const videoPath = join(dir, `source${extension}`);
+    if (uploadedVideoPath) {
+      await cp(uploadedVideoPath, videoPath);
+    } else if (/^https?:\/\//i.test(source)) {
+      await downloadVideo(source, videoPath);
+    } else {
+      const localPath = localGeneratedPath(source);
+      if (!localPath) throw new Error("上傳影片路徑不可用");
+      await cp(localPath, videoPath);
+    }
+    return await callback(videoPath, dir, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 async function extractAndUploadFrames(projectId: string, videoPath: string, dir: string) {
@@ -105,9 +145,9 @@ async function computeAnalysis(projectId: string) {
   let visualAnalysis = project.visualAnalysis || "";
   const frameUrls = Array.isArray(project.sourceFrameUrls) ? (project.sourceFrameUrls as string[]) : [];
   if (!frameUrls.length) throw new Error("尚未取得影格，請先完成抽取影格");
-  const httpFrames = frameUrls.filter((url) => typeof url === "string" && /^https?:\/\//i.test(url));
-  if (!httpFrames.length) throw new Error("影格網址不可用，請重新抽取影格");
-  visualAnalysis = await analyzeVideoFrames(httpFrames, transcript, platform);
+  const visualFrames = (await Promise.all(frameUrls.filter((url): url is string => typeof url === "string").map(frameUrlToOpenAiImage))).filter(Boolean);
+  if (!visualFrames.length) throw new Error("影格網址不可用，請重新抽取影格");
+  visualAnalysis = await analyzeVideoFrames(visualFrames, transcript, platform);
   await prisma.project.update({ where: { id: projectId }, data: { visualAnalysis } });
   const analysis = await analyzeVideo(transcript, platform, visualAnalysis);
   await prisma.project.update({ where: { id: projectId }, data: { analysis } });
@@ -132,11 +172,10 @@ async function runStepJob(projectId: string, key: StepKey, runningMessage: strin
 }
 
 async function runSource(projectId: string) {
-  await runStepJob(projectId, "source", "正在下載來源影片", async () => {
+  await runStepJob(projectId, "source", "正在準備來源影片", async () => {
     const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-    if (!project.sourceUrl) throw new Error("缺少來源影片連結");
-    await withDownloadedVideo(project.sourceUrl, async (videoPath) => {
-      await uploadSourceVideo(projectId, videoPath, null);
+    await withProjectSourceVideo(project, async (videoPath, _dir, uploaded) => {
+      if (!uploaded) await uploadSourceVideo(projectId, videoPath, null);
     });
   });
 }
@@ -144,13 +183,13 @@ async function runSource(projectId: string) {
 async function runTranscribe(projectId: string) {
   await runStepJob(projectId, "transcribe", "正在轉錄音訊", async () => {
     const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-    if (!project.sourceUrl) throw new Error("缺少來源影片連結");
     let transcript = "";
     try {
-      await withDownloadedVideo(project.sourceUrl, async (videoPath) => {
+      await withProjectSourceVideo(project, async (videoPath) => {
         transcript = await transcribeMediaFile(videoPath);
       });
     } catch {
+      if (!project.sourceUrl) throw new Error("影片轉錄失敗，請確認上傳檔案可播放");
       transcript = await fetchTranscript(project.sourceUrl);
     }
     if (!transcript) throw new Error("轉錄結果為空");
@@ -161,9 +200,8 @@ async function runTranscribe(projectId: string) {
 async function runFrames(projectId: string) {
   await runStepJob(projectId, "frames", "正在抽取影片影格", async () => {
     const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-    if (!project.sourceUrl) throw new Error("缺少來源影片連結");
-    await withDownloadedVideo(project.sourceUrl, async (videoPath, dir) => {
-      await uploadSourceVideo(projectId, videoPath, project.sourceVideoUrl);
+    await withProjectSourceVideo(project, async (videoPath, dir, uploaded) => {
+      if (!uploaded) await uploadSourceVideo(projectId, videoPath, project.sourceVideoUrl);
       await extractAndUploadFrames(projectId, videoPath, dir);
     });
   });
@@ -176,18 +214,18 @@ async function runAnalyze(projectId: string) {
 }
 
 /** 第一次建立專案：下載一次，依序做 source → transcribe → frames → analyze，逐步更新各步驟狀態。 */
-async function runFull(projectId: string) {
+async function runFull(projectId: string, uploadedVideoPath?: string) {
   const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-  if (!project.sourceUrl) throw new Error("缺少來源影片連結");
-  await prisma.project.update({ where: { id: projectId }, data: { status: "ANALYZING", message: "正在下載來源影片", progress: 0.05, error: null } });
+  if (!project.sourceUrl && !project.sourceVideoUrl && !uploadedVideoPath) throw new Error("缺少來源影片");
+  await prisma.project.update({ where: { id: projectId }, data: { status: "ANALYZING", message: "正在準備來源影片", progress: 0.05, error: null } });
 
   let transcript = project.sourceTranscript?.trim() || "";
   let transcriptError = "";
 
   try {
-    await withDownloadedVideo(project.sourceUrl, async (videoPath, dir) => {
+    await withProjectSourceVideo(project, async (videoPath, dir, uploaded) => {
       await markStepRunning(projectId, "source", 0.5);
-      await uploadSourceVideo(projectId, videoPath, project.sourceVideoUrl);
+      if (!uploaded) await uploadSourceVideo(projectId, videoPath, project.sourceVideoUrl);
       await markStepDone(projectId, "source");
 
       if (!transcript) {
@@ -213,13 +251,14 @@ async function runFull(projectId: string) {
       } catch (error) {
         await markStepFailed(projectId, "frames", error instanceof Error ? error.message : "未知錯誤");
       }
-    });
+    }, uploadedVideoPath);
   } catch {
     /* 下載整體失敗，下面再用音訊備援嘗試逐字稿 */
   }
 
   if (!transcript) {
     try {
+      if (!project.sourceUrl) throw new Error("影片轉錄失敗，請確認上傳檔案可播放");
       await markStepRunning(projectId, "transcribe", 0.5);
       await prisma.project.update({ where: { id: projectId }, data: { message: "正在改用音訊下載取得逐字稿", progress: 0.12 } });
       transcript = await fetchTranscript(project.sourceUrl);
@@ -434,26 +473,7 @@ async function generateVideo(projectId: string) {
       project.storyboardImageUrl
     );
   } catch (error) {
-    if (isSeedancePrivacyImageError(error)) {
-      await prisma.project.update({
-        where: { id: projectId },
-        data: { message: "Seedance 擋下參考圖，正在改用純文字 prompt 建立影片任務", progress: 0.61 }
-      });
-      task = await createSeedanceTask(
-        promptOnlySeedancePrompt(project.scenes),
-        {
-          ratio: project.ratio,
-          resolution: project.resolution,
-          duration: project.duration
-        },
-        null
-      );
-    } else
-    if (error instanceof SeedanceApiError && error.status === 404) {
-      throw new Error("Seedance 建立任務失敗 (404)：請檢查 ARK_API_KEY 權限/區域與 SEEDANCE_MODEL 是否正確");
-    } else {
-      throw error;
-    }
+    throw toSeedanceTaskCreationError(error);
   }
   const taskId = task.id || task.task_id;
   if (!taskId) throw new Error("Seedance 沒有回傳 task id");
@@ -529,8 +549,9 @@ const worker = new Worker(
   async (job) => {
     const projectId = String(job.data.projectId);
     const action = String(job.data.action || "video");
+    const uploadedVideoPath = typeof job.data.uploadedVideoPath === "string" ? job.data.uploadedVideoPath : undefined;
     try {
-      if (action === "full") await runFull(projectId);
+      if (action === "full") await runFull(projectId, uploadedVideoPath);
       else if (action === "source") await runSource(projectId);
       else if (action === "transcribe") await runTranscribe(projectId);
       else if (action === "frames") await runFrames(projectId);
@@ -558,6 +579,8 @@ const worker = new Worker(
         }
       });
       throw error;
+    } finally {
+      if (uploadedVideoPath) await rm(resolve(uploadedVideoPath, ".."), { recursive: true, force: true });
     }
   },
   {

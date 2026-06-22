@@ -13,7 +13,7 @@ function toCreateProjectError(error: unknown) {
   if (error instanceof z.ZodError) {
     const first = error.issues[0];
     return {
-      message: first?.path[0] === "title" ? first.message : "請貼上有效的 TikTok 連結",
+      message: first?.path[0] === "title" ? first.message : "請貼上有效的 TikTok 或 IG Reels 連結",
       status: 400
     };
   }
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   try {
     const body = createProjectSchema.parse(await request.json());
     if (!isSupportedSourceUrl(body.sourceUrl)) {
-      return NextResponse.json({ error: "目前只支援 TikTok 連結" }, { status: 400 });
+      return NextResponse.json({ error: "目前只支援 TikTok 或 IG Reels 連結" }, { status: 400 });
     }
     const sourceUrl = normalizeSourceUrl(body.sourceUrl);
 

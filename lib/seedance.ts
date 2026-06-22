@@ -45,6 +45,16 @@ export function isSeedancePrivacyImageError(error: unknown) {
   );
 }
 
+export function toSeedanceTaskCreationError(error: unknown) {
+  if (isSeedancePrivacyImageError(error)) {
+    return new Error("Seedance 拒絕參考圖，請調整或重新合併分鏡圖後再生成影片");
+  }
+  if (error instanceof SeedanceApiError && error.status === 404) {
+    return new Error("Seedance 建立任務失敗 (404)：請檢查 ARK_API_KEY 權限/區域與 SEEDANCE_MODEL 是否正確");
+  }
+  return error;
+}
+
 async function parseSeedanceResponse(response: Response) {
   const raw = await response.text().catch(() => "");
   if (!raw.trim()) return { data: {}, raw: "" };

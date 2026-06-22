@@ -13,8 +13,9 @@ describe("source URL validation", () => {
     expect(detectPlatform("https://127.0.0.1/reel/abc")).toBe("Unknown");
   });
 
-  it("rejects Instagram and Douyin links", () => {
-    expect(isSupportedSourceUrl("https://www.instagram.com/reel/abc/")).toBe(false);
+  it("accepts Instagram Reels and rejects Douyin links", () => {
+    expect(isSupportedSourceUrl("https://www.instagram.com/reel/abc/")).toBe(true);
+    expect(isSupportedSourceUrl("https://www.instagram.com/p/abc/")).toBe(false);
     expect(isSupportedSourceUrl("https://www.douyin.com/video/123")).toBe(false);
     expect(isSupportedSourceUrl("https://www.douyin.com/jingxuan?modal_id=7651578600051756778")).toBe(false);
   });

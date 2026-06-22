@@ -472,7 +472,12 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       </button>
     </div>
   ) : null;
-  const downloadButton = project.sourceVideoUrl ? (
+  const isUploadedSource = project.sourcePlatform === "上傳影片";
+  const downloadButton = isUploadedSource ? (
+    <button className="btn btn-ghost w-full cursor-default text-[var(--gray-400)] sm:w-auto" disabled type="button">
+      上傳影片僅供分析
+    </button>
+  ) : project.sourceVideoUrl ? (
     <a className="btn btn-primary w-full sm:w-auto" href={project.sourceVideoUrl} download target="_blank" rel="noreferrer">
       <Download size={16} />
       下載 MP4
@@ -537,7 +542,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       </div>
       <div className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4">
         {downloadButton}
-        {!project.sourceVideoUrl && (project.analysis || project.sourceTranscript) && (
+        {!isUploadedSource && !project.sourceVideoUrl && (project.analysis || project.sourceTranscript) && (
           <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">影片下載失敗，但已用可取得的音訊/內容完成後續分析。若需要 MP4，請重跑「影片下載」或換一支公開影片。</p>
         )}
       </div>
