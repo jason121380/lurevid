@@ -5,7 +5,7 @@ import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
   applicationName: "lurevid",
-  title: "lurevid | 短影音分析創作平台",
+  title: "lurevid",
   description: "貼上 TikTok 連結，自動分析、改編、分鏡並生成影片。",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
