@@ -1,7 +1,7 @@
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const STATIC_CACHE = `lurevid-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `lurevid-runtime-${CACHE_VERSION}`;
-const PRECACHE_ASSETS = ["/offline.html", "/favicon.png", "/app-icon.png", "/logo.svg"];
+const PRECACHE_ASSETS = ["/offline.html", "/favicon-v2.png", "/app-icon-v2.png", "/logo.svg"];
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {

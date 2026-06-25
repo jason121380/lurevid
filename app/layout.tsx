@@ -20,10 +20,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
-      { url: "/app-icon.png", sizes: "512x512", type: "image/png" }
+      { url: "/favicon-v2.png", sizes: "32x32", type: "image/png" },
+      { url: "/app-icon-v2.png", sizes: "512x512", type: "image/png" }
     ],
-    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }]
+    apple: [{ url: "/apple-icon-v2.png", sizes: "180x180", type: "image/png" }]
   }
 };
 
