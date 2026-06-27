@@ -17,19 +17,19 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "zh-Hant",
     icons: [
       {
-        src: "/favicon-v3.png",
+        src: "/favicon-v4.png",
         sizes: "32x32",
         type: "image/png",
         purpose: "any"
       },
       {
-        src: "/app-icon-v3.png",
+        src: "/app-icon-v4.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any"
       },
       {
-        src: "/app-icon-v3.png",
+        src: "/app-icon-v4.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable"
@@ -41,14 +41,14 @@ export default function manifest(): MetadataRoute.Manifest {
         short_name: "新增",
         description: "建立新的影片分析專案",
         url: "/",
-        icons: [{ src: "/app-icon-v3.png", sizes: "512x512", type: "image/png" }]
+        icons: [{ src: "/app-icon-v4.png", sizes: "512x512", type: "image/png" }]
       },
       {
         name: "我的專案",
         short_name: "專案",
         description: "查看所有分析專案",
         url: "/projects",
-        icons: [{ src: "/app-icon-v3.png", sizes: "512x512", type: "image/png" }]
+        icons: [{ src: "/app-icon-v4.png", sizes: "512x512", type: "image/png" }]
       }
     ]
   };
