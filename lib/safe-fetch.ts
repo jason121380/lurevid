@@ -95,7 +95,8 @@ export async function safeFetch(url: string, init?: SafeFetchOptions) {
       const response = await fetch(currentUrl, {
         ...init,
         redirect: "manual",
-        signal: init?.signal ?? controller.signal
+        // 呼叫端自帶 signal 時也要保留逾時，否則逾時保護會被無聲關閉。
+        signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal
       });
 
       if (response.status >= 300 && response.status < 400) {

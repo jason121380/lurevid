@@ -1,5 +1,9 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdir, rm } from "node:fs/promises";
 import { extname, join } from "node:path";
+import { Readable } from "node:stream";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
+import { pipeline } from "node:stream/promises";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { enqueueProjectJob } from "@/lib/queue";
@@ -31,7 +35,8 @@ export async function POST(request: Request) {
   const limited = await rateLimit(`upload:${user.id}`, 10, 3600);
   if (!limited.ok) return NextResponse.json({ error: "上傳太頻繁，請稍後再試" }, { status: 429 });
 
-  let uploadPath = "";
+  let uploadDir = "";
+  let projectId = "";
   try {
     const formData = await request.formData();
     const file = formData.get("file");
@@ -51,18 +56,31 @@ export async function POST(request: Request) {
       },
       include: { scenes: { orderBy: { sceneNumber: "asc" } } }
     });
+    projectId = project.id;
 
-    const uploadDir = join(storageRoot(), "uploads", project.id);
+    uploadDir = join(storageRoot(), "uploads", project.id);
     await mkdir(uploadDir, { recursive: true });
-    uploadPath = join(uploadDir, `source${extensionFor(file)}`);
-    await writeFile(uploadPath, Buffer.from(await file.arrayBuffer()));
+    const uploadPath = join(uploadDir, `source${extensionFor(file)}`);
+    // 串流寫檔：影片可達數百 MB，整包讀進記憶體會拖垮 web 服務。
+    await pipeline(
+      Readable.fromWeb(file.stream() as unknown as NodeReadableStream<Uint8Array>),
+      createWriteStream(uploadPath)
+    );
 
     await enqueueProjectJob(project.id, "full", undefined, { uploadedVideoPath: uploadPath });
 
     return NextResponse.json(project, { status: 202 });
-  } catch (error) {
-    if (uploadPath) await rm(uploadPath, { force: true });
-    const message = error instanceof Error ? error.message : "上傳影片失敗";
-    return NextResponse.json({ error: message || "上傳影片失敗" }, { status: 500 });
+  } catch {
+    if (uploadDir) await rm(uploadDir, { recursive: true, force: true });
+    // 專案已建立卻沒排到任務時要標成失敗，否則會永遠卡在「分析中」而沒有 worker 接手。
+    if (projectId) {
+      await prisma.project
+        .update({
+          where: { id: projectId },
+          data: { status: "FAILED", message: "任務失敗", error: "上傳影片失敗，請重新上傳影片再試一次。" }
+        })
+        .catch(() => undefined);
+    }
+    return NextResponse.json({ error: "上傳影片失敗，請稍後再試" }, { status: 500 });
   }
 }

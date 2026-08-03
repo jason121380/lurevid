@@ -38,7 +38,13 @@ export async function POST(request: Request) {
   const admin = await requireAdmin();
   if (isResponse(admin)) return admin;
 
-  const body = settingsSchema.parse(await request.json());
+  let body: z.infer<typeof settingsSchema>;
+  try {
+    body = settingsSchema.parse(await request.json());
+  } catch {
+    return NextResponse.json({ error: "設定資料格式錯誤" }, { status: 400 });
+  }
+
   const knownKeys = new Set<AppSettingKey>(APP_SETTING_FIELDS.map((field) => field.key));
   const secretKeys = new Set<AppSettingKey>(APP_SETTING_FIELDS.filter((field) => field.secret).map((field) => field.key));
   const values: Partial<Record<AppSettingKey, string>> = {};

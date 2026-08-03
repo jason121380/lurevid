@@ -98,7 +98,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `lib/openai.ts`: text, vision, storyboard, and image-generation OpenAI calls.
 - `lib/transcribe.ts`: audio transcription + source-URL allowlist.
 - `lib/visual.ts`: video download, frame extraction, visual analysis.
-- `lib/video.ts` / `lib/ffmpeg.ts`: clip download + ffmpeg merge / shared ffmpeg path.
+- `lib/video.ts` / `lib/ffmpeg.ts`: size-capped video download / shared ffmpeg path (frame extraction + yt-dlp).
 - `lib/safe-fetch.ts`: SSRF guard for fetching upstream URLs.
 - `lib/rate-limit.ts`: Redis-backed rate limiting.
 - `lib/queue.ts`: BullMQ queue, Redis connection, `WORKER_HEARTBEAT_KEY`, job-retention opts.

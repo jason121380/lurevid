@@ -238,12 +238,15 @@ async function runFull(projectId: string, uploadedVideoPath?: string) {
 
   let transcript = project.sourceTranscript?.trim() || "";
   let transcriptError = "";
+  let sourceDone = false;
+  let framesDone = false;
 
   try {
     await withProjectSourceVideo(project, async (videoPath, dir, uploaded) => {
       await markStepRunning(projectId, "source", 0.5);
       if (!uploaded) await uploadSourceVideo(projectId, videoPath, project.sourceVideoUrl);
       await markStepDone(projectId, "source");
+      sourceDone = true;
 
       if (!transcript) {
         try {
@@ -265,12 +268,17 @@ async function runFull(projectId: string, uploadedVideoPath?: string) {
         await prisma.project.update({ where: { id: projectId }, data: { message: "正在抽取影片影格", progress: 0.15 } });
         await extractAndUploadFrames(projectId, videoPath, dir);
         await markStepDone(projectId, "frames");
+        framesDone = true;
       } catch (error) {
         await markStepFailed(projectId, "frames", error instanceof Error ? error.message : "未知錯誤");
       }
     }, uploadedVideoPath);
-  } catch {
-    /* 下載整體失敗，下面再用音訊備援嘗試逐字稿 */
+  } catch (error) {
+    // 下載整體失敗：先把沒跑到的步驟標成失敗（否則 UI 會一直停在「等待中」），
+    // 下面再用音訊備援嘗試逐字稿。
+    const reason = error instanceof Error ? error.message : "未知錯誤";
+    if (!sourceDone) await markStepFailed(projectId, "source", reason);
+    if (!framesDone) await markStepFailed(projectId, "frames", reason);
   }
 
   if (!transcript) {
@@ -323,6 +331,7 @@ async function runAdapt(projectId: string) {
   if (!project) throw new Error(`找不到專案：${projectId}`);
   if (!project.analysis) throw new Error("尚未完成影片分析");
 
+  await markStepRunning(projectId, "adapt", 0.36);
   await prisma.project.update({
     where: { id: projectId },
     data: { status: "ADAPTING", message: "正在改編成新腳本", progress: 0.36 }
@@ -348,12 +357,14 @@ async function runAdapt(projectId: string) {
       progress: 0.4
     }
   });
+  await markStepDone(projectId, "adapt");
 }
 
 async function generateStoryboard(projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new Error(`找不到專案：${projectId}`);
 
+  await markStepRunning(projectId, "storyboard", 0.45);
   await prisma.project.update({
     where: { id: projectId },
     data: { status: "STORYBOARDING", message: "正在產生分鏡與 9 張分鏡圖", progress: 0.45, error: null, storyboardImageUrl: null, finalVideoUrl: null }
@@ -385,26 +396,35 @@ async function generateStoryboard(projectId: string) {
 
   let imagesDone = 0;
   await mapWithConcurrency(createdScenes, IMAGE_CONCURRENCY, async (scene) => {
-    const image = await generateStoryboardImage(scene.imagePrompt || scene.seedancePrompt, project.ratio);
+    try {
+      const image = await generateStoryboardImage(scene.imagePrompt || scene.seedancePrompt, project.ratio);
 
-    let buffer: Buffer;
-    if (image.b64_json) buffer = Buffer.from(image.b64_json, "base64");
-    else if (image.url) buffer = await fetchToBuffer(image.url);
-    else throw new Error(`第 ${scene.sceneNumber} 格沒有分鏡圖`);
+      let buffer: Buffer;
+      if (image.b64_json) buffer = Buffer.from(image.b64_json, "base64");
+      else if (image.url) buffer = await fetchToBuffer(image.url);
+      else throw new Error(`第 ${scene.sceneNumber} 格沒有分鏡圖`);
 
-    const imageUrl = await uploadObject(
-      `projects/${projectId}/${String(scene.sceneNumber).padStart(2, "0")}.png`,
-      buffer,
-      "image/png"
-    );
+      const imageUrl = await uploadObject(
+        `projects/${projectId}/${String(scene.sceneNumber).padStart(2, "0")}.png`,
+        buffer,
+        "image/png"
+      );
 
-    await prisma.scene.update({
-      where: { id: scene.id },
-      data: {
-        imageUrl,
-        status: "IMAGE_READY"
-      }
-    });
+      await prisma.scene.update({
+        where: { id: scene.id },
+        data: {
+          imageUrl,
+          status: "IMAGE_READY"
+        }
+      });
+    } catch (error) {
+      // 沒有這一步，失敗的那格會永遠停在 IMAGE_GENERATING，UI 會一直轉圈。
+      await prisma.scene.update({
+        where: { id: scene.id },
+        data: { status: "FAILED", error: error instanceof Error ? error.message : "分鏡圖產生失敗" }
+      });
+      throw error;
+    }
 
     imagesDone += 1;
     await prisma.project.update({
@@ -414,12 +434,14 @@ async function generateStoryboard(projectId: string) {
         message: `正在產生分鏡圖：${imagesDone}/${createdScenes.length}`
       }
     });
+    await markStepRunning(projectId, "storyboard", 0.45 + (imagesDone / createdScenes.length) * 0.5);
   });
 
   await prisma.project.update({
     where: { id: projectId },
     data: { status: "STORYBOARD_READY", message: "分鏡圖完成，可以合併成單張分鏡圖", progress: 0.5, storyboardImageUrl: null }
   });
+  await markStepDone(projectId, "storyboard");
 }
 
 async function mergeStoryboard(projectId: string) {
@@ -512,6 +534,10 @@ async function generateVideo(projectId: string) {
     try {
       latestTask = await getSeedanceTask(taskId);
     } catch {
+      // 查詢失敗要重試，但仍必須受總逾時保護，否則持續失敗會讓這個 job 永遠卡住。
+      if (Date.now() > pollDeadline) {
+        throw new Error("Seedance 生成逾時，請稍後重試「生成影片」");
+      }
       await sleep(SEEDANCE_POLL_INTERVAL_MS);
       continue;
     }
@@ -584,8 +610,10 @@ const worker = new Worker(
         console.warn(`skip stale job ${job.id}: project ${projectId} no longer exists`);
         return;
       }
-      if (["source", "transcribe", "frames", "analyze", "structure", "adapt", "storyboard", "mergeStoryboard", "video"].includes(action)) {
-        await markStepFailed(projectId, action as StepKey, error instanceof Error ? error.message : "未知錯誤");
+      // UI 把「拆解結構」併進「改編腳本」那一格，所以 structure 的失敗要標在 adapt 上才看得到。
+      const failedStep = action === "structure" ? "adapt" : action;
+      if (["source", "transcribe", "frames", "analyze", "adapt", "storyboard", "mergeStoryboard", "video"].includes(failedStep)) {
+        await markStepFailed(projectId, failedStep as StepKey, error instanceof Error ? error.message : "未知錯誤");
       }
       await prisma.project.update({
         where: { id: projectId },

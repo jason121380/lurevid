@@ -48,11 +48,13 @@ export function buildProcessSteps(project: Project): StepInfo[] {
   const storyboardDone = hasNineStoryboardImages(project);
   const mergeDone = Boolean(project.storyboardImageUrl);
 
+  // 也要認 worker 記錄的 done：上傳影片的專案不會有 sourceVideoUrl，
+  // 只看產物會讓「影片下載」永遠停在等待中。
   const sub = (key: string, done: boolean): StepState => {
     const s = steps[key]?.status;
     if (s === "running") return "active";
     if (s === "failed") return "failed";
-    if (done) return "done";
+    if (done || s === "done") return "done";
     return "waiting";
   };
   const subProgress = (key: string, state: StepState): number => {
@@ -147,7 +149,8 @@ function failedProjectStep(project: Project) {
   if (project.adaptedScript) return 6;
   if (project.analysis) return 5;
   if (project.sourceTranscript && project.sourceFrameUrls?.length) return 4;
-  if (project.sourceFrameUrls?.length) return 3;
-  if (project.sourceTranscript) return 2;
+  // 只缺其中一項時，失敗的是那個「還沒完成」的步驟，不是已經完成的那個。
+  if (project.sourceFrameUrls?.length) return 2;
+  if (project.sourceTranscript) return 3;
   return 1;
 }
