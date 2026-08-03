@@ -96,7 +96,7 @@ export default function HealthPage() {
         }
       />
 
-      <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:p-6">
+      <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:mx-0 lg:px-8 lg:py-6">
         {error && <div className="rounded-md border border-[var(--red)]/30 bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           {checkedAt ? (

@@ -32,6 +32,11 @@
   --appbar-h: 52px;
   --content-max: 720px;
   --content-max-wide: 980px;
+  /* 桌機：側邊導覽 + 工作區步驟列 + 可放得下多欄內容的主容器 */
+  --sidenav-w: 232px;
+  --steprail-w: 236px;
+  --appbar-h-lg: 64px;
+  --content-max-app: 1440px;
 
   /* Radius scale */
   --radius-sm: 10px;

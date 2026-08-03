@@ -19,7 +19,8 @@ export function BottomTabBar() {
     <nav
       aria-label="主要導覽"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-md pb-safe-bottom
-                 md:inset-x-auto md:bottom-6 md:left-1/2 md:w-auto md:-translate-x-1/2 md:rounded-full md:border md:pb-0 md:shadow-float"
+                 md:inset-x-auto md:bottom-6 md:left-1/2 md:w-auto md:-translate-x-1/2 md:rounded-full md:border md:pb-0 md:shadow-float
+                 lg:hidden"
     >
       <ul className="mx-auto flex h-tabbar max-w-content items-stretch justify-around md:h-auto md:gap-1 md:p-1.5">
         {TABS.map((tab) => {

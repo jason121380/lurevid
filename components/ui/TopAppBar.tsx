@@ -20,8 +20,9 @@ export function TopAppBar({ title, subtitle, back, right, align = "center" }: To
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-md pt-safe-top">
+      {/* 桌機有固定側欄，內容靠左對齊（而非置中）才會跟下方列表切齊。 */}
       <div
-        className="mx-auto flex h-appbar max-w-content-wide items-center gap-2 px-3"
+        className="mx-auto flex h-appbar max-w-content-wide items-center gap-2 px-3 lg:mx-0 lg:h-appbar-lg lg:max-w-none lg:px-8"
       >
         {showBack && (
           <button

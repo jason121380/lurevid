@@ -191,7 +191,7 @@ export default function SettingsPage() {
           }
         />
 
-        <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:p-6">
+        <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:mx-0 lg:px-8 lg:py-6">
           <section className="card p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>

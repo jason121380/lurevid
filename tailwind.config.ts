@@ -30,11 +30,15 @@ const config: Config = {
       },
       maxWidth: {
         content: "var(--content-max)",
-        "content-wide": "var(--content-max-wide)"
+        "content-wide": "var(--content-max-wide)",
+        app: "var(--content-max-app)"
       },
       spacing: {
         tabbar: "var(--tabbar-h)",
         appbar: "var(--appbar-h)",
+        "appbar-lg": "var(--appbar-h-lg)",
+        sidenav: "var(--sidenav-w)",
+        steprail: "var(--steprail-w)",
         "safe-bottom": "var(--safe-bottom)",
         "safe-top": "var(--safe-top)"
       }

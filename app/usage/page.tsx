@@ -139,7 +139,7 @@ export default function UsagePage() {
         }
       />
 
-      <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:p-6">
+      <div className="mx-auto max-w-content-wide space-y-4 p-4 lg:mx-0 lg:px-8 lg:py-6">
         {error && <div className="rounded-xl border border-[var(--red)] bg-[var(--red-bg)] p-3 text-sm text-[var(--red)]">{error}</div>}
         {loading && !data ? (
           <div className="card p-4 text-sm text-[var(--gray-500)]">計算中…</div>

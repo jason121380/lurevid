@@ -19,6 +19,10 @@ lurevid 的程式與介面風格規範。新程式碼請比照既有檔案的慣
 - 沿用既有的 Tailwind 設計 token（`var(--orange)`、`var(--warm-white)`、`.card`、`.btn` 等），不要硬寫色碼。
 - 狀態用色一致：正常=綠（`var(--green)`）、注意=橘（`orange`）、異常=紅（`var(--red)`）；完成的步驟徽章用實心橘。
 - 動作要有回饋：成功/失敗給 toast 或就地訊息，不要讓使用者「按了沒反應」。
+- 版面以 `lg`（1024px）為手機/桌機分界：
+  - `lg` 以下＝手機外觀：底部分頁列（`BottomTabBar`）、橫向膠囊步驟列、固定在底部的整寬主動作。
+  - `lg` 以上＝桌機外觀：固定左側導覽（`SideNav`）、專案工作區改用直向步驟側欄（`<Stepper orientation="vertical">`）、主動作移到標題右側、內容靠左對齊並放寬到 `max-w-app`。
+  - 桌機不要只是「把手機版拉寬」：格線要真的多欄（`lg:grid-cols-3`、`xl:grid-cols-4`），並避免整片空白。
 - 管理員專屬頁（`/settings`、`/health`）的入口在側欄只對 admin 顯示，且對應 API 用 `requireAdmin` 把關。
 
 ## 安全

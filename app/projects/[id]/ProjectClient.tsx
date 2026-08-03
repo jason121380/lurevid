@@ -513,25 +513,6 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       </div>
     </div>
   );
-  const downloadPanel = (
-    <div className="space-y-3">
-      <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] uppercase text-orange">影片下載</p>
-          <span className={`badge ${project.sourceVideoUrl ? "badge-active" : busy ? "badge-warn" : "badge-warn"}`}>
-            {project.sourceVideoUrl ? "已取得 MP4" : busy ? "處理中" : "尚未取得"}
-          </span>
-        </div>
-        {activeStepError(project, 1) && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{activeStepError(project, 1)}</p>}
-      </div>
-      <div className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4">
-        {downloadButton}
-        {!isUploadedSource && !project.sourceVideoUrl && (project.analysis || project.sourceTranscript) && (
-          <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">影片下載失敗，但已用可取得的音訊/內容完成後續分析。若需要 MP4，請重跑「影片下載」或換一支公開影片。</p>
-        )}
-      </div>
-    </div>
-  );
   const sourcePreview = sourceEmbedUrl(project.sourceUrl);
   const previewPanel = (
     <div className="w-full rounded-lg border border-[var(--border)] bg-white p-1.5">
@@ -558,8 +539,31 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       </div>
     </div>
   );
+  // 桌機把來源預覽擺在下載動作旁邊，避免整片空白。
+  const downloadPanel = (
+    <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-3">
+        <div className="rounded-xl border border-[var(--border)] bg-white p-3 text-sm md:p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] uppercase text-orange">影片下載</p>
+            <span className={`badge ${project.sourceVideoUrl ? "badge-active" : "badge-warn"}`}>
+              {project.sourceVideoUrl ? "已取得 MP4" : busy ? "處理中" : "尚未取得"}
+            </span>
+          </div>
+          {activeStepError(project, 1) && <p className="mt-3 rounded-lg bg-[var(--red-bg)] p-2 text-xs text-[var(--red)]">{activeStepError(project, 1)}</p>}
+        </div>
+        <div className="rounded-xl border border-[var(--border)] bg-white p-3 md:p-4">
+          {downloadButton}
+          {!isUploadedSource && !project.sourceVideoUrl && (project.analysis || project.sourceTranscript) && (
+            <p className="mt-2 text-xs leading-5 text-[var(--gray-500)]">影片下載失敗，但已用可取得的音訊/內容完成後續分析。若需要 MP4，請重跑「影片下載」或換一支公開影片。</p>
+          )}
+        </div>
+      </div>
+      <div className="hidden lg:block">{previewPanel}</div>
+    </div>
+  );
   const transcriptPanel = (
-    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
+    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4 lg:h-[calc(100dvh-260px)] lg:min-h-[480px]">
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <h2 className="text-sm">轉錄音訊</h2>
         <span className="text-[11px] text-[var(--gray-500)]">逐字稿</span>
@@ -580,7 +584,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <span className="text-[11px] text-[var(--gray-500)]">{project.sourceFrameUrls?.length || 0} 張</span>
       </div>
       {project.sourceFrameUrls?.length ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {project.sourceFrameUrls.map((url, index) => (
             <article className="overflow-hidden rounded-xl border border-[var(--border)] bg-white" key={`${url}-${index}`}>
               <div className="aspect-[9/16] bg-[var(--warm-white)]">
@@ -605,7 +609,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
         <h2 className="text-sm">產生分鏡</h2>
       </div>
       {project.scenes.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {project.scenes.map((scene) => (
             <article key={scene.id} className="card p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -703,9 +707,9 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
   const selectedPanel = (() => {
     if (activeStep === "project")
       return (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-6 lg:space-y-0">
           {projectDataPanel}
-          <div className="mx-auto w-full max-w-[240px]">{previewPanel}</div>
+          <div className="mx-auto w-full max-w-[240px] lg:mx-0 lg:max-w-none">{previewPanel}</div>
         </div>
       );
     if (activeStep === 1) return downloadPanel;
@@ -743,10 +747,10 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
     }))
   ];
 
-  const runButton =
+  const renderRunButton = (fullWidth: boolean) =>
     typeof activeStep === "number" ? (
       <button
-        className="btn btn-primary w-full"
+        className={`btn btn-primary ${fullWidth ? "w-full" : "shrink-0"}`}
         disabled={!currentCanRun}
         onClick={() => runStep(activeStep)}
         title={currentBlockedReason || stepActionLabel(project, activeStep)}
@@ -757,23 +761,28 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
       </button>
     ) : null;
 
-  const bottomBar = (() => {
+  // 手機：固定在底部的整寬動作列；桌機：跟著標題同一行的一般按鈕。
+  const renderActions = (fullWidth: boolean) => {
     if (activeStep === "project") return null;
     if (activeStep === 8 && videoControls) return videoControls;
     return (
-      <div className="space-y-1.5">
-        {currentBlockedReason && <p className="text-center text-[12px] text-[var(--gray-400)]">{currentBlockedReason}</p>}
-        {runButton}
+      <div className={fullWidth ? "space-y-1.5" : "flex items-center justify-end gap-3"}>
+        {currentBlockedReason && (
+          <p className={`text-[12px] text-[var(--gray-400)] ${fullWidth ? "text-center" : "text-right"}`}>{currentBlockedReason}</p>
+        )}
+        {renderRunButton(fullWidth)}
       </div>
     );
-  })();
+  };
+  const bottomBar = renderActions(true);
+  const desktopActions = renderActions(false);
 
   return (
     <div className="min-h-dvh bg-[var(--warm-white)]">
       {/* 頂部：返回 + 可編輯標題 + 狀態 + 更多選單，並接著步驟列 */}
       <div className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-md pt-safe-top">
-        <div className="mx-auto max-w-content px-2">
-          <div className="flex h-appbar items-center gap-1">
+        <div className="mx-auto max-w-content px-2 lg:max-w-app lg:px-6">
+          <div className="flex h-appbar items-center gap-1 lg:h-appbar-lg lg:gap-2">
             <button
               className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--gray-600)] transition hover:bg-[var(--surface-muted)]"
               onClick={() => router.push("/projects")}
@@ -783,7 +792,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               <ChevronLeft size={20} />
             </button>
             <input
-              className="min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 text-[15px] font-semibold text-[var(--black)] outline-none transition focus:bg-[var(--surface-muted)]"
+              className="min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 text-[15px] font-semibold text-[var(--black)] outline-none transition focus:bg-[var(--surface-muted)] lg:max-w-[520px] lg:text-[17px]"
               value={projectTitle}
               onChange={(event) => setProjectTitle(event.target.value)}
               onBlur={saveProjectTitle}
@@ -793,6 +802,8 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               placeholder="命名專案"
               aria-label="專案名稱"
             />
+            {/* 桌機把標題寬度收斂後，用這個伸縮空白把狀態與選單推到最右側 */}
+            <div className="hidden flex-1 lg:block" />
             {projectStatusBadge}
             <div className="relative shrink-0">
               <button
@@ -837,38 +848,62 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               )}
             </div>
           </div>
-          <Stepper items={stepperItems} activeKey={activeStep} onSelect={(key) => setActiveStep(key as ActivePanel)} />
+          {/* 手機用橫向膠囊列；桌機改用左側步驟欄 */}
+          <div className="lg:hidden">
+            <Stepper items={stepperItems} activeKey={activeStep} onSelect={(key) => setActiveStep(key as ActivePanel)} />
+          </div>
         </div>
       </div>
 
-      {/* 內容 */}
-      <main className="mx-auto max-w-content px-3 pb-[calc(var(--safe-bottom)+124px)] pt-3">
-        <div className="mb-3">
-          <h2 className="text-lg font-semibold tracking-tight text-[var(--black)]">{currentPanelTitle}</h2>
-          {currentPanelDescription && <p className="mt-1 text-[13px] leading-5 text-[var(--gray-500)]">{currentPanelDescription}</p>}
-          {currentMeta && (
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <RequirementCard label="依賴" value={currentMeta.dependency} />
-              <RequirementCard label="產出" value={currentMeta.output} />
-              <RequirementCard
-                label={currentBlockedReason ? "尚不能執行" : "狀態"}
-                value={currentBlockedReason || (currentStep?.state === "done" ? "可重跑" : currentStep?.state === "active" ? "執行中" : "可執行")}
-                tone={currentBlockedReason ? "warn" : currentStep?.state === "done" ? "ok" : "default"}
-              />
-            </div>
-          )}
-        </div>
-        {currentStepError && (
-          <div className="mb-3 rounded-md border border-[var(--red)]/30 bg-[var(--red-bg)] p-3 text-sm leading-6 text-[var(--red)]">
-            {currentStepError}
-          </div>
-        )}
-        {selectedPanel}
-      </main>
+      {/* 內容：桌機是「步驟側欄 + 寬工作區」，手機維持單欄 */}
+      <div className="mx-auto max-w-content lg:max-w-app lg:px-6">
+        <div className="lg:grid lg:grid-cols-[var(--steprail-w)_minmax(0,1fr)] lg:items-start lg:gap-8 lg:py-6">
+          <aside className="hidden lg:sticky lg:top-[calc(var(--appbar-h-lg)+24px)] lg:block">
+            <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--gray-400)]">
+              處理步驟 · {doneSteps}/8
+            </p>
+            <Stepper
+              orientation="vertical"
+              items={stepperItems}
+              activeKey={activeStep}
+              onSelect={(key) => setActiveStep(key as ActivePanel)}
+            />
+          </aside>
 
-      {/* 底部主動作列（蓋在內容上方、尊重安全區） */}
+          <main className="px-3 pb-[calc(var(--safe-bottom)+124px)] pt-3 lg:px-0 lg:pb-16 lg:pt-0">
+            <div className="mb-3 lg:mb-5">
+              <div className="lg:flex lg:items-start lg:justify-between lg:gap-6">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold tracking-tight text-[var(--black)] lg:text-2xl">{currentPanelTitle}</h2>
+                  {currentPanelDescription && <p className="mt-1 text-[13px] leading-5 text-[var(--gray-500)] lg:text-sm">{currentPanelDescription}</p>}
+                </div>
+                {desktopActions && <div className="hidden shrink-0 lg:block">{desktopActions}</div>}
+              </div>
+              {currentMeta && (
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 lg:mt-4 lg:max-w-3xl">
+                  <RequirementCard label="依賴" value={currentMeta.dependency} />
+                  <RequirementCard label="產出" value={currentMeta.output} />
+                  <RequirementCard
+                    label={currentBlockedReason ? "尚不能執行" : "狀態"}
+                    value={currentBlockedReason || (currentStep?.state === "done" ? "可重跑" : currentStep?.state === "active" ? "執行中" : "可執行")}
+                    tone={currentBlockedReason ? "warn" : currentStep?.state === "done" ? "ok" : "default"}
+                  />
+                </div>
+              )}
+            </div>
+            {currentStepError && (
+              <div className="mb-3 rounded-md border border-[var(--red)]/30 bg-[var(--red-bg)] p-3 text-sm leading-6 text-[var(--red)]">
+                {currentStepError}
+              </div>
+            )}
+            {selectedPanel}
+          </main>
+        </div>
+      </div>
+
+      {/* 底部主動作列：只在手機/平板出現（桌機的動作在標題右側） */}
       {bottomBar && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md pb-safe-bottom">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md pb-safe-bottom lg:hidden">
           <div className="mx-auto max-w-content px-3 py-3">{bottomBar}</div>
         </div>
       )}
@@ -1140,7 +1175,7 @@ function ResultCard({
   value: string;
 }) {
   return (
-    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
+    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4 lg:h-[calc(100dvh-260px)] lg:min-h-[480px]">
       <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
         <h2 className="text-sm">{title}</h2>
         <span className="text-[11px] text-[var(--gray-500)]">分析結果</span>
@@ -1189,7 +1224,7 @@ function StepCard({
   }
 
   return (
-    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4">
+    <div className="card flex min-h-[calc(100dvh-96px)] flex-col p-3 md:h-[calc(100dvh-48px)] md:min-h-0 md:p-4 lg:h-[calc(100dvh-260px)] lg:min-h-[480px]">
       <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
         <h2 className="text-sm">{title}</h2>
         {storyboardScript && (

@@ -15,7 +15,7 @@ export default function MePage() {
     <div className="min-h-dvh bg-[var(--warm-white)]">
       <TopAppBar title="我的" align="left" />
 
-      <div className="mx-auto max-w-content space-y-5 px-4 py-5">
+      <div className="mx-auto max-w-content space-y-5 px-4 py-5 lg:mx-0 lg:max-w-content-wide lg:px-8 lg:py-6">
         <div className="surface flex items-center gap-4 p-4">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-orange text-lg font-semibold text-white">{initial}</div>
           <div className="min-w-0">

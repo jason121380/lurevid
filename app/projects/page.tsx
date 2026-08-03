@@ -88,7 +88,7 @@ export default function ProjectsPage() {
         }
       />
 
-      <div className="mx-auto max-w-content px-4 py-4">
+      <div className="mx-auto max-w-content px-4 py-4 lg:mx-0 lg:max-w-content-wide lg:px-8 lg:py-6">
         {loading && projects.length === 0 ? (
           <div className="surface divide-y divide-[var(--border)] overflow-hidden">
             {Array.from({ length: 4 }, (_, i) => (

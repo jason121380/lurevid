@@ -13,6 +13,14 @@ export type StepperItem = {
   state: StepperState;
 };
 
+const STATE_LABEL: Record<StepperState, string> = {
+  project: "",
+  done: "完成",
+  active: "執行中",
+  failed: "失敗",
+  waiting: "等待中"
+};
+
 function Dot({ item }: { item: StepperItem }) {
   const { state, icon: Icon } = item;
   const cls =
@@ -34,22 +42,71 @@ function Dot({ item }: { item: StepperItem }) {
 export function Stepper({
   items,
   activeKey,
-  onSelect
+  onSelect,
+  orientation = "horizontal"
 }: {
   items: StepperItem[];
   activeKey: string | number;
   onSelect: (key: string | number) => void;
+  /** horizontal：手機的橫向膠囊列；vertical：桌機的步驟側欄。 */
+  orientation?: "horizontal" | "vertical";
 }) {
-  const railRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
+  const vertical = orientation === "vertical";
 
   useEffect(() => {
+    // 只有橫向膠囊列需要把目前步驟捲進畫面；直向側欄一次就看得完。
+    if (vertical) return;
     const node = activeRef.current;
     if (node) node.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }, [activeKey]);
+  }, [activeKey, vertical]);
+
+  if (vertical) {
+    return (
+      <nav aria-label="處理步驟" className="flex flex-col gap-1">
+        {items.map((item) => {
+          const active = item.key === activeKey;
+          return (
+            <button
+              key={String(item.key)}
+              onClick={() => onSelect(item.key)}
+              type="button"
+              aria-current={active ? "step" : undefined}
+              className={`flex w-full items-center gap-2.5 rounded-md border px-3 py-2.5 text-left transition ${
+                active
+                  ? "border-[var(--orange-border)] bg-orange-bg text-orange"
+                  : "border-transparent text-[var(--gray-600)] hover:bg-[var(--surface-muted)]"
+              }`}
+            >
+              <Dot item={item} />
+              <span className="min-w-0 flex-1 truncate text-[14px] leading-tight">
+                {item.number ? <span className="tabular-nums text-[var(--gray-400)]">{item.number}. </span> : null}
+                {item.label}
+              </span>
+              {item.state !== "project" && (
+                <span
+                  className={`shrink-0 text-[11px] ${
+                    item.state === "failed"
+                      ? "text-[var(--red)]"
+                      : item.state === "done"
+                        ? "text-[var(--green)]"
+                        : item.state === "active"
+                          ? "text-orange"
+                          : "text-[var(--gray-300)]"
+                  }`}
+                >
+                  {STATE_LABEL[item.state]}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    );
+  }
 
   return (
-    <div ref={railRef} className="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 py-2">
+    <div className="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 py-2">
       {items.map((item) => {
         const active = item.key === activeKey;
         return (
