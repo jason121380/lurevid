@@ -46,13 +46,29 @@ export function isSeedancePrivacyImageError(error: unknown) {
 }
 
 export function toSeedanceTaskCreationError(error: unknown) {
+  // 一律用 cause 帶著上游原文：使用者看到的是翻譯過的訊息，
+  // 但排查時仍然找得到 Seedance 到底說了什麼。
   if (isSeedancePrivacyImageError(error)) {
-    return new Error("Seedance 拒絕參考圖，請調整或重新合併分鏡圖後再生成影片");
+    return new Error(
+      "Seedance 內容審核判定參考圖含有真人，因此拒絕生成。請回到第 6 步重新產生分鏡（避免清晰正面人臉，例如改用背影、手部特寫或料理特寫），再重新合併分鏡後生成。",
+      { cause: error }
+    );
   }
   if (error instanceof SeedanceApiError && error.status === 404) {
-    return new Error("Seedance 建立任務失敗 (404)：請檢查 ARK_API_KEY 權限/區域與 SEEDANCE_MODEL 是否正確");
+    return new Error(
+      "Seedance 建立任務失敗 (404)：請檢查 ARK_API_KEY 權限/區域與 SEEDANCE_MODEL 是否正確",
+      { cause: error }
+    );
   }
   return error;
+}
+
+/** 取出上游原文（含被包在 cause 裡的），只給伺服器日誌用，不要顯示給使用者。 */
+export function seedanceUpstreamDetail(error: unknown): string {
+  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  if (cause instanceof SeedanceApiError) return `[${cause.status}] ${cause.message}`;
+  if (cause instanceof Error) return cause.message;
+  return String(cause ?? "");
 }
 
 async function parseSeedanceResponse(response: Response) {

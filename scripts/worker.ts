@@ -17,7 +17,7 @@ import {
   generateStoryboardWithTwoModels
 } from "@/lib/openai";
 import { detectPlatform, fetchTranscript } from "@/lib/transcribe";
-import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask, toSeedanceTaskCreationError } from "@/lib/seedance";
+import { createSeedanceTask, extractSeedanceVideoUrl, getSeedanceTask, seedanceUpstreamDetail, toSeedanceTaskCreationError } from "@/lib/seedance";
 import { analyzeVideoFrames, extractVideoFrames, withDownloadedVideo } from "@/lib/visual";
 import { downloadVideo, storageRoot } from "@/lib/video";
 import { uploadFileObject, uploadObject } from "@/lib/storage";
@@ -512,6 +512,8 @@ async function generateVideo(projectId: string) {
       project.storyboardImageUrl
     );
   } catch (error) {
+    // 使用者只會看到翻譯過的訊息，上游原文留在 worker 日誌供排查。
+    console.error(`[seedance] 建立任務失敗 project=${projectId}:`, seedanceUpstreamDetail(error));
     throw toSeedanceTaskCreationError(error);
   }
   const taskId = task.id || task.task_id;
