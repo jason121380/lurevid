@@ -45,6 +45,7 @@ model User {
   passwordHash String
   projects     Project[]
   resetTokens  PasswordResetToken[]
+  generations  Generation[]
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 }
@@ -52,13 +53,13 @@ model User {
 /// 忘記密碼用的一次性重設票證。只存 token 的 SHA-256 雜湊，
 /// 資料庫外洩時無法反推出可用的重設連結。
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -117,6 +118,39 @@ model Scene {
   updatedAt      DateTime    @updatedAt
 
   @@unique([projectId, sceneNumber])
+}
+
+enum GenerationKind {
+  IMAGE
+  VIDEO
+}
+
+enum GenerationStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// 「快速使用」的單次文生圖／文生影片。與 Project 的八步流程無關，
+/// 每張卡片就是一筆，因此要能跨重新整理存活。
+model Generation {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      GenerationKind
+  prompt    String           @db.Text
+  status    GenerationStatus @default(QUEUED)
+  ratio     String           @default("9:16")
+  duration  Int              @default(8)
+  model     String           @default("")
+  resultUrl String?
+  taskId    String?
+  error     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([userId, kind, createdAt])
 }
 
 model AppSetting {

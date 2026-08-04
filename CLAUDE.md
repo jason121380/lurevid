@@ -27,6 +27,15 @@ The worker should analyze:
 
 When the muxed download fails, the worker falls back to an audio-only yt-dlp download for transcription (`runFull` in `scripts/worker.ts`); if both fail, the project is marked failed with a friendly message.
 
+## Quick Studio
+
+- `/quick/image` and `/quick/video` are one-shot generations, separate from the eight-step project flow. Each card is a `Generation` row so results survive a reload.
+- They run on their own BullMQ queue (`QUICK_QUEUE_NAME`, `QUICK_CONCURRENCY`, default 3) with its own worker in `scripts/worker.ts`; project-job failure handling does not apply to them.
+- `enhancePrompt` only fills in the prompt and hands it back — the user confirms or reverts before anything is generated. Never generate straight from the enhanced text.
+- `generateImageFromPrompt` deliberately does not inject the "East Asian (Taiwanese)" line that `generateStoryboardImage` adds; that exists for storyboard continuity and must not rewrite a user's own prompt.
+- Worker errors are passed through `friendlyGenerationError`: only messages we authored (Traditional Chinese) reach the user, everything else becomes a generic line so hostnames and internal paths stay in the log.
+- The model shown on each page comes from `/api/quick/config`, so the badge always matches the configured model rather than a hardcoded name.
+
 ## Mail
 
 - Two transports behind `sendMail` in `lib/mailer.ts`, chosen by `MAIL_PROVIDER`.
@@ -98,6 +107,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 ## Key Files
 
 - `app/page.tsx`: TikTok / IG Reels URL entry + video upload that creates a project.
+- `app/quick/QuickStudio.tsx`, `app/api/quick/*`: the one-shot text-to-image / text-to-video studio.
 - `app/api/projects/route.ts`, `app/api/projects/upload/route.ts`: create-project (URL) and upload-video endpoints.
 - `app/login/page.tsx`, `app/register/page.tsx`: auth pages.
 - `app/settings/page.tsx`: admin settings UI.
@@ -119,7 +129,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `lib/queue.ts`: BullMQ queue, Redis connection, `WORKER_HEARTBEAT_KEY`, job-retention opts.
 - `middleware.ts`: protects page routes (`/`, `/projects/*`, `/settings/*`, `/health`).
 - `scripts/worker.ts`: BullMQ job processor + Redis heartbeat.
-- `prisma/schema.prisma`: includes `User`, `Project`, `Scene`, `AppSetting`, and `PasswordResetToken`.
+- `prisma/schema.prisma`: includes `User`, `Project`, `Scene`, `AppSetting`, `PasswordResetToken`, and `Generation`.
 
 ## Commands
 

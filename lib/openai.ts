@@ -449,3 +449,57 @@ export async function generateSeedanceReferenceImage(
   if (!image?.b64_json && !image?.url) throw new Error("OpenAI 沒有回傳 Seedance 單張參考圖");
   return image;
 }
+
+const IMAGE_SIZES: Record<string, "1024x1536" | "1024x1024" | "1536x1024"> = {
+  "9:16": "1024x1536",
+  "1:1": "1024x1024",
+  "16:9": "1536x1024"
+};
+
+/**
+ * 「快速使用」的文生圖。跟 generateStoryboardImage 不同，
+ * 這裡不注入「所有人物皆為東亞／台灣人」——那是分鏡連續性的需求，
+ * 一般文生圖不該擅自改寫使用者的描述。
+ */
+export async function generateImageFromPrompt(prompt: string, ratio: string) {
+  const openai = await client(openaiImageTimeoutMs(), 2);
+  const model = (await getAppSettings()).OPENAI_IMAGE_MODEL || "gpt-image-2";
+  const response = await openai.images.generate({
+    model,
+    prompt,
+    size: IMAGE_SIZES[ratio] || IMAGE_SIZES["9:16"],
+    n: 1
+  });
+  const image = response.data?.[0] as { b64_json?: string; url?: string } | undefined;
+  if (!image?.b64_json && !image?.url) throw new Error("OpenAI 沒有回傳圖片");
+  return { image, model };
+}
+
+const ENHANCE_SYSTEM: Record<"IMAGE" | "VIDEO", string> = {
+  IMAGE:
+    "你是 AI 影像 prompt 工程師。把使用者的簡短想法補完成一段可直接生成圖片的描述，" +
+    "涵蓋主體、場景、構圖、鏡頭、光線、材質、色調與風格。" +
+    "保留使用者原本的意圖與指定的細節，不要擅自更換主題。不要加入畫面文字或浮水印。",
+  VIDEO:
+    "你是 AI 影片 prompt 工程師。把使用者的簡短想法補完成一段可直接生成影片的描述，" +
+    "涵蓋主體、場景、動作、鏡頭運動、節奏、光線與風格。" +
+    "保留使用者原本的意圖與指定的細節，不要擅自更換主題。不要加入字幕、畫面文字或浮水印。"
+};
+
+/** 提示詞補完：回傳完整版讓使用者確認後再送出，不會直接拿去生成。 */
+export async function enhancePrompt(prompt: string, kind: "IMAGE" | "VIDEO") {
+  const openai = await client();
+  const response = await openai.responses.create({
+    model: (await getAppSettings()).OPENAI_PROMPT_MODEL || (await textModel()),
+    input: [
+      {
+        role: "system",
+        content: `${ENHANCE_SYSTEM[kind]}\n只輸出補完後的提示詞本身，不要有前言、說明、引號或條列。用繁體中文書寫。`
+      },
+      { role: "user", content: prompt }
+    ]
+  });
+  const text = response.output_text.trim();
+  if (!text) throw new Error("提示詞補完結果為空");
+  return text;
+}

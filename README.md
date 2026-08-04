@@ -23,6 +23,20 @@
 - `/health`：**僅管理員**的系統健康頁（DB / Redis / Worker / 佇列 / 金鑰狀態）
 - Zeabur 部署（Web 與 Worker 兩個服務共用同一個 Docker image）
 
+## 快速使用（單次生成）
+
+除了八步的專案流程，側欄「快速使用」有兩個獨立頁面，適合只想產一張圖或一支短片的情境：
+
+- **文生圖**：用 `OPENAI_IMAGE_MODEL` 生成單張圖片。
+- **文生影片**：用 `SEEDANCE_MODEL` 純文字生成短片（不帶參考圖）。
+
+兩頁都可以先按 ✨ 讓 AI 把簡短想法補完成完整提示詞，**確認（或還原）後才送出**。
+送出後不用等待，可以連續送多組，結果以卡片呈現並自動更新；紀錄存在資料庫，重新整理不會消失。
+並行上限由 `QUICK_CONCURRENCY`（預設 3）控制。
+
+> 生成結果和分鏡圖一樣存進物件儲存，所以**需要設定好 R2**；沒設定時會退回本機 `public/generated`，
+> 而 `next start` 不會提供啟動後才寫入的檔案，卡片會顯示破圖。
+
 ## 支援平台與監控
 
 - 支援來源：TikTok 與 Instagram Reels（`lib/transcribe.ts` 以 allowlist 驗證；IG 僅限 `/reel(s)/` 連結），或直接上傳影片檔（MP4／MOV／WebM）。

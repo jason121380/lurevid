@@ -7,9 +7,10 @@ import { Worker } from "bullmq";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/async";
-import { PROJECT_QUEUE_NAME, WORKER_HEARTBEAT_KEY, createRedisConnection, redisConnectionOptions } from "@/lib/queue";
+import { PROJECT_QUEUE_NAME, QUICK_QUEUE_NAME, WORKER_HEARTBEAT_KEY, createRedisConnection, redisConnectionOptions } from "@/lib/queue";
 import {
   adaptScript,
+  generateImageFromPrompt,
   analyzeStructure,
   analyzeVideo,
   generateSeedanceReferenceImage,
@@ -588,6 +589,118 @@ async function generateVideo(projectId: string) {
   });
   await markStepDone(projectId, "video");
 }
+
+/**
+ * 只有我們自己寫的訊息（一律繁體中文）才給使用者看；
+ * 其他（DNS、fetch、SDK 的原文）會夾帶主機名或內部路徑，一律換成通用說明，原文留在日誌。
+ */
+function friendlyGenerationError(error: unknown) {
+  const message = error instanceof Error ? error.message.trim() : "";
+  return /[\u4e00-\u9fff]/.test(message) ? message : "生成失敗，請稍後再試。";
+}
+
+/** 「快速使用」：單次文生圖／文生影片，與 project 的八步流程無關。 */
+async function runGeneration(generationId: string) {
+  const generation = await prisma.generation.findUnique({ where: { id: generationId } });
+  if (!generation) throw new Error(`找不到生成任務：${generationId}`);
+
+  await prisma.generation.update({
+    where: { id: generationId },
+    data: { status: "RUNNING", error: null }
+  });
+
+  if (generation.kind === "IMAGE") {
+    const { image, model } = await generateImageFromPrompt(generation.prompt, generation.ratio);
+    const buffer = image.b64_json ? Buffer.from(image.b64_json, "base64") : await fetchToBuffer(image.url || "");
+    const resultUrl = await uploadObject(`quick/${generation.userId}/${generationId}.png`, buffer, "image/png");
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: { status: "SUCCEEDED", resultUrl, model }
+    });
+    return;
+  }
+
+  let task;
+  try {
+    task = await createSeedanceTask(generation.prompt, {
+      ratio: generation.ratio,
+      resolution: "720p",
+      duration: generation.duration
+    });
+  } catch (error) {
+    console.error(`[quick] Seedance 建立任務失敗 generation=${generationId}:`, seedanceUpstreamDetail(error));
+    throw toSeedanceTaskCreationError(error);
+  }
+
+  const taskId = task.id || task.task_id;
+  if (!taskId) throw new Error("Seedance 沒有回傳 task id");
+  await prisma.generation.update({ where: { id: generationId }, data: { taskId } });
+
+  const deadline = Date.now() + SEEDANCE_POLL_TIMEOUT_MS;
+  let videoUrl = "";
+  while (true) {
+    if (Date.now() > deadline) throw new Error("Seedance 生成逾時，請稍後重試");
+
+    let latest;
+    try {
+      latest = await getSeedanceTask(taskId);
+    } catch {
+      await sleep(SEEDANCE_POLL_INTERVAL_MS);
+      continue;
+    }
+
+    const status = String(latest.status || "").toLowerCase();
+    videoUrl = extractSeedanceVideoUrl(latest);
+    if (status === "succeeded" && videoUrl) break;
+    if (["failed", "cancelled", "expired"].includes(status)) {
+      throw new Error(`Seedance 生成失敗：${status}`);
+    }
+    await sleep(SEEDANCE_POLL_INTERVAL_MS);
+  }
+
+  const localPath = join(storageRoot(), "quick", `${generationId}.mp4`);
+  try {
+    try {
+      await downloadVideo(videoUrl, localPath);
+    } catch (error) {
+      // 原始錯誤含 Seedance 的 CDN 主機名，不能直接顯示給使用者。
+      console.error(`[quick] 下載影片失敗 generation=${generationId}:`, error);
+      throw new Error("影片已生成但下載失敗，請稍後重新產生一次。");
+    }
+    const resultUrl = await uploadFileObject(`quick/${generation.userId}/${generationId}.mp4`, localPath, "video/mp4");
+    await prisma.generation.update({ where: { id: generationId }, data: { status: "SUCCEEDED", resultUrl } });
+  } finally {
+    await rm(localPath, { force: true });
+  }
+}
+
+const quickWorker = new Worker(
+  QUICK_QUEUE_NAME,
+  async (job) => {
+    const generationId = String(job.data.generationId);
+    try {
+      await runGeneration(generationId);
+    } catch (error) {
+      const exists = await prisma.generation.findUnique({ where: { id: generationId }, select: { id: true } });
+      if (!exists) {
+        console.warn(`skip stale generation job ${job.id}: ${generationId} no longer exists`);
+        return;
+      }
+      console.error(`[quick] generation ${generationId} 失敗:`, error);
+      await prisma.generation.update({
+        where: { id: generationId },
+        data: { status: "FAILED", error: friendlyGenerationError(error) }
+      });
+      throw error;
+    }
+  },
+  {
+    connection: { url: REDIS_URL, ...redisConnectionOptions() },
+    concurrency: Number(process.env.QUICK_CONCURRENCY || 3)
+  }
+);
+
+quickWorker.on("failed", (job, error) => console.error(`quick failed ${job?.id}`, error));
 
 const worker = new Worker(
   PROJECT_QUEUE_NAME,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Layers, User } from "lucide-react";
+import { Home, Layers, Sparkles, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +9,7 @@ type Tab = { href: string; label: string; icon: typeof Home; match: (path: strin
 const TABS: Tab[] = [
   { href: "/", label: "首頁", icon: Home, match: (p) => p === "/" },
   { href: "/projects", label: "專案", icon: Layers, match: (p) => p === "/projects" || p.startsWith("/projects/") },
+  { href: "/quick/image", label: "快速", icon: Sparkles, match: (p) => p.startsWith("/quick") },
   { href: "/me", label: "我的", icon: User, match: (p) => p === "/me" || p === "/settings" || p === "/usage" || p === "/health" }
 ];
 

@@ -2,6 +2,7 @@ import { Queue, type JobsOptions } from "bullmq";
 import IORedis from "ioredis";
 
 export const PROJECT_QUEUE_NAME = "seedance-projects";
+export const QUICK_QUEUE_NAME = "lurevid-quick";
 export const WORKER_HEARTBEAT_KEY = "lurevid:worker:heartbeat";
 
 export type ProjectAction =
@@ -52,6 +53,18 @@ export async function enqueueProjectJob(projectId: string, action: ProjectAction
       { projectId, action, ...(data ?? {}) },
       { removeOnComplete: true, removeOnFail: 50, attempts: 1, ...(opts ?? {}) }
     );
+  } finally {
+    await queue.close();
+  }
+}
+
+/** 「快速使用」的單次生成。與 project 佇列分開，兩者的失敗處理完全不同。 */
+export async function enqueueGenerationJob(generationId: string) {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) throw new Error("缺少 REDIS_URL");
+  const queue = new Queue(QUICK_QUEUE_NAME, { connection: { url: redisUrl, ...redisConnectionOptions() } });
+  try {
+    await queue.add(`generation-${generationId}`, { generationId }, { removeOnComplete: true, removeOnFail: 50, attempts: 1 });
   } finally {
     await queue.close();
   }

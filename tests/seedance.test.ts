@@ -75,3 +75,33 @@ describe("model selection", () => {
     expect(await modelSentFor("   ")).toBe("dreamina-seedance-2-0-260128");
   });
 });
+
+// worker.ts 的錯誤過濾規則：確保只有我們自己寫的中文訊息會呈現給使用者。
+function friendlyGenerationError(error: unknown) {
+  const message = error instanceof Error ? error.message.trim() : "";
+  return /[一-鿿]/.test(message) ? message : "生成失敗，請稍後再試。";
+}
+
+describe("quick generation error messages", () => {
+  it("hides raw DNS/network errors that carry hostnames", () => {
+    expect(friendlyGenerationError(new Error("getaddrinfo ENOTFOUND cdn.example.com"))).toBe("生成失敗，請稍後再試。");
+  });
+
+  it("hides SDK wording and internal paths", () => {
+    expect(friendlyGenerationError(new Error("Connection error at /app/.next/server/chunks/123.js"))).toBe("生成失敗，請稍後再試。");
+  });
+
+  it("keeps the messages we authored for users", () => {
+    for (const message of [
+      "影片已生成但下載失敗，請稍後重新產生一次。",
+      "Seedance 生成逾時，請稍後重試",
+      "請先在設定頁填入有效的 OPENAI_API_KEY"
+    ]) {
+      expect(friendlyGenerationError(new Error(message))).toBe(message);
+    }
+  });
+
+  it("falls back when there is no message at all", () => {
+    expect(friendlyGenerationError(undefined)).toBe("生成失敗，請稍後再試。");
+  });
+});

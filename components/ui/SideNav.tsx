@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Home, Layers, LogOut, Settings, User } from "lucide-react";
+import { Activity, BarChart3, Clapperboard, Home, ImageIcon, Layers, LogOut, Settings, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -13,6 +13,11 @@ const MAIN_ITEMS: NavItem[] = [
   { href: "/", label: "首頁", icon: Home, match: (p) => p === "/" },
   { href: "/projects", label: "專案", icon: Layers, match: (p) => p === "/projects" || p.startsWith("/projects/") },
   { href: "/me", label: "我的", icon: User, match: (p) => p === "/me" }
+];
+
+const QUICK_ITEMS: NavItem[] = [
+  { href: "/quick/image", label: "文生圖", icon: ImageIcon, match: (p) => p === "/quick/image" },
+  { href: "/quick/video", label: "文生影片", icon: Clapperboard, match: (p) => p === "/quick/video" }
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -54,6 +59,11 @@ export function SideNav() {
 
       <nav aria-label="主要導覽" className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
         {MAIN_ITEMS.map((item) => (
+          <NavLink key={item.href} item={item} active={item.match(pathname)} />
+        ))}
+
+        <div className="px-3 pb-1 pt-5 text-[11px] font-medium uppercase tracking-wide text-[var(--gray-400)]">快速使用</div>
+        {QUICK_ITEMS.map((item) => (
           <NavLink key={item.href} item={item} active={item.match(pathname)} />
         ))}
 
