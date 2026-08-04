@@ -49,6 +49,8 @@ This is a public multi-user app. All pages and API routes require login (NextAut
 - Each `Project` is owned by a `User` (`Project.userId`); every project API checks ownership.
 - `/settings` and `/api/settings` are admin-only. Admins are listed in `ADMIN_EMAILS` (comma-separated).
 - `middleware.ts` protects page routes (redirect to `/login`); API routes self-check via `lib/authz.ts` and return JSON 401/403.
+- Forgot password: `/forgot-password` issues a single-use, 60-minute token (`PasswordResetToken`; only a SHA-256 hash is stored) and mails a link built from `NEXTAUTH_URL` — never from the request Host, which would allow poisoned reset links. `/forgot-password` always returns the same response whether or not the account exists, including when sending fails, so it cannot be used to enumerate accounts. Needs SMTP configured in `/settings`; without it the endpoint says so instead of silently dropping mail.
+- `npm run set-password -- <email>` is the out-of-band recovery path when mail is unavailable.
 - Edge constraint: `lib/auth.config.ts` is edge-safe (no Prisma/bcrypt) and is what `middleware.ts` imports. The Credentials provider (Prisma + bcrypt) lives only in `lib/auth.ts` (node runtime).
 
 ## Settings
@@ -73,6 +75,7 @@ These are needed before the app can authenticate users and read settings from th
 - `OPENAI_PROMPT_MODEL`: `gpt-5.4-mini`
 - `OPENAI_IMAGE_MODEL`: `gpt-image-2`
 - `OPENAI_TRANSCRIBE_MODEL`: `gpt-4o-transcribe`
+- `SMTP_PORT`: `587` (465 switches to implicit TLS; everything else requires STARTTLS)
 - `ARK_BASE_URL`: `https://ark.ap-southeast.bytepluses.com/api/v3`
 - `SEEDANCE_MODEL`: `dreamina-seedance-2-0-260128`
 
@@ -97,6 +100,8 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `lib/settings.ts`: setting definitions, DB access, and TTL cache.
 - `lib/openai.ts`: text, vision, storyboard, and image-generation OpenAI calls.
 - `lib/transcribe.ts`: audio transcription + source-URL allowlist.
+- `lib/mailer.ts`: SMTP transport + the password-reset mail template.
+- `lib/password-reset.ts`: reset-token issue/verify/consume helpers.
 - `lib/visual.ts`: video download, frame extraction, visual analysis.
 - `lib/video.ts` / `lib/ffmpeg.ts`: size-capped video download / shared ffmpeg path (frame extraction + yt-dlp).
 - `lib/safe-fetch.ts`: SSRF guard for fetching upstream URLs.
@@ -104,7 +109,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `lib/queue.ts`: BullMQ queue, Redis connection, `WORKER_HEARTBEAT_KEY`, job-retention opts.
 - `middleware.ts`: protects page routes (`/`, `/projects/*`, `/settings/*`, `/health`).
 - `scripts/worker.ts`: BullMQ job processor + Redis heartbeat.
-- `prisma/schema.prisma`: includes `User`, `Project`, `Scene`, and `AppSetting`.
+- `prisma/schema.prisma`: includes `User`, `Project`, `Scene`, `AppSetting`, and `PasswordResetToken`.
 
 ## Commands
 

@@ -72,7 +72,12 @@ function LoginForm() {
             />
           </label>
           <label className="grid gap-1.5 text-sm">
-            <span className="text-[13px] text-[var(--gray-500)]">密碼</span>
+            <span className="flex items-center justify-between gap-2 text-[13px] text-[var(--gray-500)]">
+              密碼
+              <Link className="font-medium text-orange" href="/forgot-password">
+                忘記密碼？
+              </Link>
+            </span>
             <input
               className="field"
               type="password"

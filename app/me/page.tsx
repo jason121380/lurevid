@@ -4,6 +4,7 @@ import { Activity, BarChart3, LogOut, Settings } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { TopAppBar } from "@/components/ui/TopAppBar";
 import { ListGroup, ListRow } from "@/components/ui/ListRow";
+import { ChangePasswordCard } from "@/components/ChangePasswordCard";
 
 export default function MePage() {
   const { data: session } = useSession();
@@ -49,6 +50,8 @@ export default function MePage() {
             </ListGroup>
           </div>
         )}
+
+        <ChangePasswordCard />
 
         <ListGroup>
           <ListRow

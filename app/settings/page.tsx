@@ -49,6 +49,12 @@ const groups: SettingGroup[] = [
     description: "儲存分鏡圖、影片片段與 final.mp4，並提供前台播放網址。bucket 需開公開讀取。",
     keys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL", "S3_FORCE_PATH_STYLE"],
     requiredKeys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL"]
+  },
+  {
+    title: "寄信（SMTP）",
+    description: "只用於「忘記密碼」的重設信。沒設定的話，忘記密碼頁會請使用者聯絡管理員。",
+    keys: ["MAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"],
+    requiredKeys: ["MAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"]
   }
 ];
 

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { BottomTabBar } from "@/components/ui/BottomTabBar";
 import { SideNav } from "@/components/ui/SideNav";
 
-const plainRoutes = new Set(["/login", "/register"]);
+const plainRoutes = new Set(["/login", "/register", "/forgot-password", "/reset-password"]);
 
 export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();

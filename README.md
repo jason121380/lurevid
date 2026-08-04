@@ -36,6 +36,10 @@
 - 這是對外公開的多使用者服務，所有頁面與 API 都需要登入。
 - 第一次使用請到 `/register` 註冊，再到 `/login` 登入。
 - 每個專案綁定建立者，使用者只能看到/操作自己的專案。
+- 忘記密碼：登入頁的「忘記密碼？」會寄出一次性重設連結（60 分鐘內有效、只能用一次）。
+  需要管理員先在 `/settings` 的「寄信（SMTP）」填好寄件設定，否則該頁會請使用者聯絡管理員。
+- 登入後可在「我的 → 變更密碼」自行更換密碼。
+- 帳號完全登不進去時，有資料庫連線的人可以用 `npm run set-password -- <email>` 直接重設。
 - `ADMIN_EMAILS`（逗號分隔）內的 Email 才是管理員，只有管理員能進 `/settings` 並讀寫 API 金鑰。
 
 ## 本機啟動
@@ -93,6 +97,13 @@ S3_ACCESS_KEY_ID="..."
 S3_SECRET_ACCESS_KEY="..."
 S3_PUBLIC_URL="https://你的公開-bucket-網域"
 S3_FORCE_PATH_STYLE="false"
+
+# 寄信（忘記密碼用），也可改由管理員在 /settings 填
+MAIL_FROM="lurevid <no-reply@你的網域>"
+SMTP_HOST="smtp.example.com"
+SMTP_PORT="587"
+SMTP_USER="..."
+SMTP_PASSWORD="..."
 
 # Worker 合成影片的本機暫存目錄
 STORAGE_DIR="./storage/generated"
