@@ -11,11 +11,13 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notRegistered, setNotRegistered] = useState(false);
   const [sentMessage, setSentMessage] = useState("");
 
   async function submit() {
     if (!email.trim() || loading) return;
     setError("");
+    setNotRegistered(false);
     setLoading(true);
     try {
       const res = await fetch("/api/auth/forgot-password", {
@@ -26,10 +28,11 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "寄送重設信失敗");
+        setNotRegistered(Boolean(data.notRegistered));
         toast(data.error || "寄送重設信失敗", "error");
         return;
       }
-      setSentMessage(data.message || "如果這個 Email 有註冊過，我們已經寄出重設密碼的信。");
+      setSentMessage(data.message || "重設連結已寄出，請收信（含垃圾郵件匣）。");
       toast("已寄出重設信");
     } catch {
       setError("API 沒有回應，請稍後再試");
@@ -84,7 +87,12 @@ export default function ForgotPasswordPage() {
 
             {error && (
               <div className="rounded-md border border-[var(--red)]/30 bg-[var(--red-bg)] p-3 text-[13px] leading-6 text-[var(--red)]" role="alert">
-                {error}
+                <p>{error}</p>
+                {notRegistered && (
+                  <Link className="mt-1 inline-block font-medium underline" href="/register">
+                    用這個 Email 註冊
+                  </Link>
+                )}
               </div>
             )}
 

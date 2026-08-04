@@ -37,6 +37,7 @@
 - 第一次使用請到 `/register` 註冊，再到 `/login` 登入。
 - 每個專案綁定建立者，使用者只能看到/操作自己的專案。
 - 忘記密碼：登入頁的「忘記密碼？」會寄出一次性重設連結（60 分鐘內有效、只能用一次）。
+  Email 沒註冊過會直接告知並提供註冊連結；寄送失敗也會顯示，不會假裝成功。
   需要管理員先在 `/settings` 的「寄信」填好寄件設定，否則該頁會請使用者聯絡管理員。
   部署在 Zeabur 請用 `MAIL_PROVIDER=zeabur`（Zeabur 機房封鎖對外 SMTP 埠，SMTP 連不出去），
   只需填寄件人與 Zeabur Email API Key；寄件網域要先在 Zeabur Email 完成 DKIM/SPF/DMARC 驗證。

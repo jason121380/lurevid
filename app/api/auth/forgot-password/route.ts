@@ -17,8 +17,12 @@ function clientIp(request: Request) {
 }
 
 // 不論帳號是否存在都回同一則訊息，避免被拿來列舉已註冊的 Email。
-const GENERIC_OK = { ok: true, message: "如果這個 Email 有註冊過，我們已經寄出重設密碼的信，請收信（含垃圾郵件匣）。" };
-
+/**
+ * 這個端點會明講帳號存不存在，代價是可以被拿來列舉已註冊的 Email。
+ * 這是刻意的取捨：`/api/register` 本來就會回「這個 Email 已經註冊過了」，
+ * 同樣問得出答案，所以這裡裝傻只會讓真正的使用者困惑。
+ * 濫用防線改由上面的 per-IP / per-email 限流負責。
+ */
 export async function POST(request: Request) {
   let body: z.infer<typeof forgotPasswordSchema>;
   try {
@@ -43,17 +47,28 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    const user = await prisma.user.findUnique({ where: { email: body.email }, select: { id: true, email: true } });
-    if (user) {
-      const { token } = await issueResetToken(user.id);
-      await sendMail(passwordResetMail(user.email, resetUrlFor(token), RESET_TOKEN_TTL_MINUTES));
-    }
-  } catch (error) {
-    // 寄信只會發生在「帳號存在」的分支，所以這裡不能回不一樣的結果，
-    // 否則錯誤訊息本身就變成帳號存在與否的探測管道。失敗只記在伺服器日誌。
-    console.error("[forgot-password] 寄送重設信失敗", error);
+  const user = await prisma.user.findUnique({ where: { email: body.email }, select: { id: true, email: true } });
+  if (!user) {
+    return NextResponse.json(
+      { error: "這個 Email 還沒有註冊過。請確認拼字，或直接註冊一個新帳號。", notRegistered: true },
+      { status: 404 }
+    );
   }
 
-  return NextResponse.json(GENERIC_OK);
+  try {
+    const { token } = await issueResetToken(user.id);
+    await sendMail(passwordResetMail(user.email, resetUrlFor(token), RESET_TOKEN_TTL_MINUTES));
+  } catch (error) {
+    // 原始的寄信錯誤含主機/金鑰等細節，只留在伺服器日誌。
+    console.error("[forgot-password] 寄送重設信失敗", error);
+    return NextResponse.json(
+      { error: "重設信寄送失敗，請稍後再試；若持續發生請聯絡管理員。" },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    message: `重設連結已寄到 ${user.email}，請收信（含垃圾郵件匣）。`
+  });
 }
