@@ -51,10 +51,11 @@ const groups: SettingGroup[] = [
     requiredKeys: ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_PUBLIC_URL"]
   },
   {
-    title: "寄信（SMTP）",
-    description: "只用於「忘記密碼」的重設信。沒設定的話，忘記密碼頁會請使用者聯絡管理員。",
-    keys: ["MAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"],
-    requiredKeys: ["MAIL_FROM", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"]
+    title: "寄信",
+    description:
+      "只用於「忘記密碼」的重設信。部署在 Zeabur 請用 zeabur（機房會擋對外 SMTP 埠），只需填寄件人與 API Key；自架或其他主機可改用 smtp。沒設定的話，忘記密碼頁會請使用者聯絡管理員。",
+    keys: ["MAIL_PROVIDER", "MAIL_FROM", "ZEABUR_EMAIL_API_KEY", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"],
+    requiredKeys: ["MAIL_PROVIDER", "MAIL_FROM"]
   }
 ];
 

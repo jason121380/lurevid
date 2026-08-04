@@ -63,13 +63,27 @@ export const APP_SETTING_FIELDS = [
   },
   { key: "S3_FORCE_PATH_STYLE", label: "R2 Force Path Style（用 false）", secret: false, defaultValue: "false", envFallback: true },
   {
+    key: "MAIL_PROVIDER",
+    label: "寄信方式（zeabur 或 smtp）",
+    secret: false,
+    defaultValue: "zeabur",
+    placeholder: "zeabur",
+    envFallback: true
+  },
+  {
     key: "MAIL_FROM",
     label: "寄件人（例：lurevid <no-reply@你的網域>）",
     secret: false,
     placeholder: "lurevid <no-reply@example.com>",
     envFallback: true
   },
-  { key: "SMTP_HOST", label: "SMTP 主機", secret: false, placeholder: "smtp.example.com", envFallback: true },
+  {
+    key: "ZEABUR_EMAIL_API_KEY",
+    label: "Zeabur Email API Key（寄信方式選 zeabur 時使用）",
+    secret: true,
+    envFallback: true
+  },
+  { key: "SMTP_HOST", label: "SMTP 主機（寄信方式選 smtp 時使用）", secret: false, placeholder: "smtp.example.com", envFallback: true },
   { key: "SMTP_PORT", label: "SMTP 埠號（587 用 STARTTLS、465 用 SSL）", secret: false, defaultValue: "587", envFallback: true },
   { key: "SMTP_USER", label: "SMTP 帳號", secret: false, placeholder: "帳號或 API key 使用者名稱", envFallback: true },
   { key: "SMTP_PASSWORD", label: "SMTP 密碼", secret: true, envFallback: true }

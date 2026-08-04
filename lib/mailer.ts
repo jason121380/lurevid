@@ -8,25 +8,11 @@ export type OutgoingMail = {
   html: string;
 };
 
-/**
- * 寄信目前只走 SMTP。之後要接 REST API 的寄信服務時，
- * 在 sendMail 裡多一個分支即可，呼叫端不用改。
- */
-async function smtpConfig() {
-  const settings = await getAppSettings();
-  const host = settings.SMTP_HOST?.trim() || "";
-  const user = settings.SMTP_USER?.trim() || "";
-  const password = settings.SMTP_PASSWORD?.trim() || "";
-  const from = settings.MAIL_FROM?.trim() || "";
-  const port = Number(settings.SMTP_PORT?.trim() || 587);
-  if (!host || !user || !password || !from || !Number.isFinite(port) || port <= 0) return null;
-  return { host, port, user, password, from };
-}
+export type MailProvider = "zeabur" | "smtp";
 
-/** /forgot-password 用它決定要顯示「已寄出」還是「請聯絡管理員」。 */
-export async function isMailerConfigured() {
-  return (await smtpConfig()) !== null;
-}
+/** Zeabur Email 的送信端點是固定值，不開放設定以免變成 SSRF 的出口。 */
+const ZEABUR_EMAIL_ENDPOINT = "https://api.zeabur.com/api/v1/zsend/emails";
+const ZEABUR_TIMEOUT_MS = 20000;
 
 export class MailNotConfiguredError extends Error {
   constructor() {
@@ -35,10 +21,79 @@ export class MailNotConfiguredError extends Error {
   }
 }
 
-export async function sendMail(mail: OutgoingMail) {
-  const config = await smtpConfig();
-  if (!config) throw new MailNotConfiguredError();
+function normalizeProvider(value: string | undefined): MailProvider {
+  return value?.trim().toLowerCase() === "smtp" ? "smtp" : "zeabur";
+}
 
+/**
+ * 從「顯示名稱 <a@b.c>」取出純信箱。
+ * Zeabur 的 from 欄位在文件裡是純信箱，送顯示名稱格式可能被拒絕。
+ */
+export function bareAddress(value: string) {
+  const match = value.match(/<([^>]+)>/);
+  return (match ? match[1] : value).trim();
+}
+
+async function mailConfig() {
+  const settings = await getAppSettings();
+  const provider = normalizeProvider(settings.MAIL_PROVIDER);
+  const from = settings.MAIL_FROM?.trim() || "";
+  if (!from) return null;
+
+  if (provider === "zeabur") {
+    const apiKey = settings.ZEABUR_EMAIL_API_KEY?.trim() || "";
+    if (!apiKey) return null;
+    return { provider, from, apiKey } as const;
+  }
+
+  const host = settings.SMTP_HOST?.trim() || "";
+  const user = settings.SMTP_USER?.trim() || "";
+  const password = settings.SMTP_PASSWORD?.trim() || "";
+  const port = Number(settings.SMTP_PORT?.trim() || 587);
+  if (!host || !user || !password || !Number.isFinite(port) || port <= 0) return null;
+  return { provider, from, host, port, user, password } as const;
+}
+
+/** /forgot-password 用它決定要顯示「已寄出」還是「請聯絡管理員」。 */
+export async function isMailerConfigured() {
+  return (await mailConfig()) !== null;
+}
+
+async function sendViaZeabur(config: { from: string; apiKey: string }, mail: OutgoingMail) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ZEABUR_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(ZEABUR_EMAIL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        from: bareAddress(config.from),
+        to: [mail.to],
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text
+      }),
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    // 回應內容可能含帳務/網域細節，只留在伺服器日誌，不往上拋給使用者。
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Zeabur Email 寄送失敗 (${response.status})：${detail.slice(0, 300)}`);
+  }
+}
+
+async function sendViaSmtp(
+  config: { from: string; host: string; port: number; user: string; password: string },
+  mail: OutgoingMail
+) {
   const transport = nodemailer.createTransport({
     host: config.host,
     port: config.port,
@@ -62,6 +117,13 @@ export async function sendMail(mail: OutgoingMail) {
   } finally {
     transport.close();
   }
+}
+
+export async function sendMail(mail: OutgoingMail) {
+  const config = await mailConfig();
+  if (!config) throw new MailNotConfiguredError();
+  if (config.provider === "zeabur") return sendViaZeabur(config, mail);
+  return sendViaSmtp(config, mail);
 }
 
 function escapeHtml(value: string) {

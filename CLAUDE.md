@@ -27,6 +27,14 @@ The worker should analyze:
 
 When the muxed download fails, the worker falls back to an audio-only yt-dlp download for transcription (`runFull` in `scripts/worker.ts`); if both fail, the project is marked failed with a friendly message.
 
+## Mail
+
+- Two transports behind `sendMail` in `lib/mailer.ts`, chosen by `MAIL_PROVIDER`.
+- `zeabur` (default) POSTs to the fixed `https://api.zeabur.com/api/v1/zsend/emails` with a `Bearer` key. **Zeabur's own infrastructure blocks outbound SMTP ports**, so SMTP does not work from a Zeabur deployment — use this one there. Its `from` must be a bare address, so `MAIL_FROM` is reduced with `bareAddress()`; the sending domain needs DKIM/SPF/DMARC verified in Zeabur Email first.
+- `smtp` uses nodemailer for self-hosting or any host that permits SMTP.
+- The endpoint is a hardcoded constant, not a setting, to keep it out of SSRF reach.
+- Send failures must never change the response `/api/auth/forgot-password` returns; log them instead.
+
 ## Platforms & Downloads
 
 - Supported source hosts: `tiktok.com` and `instagram.com` (allowlist + `new URL` validation in `lib/transcribe.ts`). Instagram is further restricted to `/reel(s)/` paths. The allowlist is intentionally narrow; adding a platform means extending `ALLOWED_HOSTS` and `detectPlatform` together (and the mirror check in `app/page.tsx`).
@@ -49,7 +57,7 @@ This is a public multi-user app. All pages and API routes require login (NextAut
 - Each `Project` is owned by a `User` (`Project.userId`); every project API checks ownership.
 - `/settings` and `/api/settings` are admin-only. Admins are listed in `ADMIN_EMAILS` (comma-separated).
 - `middleware.ts` protects page routes (redirect to `/login`); API routes self-check via `lib/authz.ts` and return JSON 401/403.
-- Forgot password: `/forgot-password` issues a single-use, 60-minute token (`PasswordResetToken`; only a SHA-256 hash is stored) and mails a link built from `NEXTAUTH_URL` — never from the request Host, which would allow poisoned reset links. `/forgot-password` always returns the same response whether or not the account exists, including when sending fails, so it cannot be used to enumerate accounts. Needs SMTP configured in `/settings`; without it the endpoint says so instead of silently dropping mail.
+- Forgot password: `/forgot-password` issues a single-use, 60-minute token (`PasswordResetToken`; only a SHA-256 hash is stored) and mails a link built from `NEXTAUTH_URL` — never from the request Host, which would allow poisoned reset links. `/forgot-password` always returns the same response whether or not the account exists, including when sending fails, so it cannot be used to enumerate accounts. Needs mail configured in `/settings`; without it the endpoint says so instead of silently dropping mail.
 - `npm run set-password -- <email>` is the out-of-band recovery path when mail is unavailable.
 - Edge constraint: `lib/auth.config.ts` is edge-safe (no Prisma/bcrypt) and is what `middleware.ts` imports. The Credentials provider (Prisma + bcrypt) lives only in `lib/auth.ts` (node runtime).
 
@@ -75,6 +83,7 @@ These are needed before the app can authenticate users and read settings from th
 - `OPENAI_PROMPT_MODEL`: `gpt-5.4-mini`
 - `OPENAI_IMAGE_MODEL`: `gpt-image-2`
 - `OPENAI_TRANSCRIBE_MODEL`: `gpt-4o-transcribe`
+- `MAIL_PROVIDER`: `zeabur` (`smtp` is the alternative)
 - `SMTP_PORT`: `587` (465 switches to implicit TLS; everything else requires STARTTLS)
 - `ARK_BASE_URL`: `https://ark.ap-southeast.bytepluses.com/api/v3`
 - `SEEDANCE_MODEL`: `dreamina-seedance-2-0-260128`
@@ -100,7 +109,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `lib/settings.ts`: setting definitions, DB access, and TTL cache.
 - `lib/openai.ts`: text, vision, storyboard, and image-generation OpenAI calls.
 - `lib/transcribe.ts`: audio transcription + source-URL allowlist.
-- `lib/mailer.ts`: SMTP transport + the password-reset mail template.
+- `lib/mailer.ts`: mail transports (Zeabur Email REST + SMTP) and the password-reset mail template.
 - `lib/password-reset.ts`: reset-token issue/verify/consume helpers.
 - `lib/visual.ts`: video download, frame extraction, visual analysis.
 - `lib/video.ts` / `lib/ffmpeg.ts`: size-capped video download / shared ffmpeg path (frame extraction + yt-dlp).
