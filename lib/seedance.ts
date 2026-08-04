@@ -103,10 +103,13 @@ function seedanceError(data: unknown, fallback: string, raw = "") {
   return fallback;
 }
 
+/**
+ * 只在沒填時套預設值。管理員填了什麼就送什麼——
+ * 靜默改寫會讓設定頁顯示的模型和實際送出的模型不一致，
+ * 換模型時根本查不出來。填錯的話 Seedance 會回 404，訊息已經指向 SEEDANCE_MODEL。
+ */
 function seedanceModel(value: string | undefined) {
-  const model = value?.trim();
-  if (!model || model === "dreamina-seedance-2-0-fast-260128") return DEFAULT_SEEDANCE_MODEL;
-  return model;
+  return value?.trim() || DEFAULT_SEEDANCE_MODEL;
 }
 
 function arkBaseUrl(value: string | undefined) {
