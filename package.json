@@ -9,6 +9,7 @@
     "start": "prisma db push --skip-generate && next start",
     "worker": "tsx scripts/worker.ts",
     "set-password": "tsx scripts/set-password.ts",
+    "mail-test": "tsx scripts/send-test-mail.ts",
     "db:push": "prisma db push",
     "lint": "eslint .",
     "test": "vitest run",

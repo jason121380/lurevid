@@ -59,6 +59,7 @@ This is a public multi-user app. All pages and API routes require login (NextAut
 - `middleware.ts` protects page routes (redirect to `/login`); API routes self-check via `lib/authz.ts` and return JSON 401/403.
 - Forgot password: `/forgot-password` issues a single-use, 60-minute token (`PasswordResetToken`; only a SHA-256 hash is stored) and mails a link built from `NEXTAUTH_URL` — never from the request Host, which would allow poisoned reset links. `/forgot-password` always returns the same response whether or not the account exists, including when sending fails, so it cannot be used to enumerate accounts. Needs mail configured in `/settings`; without it the endpoint says so instead of silently dropping mail.
 - `npm run set-password -- <email>` is the out-of-band recovery path when mail is unavailable.
+- `npm run mail-test -- <email>` sends through the configured provider and translates the common failures (bad key, unverified domain, quota, blocked SMTP port) into actionable messages.
 - Edge constraint: `lib/auth.config.ts` is edge-safe (no Prisma/bcrypt) and is what `middleware.ts` imports. The Credentials provider (Prisma + bcrypt) lives only in `lib/auth.ts` (node runtime).
 
 ## Settings

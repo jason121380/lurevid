@@ -42,6 +42,7 @@
   只需填寄件人與 Zeabur Email API Key；寄件網域要先在 Zeabur Email 完成 DKIM/SPF/DMARC 驗證。
 - 登入後可在「我的 → 變更密碼」自行更換密碼。
 - 帳號完全登不進去時，有資料庫連線的人可以用 `npm run set-password -- <email>` 直接重設。
+- 設定完寄信後，用 `npm run mail-test -- <你的 email>` 確認真的寄得出去（失敗會指出是金鑰、網域驗證還是配額問題）。
 - `ADMIN_EMAILS`（逗號分隔）內的 Email 才是管理員，只有管理員能進 `/settings` 並讀寫 API 金鑰。
 
 ## 本機啟動
