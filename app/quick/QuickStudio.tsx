@@ -176,7 +176,7 @@ export function QuickStudio({
         right={model ? <span className="badge badge-warn font-normal">{model}</span> : null}
       />
 
-      <div className="mx-auto max-w-content px-4 py-4 lg:mx-0 lg:max-w-content-wide lg:px-8 lg:py-6">
+      <div className="mx-auto max-w-content px-4 py-4 lg:mx-0 lg:max-w-app lg:px-8 lg:py-6">
         <p className="mb-3 text-[13px] leading-6 text-[var(--gray-500)]">{description}</p>
 
         <div className="surface p-3 md:p-4">
@@ -268,7 +268,7 @@ export function QuickStudio({
               <p className="mt-1 text-[13px] leading-6 text-[var(--gray-500)]">在上面輸入想法，按 ✨ 讓 AI 補完，確認後送出。</p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {items.map((item) => (
                 <GenerationCard key={item.id} generation={item} onRemove={() => remove(item.id)} />
               ))}
