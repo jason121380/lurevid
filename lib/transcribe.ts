@@ -7,7 +7,7 @@ import type { Uploadable } from "openai";
 import { openaiClient } from "@/lib/openai";
 import { ffmpegPath } from "@/lib/ffmpeg";
 import { getAppSettings } from "@/lib/settings";
-import { withYtdlpCookies } from "@/lib/ytdlp";
+import { hasYtdlpCookies, withYtdlpCookies } from "@/lib/ytdlp";
 
 /**
  * 來源平台白名單。刻意維持狹窄：每個平台都要明確列出網域與允許的路徑，
@@ -111,12 +111,20 @@ function formatTimestampedTranscript(result: {
  * 把 yt-dlp／下載失敗的原始錯誤轉成乾淨的使用者訊息，
  * 不外洩原始 stderr、影片 ID 或網址（符合專案的錯誤訊息規範）。
  */
-export function describeDownloadError(error: unknown, sourceUrl?: string): Error {
+export function describeDownloadError(error: unknown, options?: { sourceUrl?: string; hasCookies?: boolean }): Error {
   const text = (error instanceof Error ? error.message : String(error || "")).toLowerCase();
-  // 限時動態就算是分享連結，沒有登入 cookies 幾乎一定失敗，直接講清楚要怎麼解。
-  if (sourceUrl && isStoryUrl(sourceUrl)) {
+  const isStory = Boolean(options?.sourceUrl && isStoryUrl(options.sourceUrl));
+
+  // 沒設 cookies：限時動態幾乎一定失敗，直接講要怎麼解。
+  if (isStory && !options?.hasCookies) {
     return new Error(
       "限時動態需要登入才能下載。請在設定頁填入 yt-dlp cookies（Netscape 格式），或改用公開的 Reels／TikTok 連結，也可以下載後改用上傳影片。"
+    );
+  }
+  // 已經設了 cookies 還是失敗：叫使用者再去填一次 cookies 沒有意義，要給不同的下一步。
+  if (isStory) {
+    return new Error(
+      "限時動態下載失敗。cookies 可能已過期（請重新匯出一份），或該動態已超過 24 小時失效；也可能是此伺服器 IP 被平台阻擋。可改用「上傳影片」。"
     );
   }
   if (/rehydration|unable to extract|extractor|unable to download webpage/.test(text)) {
@@ -158,7 +166,7 @@ export async function fetchTranscript(url: string): Promise<string> {
         ])
       );
     } catch (error) {
-      throw describeDownloadError(error, normalizedUrl);
+      throw describeDownloadError(error, { sourceUrl: normalizedUrl, hasCookies: await hasYtdlpCookies() });
     }
 
     const files = await readdir(dir);

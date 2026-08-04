@@ -25,3 +25,8 @@ export async function withYtdlpCookies<T>(run: (extraArgs: string[]) => Promise<
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+/** 錯誤訊息要區分「還沒設 cookies」和「設了但還是失敗」，兩者的下一步完全不同。 */
+export async function hasYtdlpCookies() {
+  return Boolean((await getAppSettings()).YTDLP_COOKIES?.trim());
+}

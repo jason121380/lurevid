@@ -7,7 +7,7 @@ import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 import { ffmpegPath } from "@/lib/ffmpeg";
 import { describeDownloadError, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
-import { withYtdlpCookies } from "@/lib/ytdlp";
+import { hasYtdlpCookies, withYtdlpCookies } from "@/lib/ytdlp";
 
 function run(command: string, args: string[]) {
   return new Promise<void>((resolvePromise, reject) => {
@@ -48,7 +48,7 @@ export async function downloadSourceVideo(url: string) {
       ])
     );
   } catch (error) {
-    throw describeDownloadError(error, normalizedUrl);
+    throw describeDownloadError(error, { sourceUrl: normalizedUrl, hasCookies: await hasYtdlpCookies() });
   }
 
   const files = await readdir(dir);

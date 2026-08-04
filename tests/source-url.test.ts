@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectPlatform, isStoryUrl, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
+import { describeDownloadError, detectPlatform, isStoryUrl, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
 
 describe("source URL support", () => {
   it("accepts TikTok URLs", () => {
@@ -69,5 +69,35 @@ describe("Facebook / Instagram stories", () => {
   it("marks reels and TikTok as non-stories", () => {
     expect(isStoryUrl("https://www.instagram.com/reel/ABC123/")).toBe(false);
     expect(isStoryUrl("https://www.tiktok.com/@user/video/123")).toBe(false);
+  });
+});
+
+describe("story download errors", () => {
+  const STORY = "https://www.facebook.com/stories/108389491301288/UzpfSVND/";
+  const REEL = "https://www.instagram.com/reel/ABC123/";
+  const raw = new Error("ERROR: [facebook] Cannot parse data; login required");
+
+  it("tells you to add cookies when none are configured", () => {
+    const message = describeDownloadError(raw, { sourceUrl: STORY, hasCookies: false }).message;
+    expect(message).toContain("填入 yt-dlp cookies");
+  });
+
+  it("stops telling you to add cookies once they are configured", () => {
+    const message = describeDownloadError(raw, { sourceUrl: STORY, hasCookies: true }).message;
+    expect(message).not.toContain("填入 yt-dlp cookies");
+    expect(message).toContain("已過期");
+  });
+
+  it("does not mention cookies for non-story links", () => {
+    const message = describeDownloadError(raw, { sourceUrl: REEL, hasCookies: false }).message;
+    expect(message).not.toContain("cookies");
+  });
+
+  it("never leaks the raw yt-dlp output or the url", () => {
+    for (const options of [{ sourceUrl: STORY, hasCookies: false }, { sourceUrl: STORY, hasCookies: true }]) {
+      const message = describeDownloadError(raw, options).message;
+      expect(message).not.toContain("facebook.com/stories");
+      expect(message).not.toContain("Cannot parse data");
+    }
   });
 });
