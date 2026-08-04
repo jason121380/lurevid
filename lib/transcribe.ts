@@ -7,8 +7,30 @@ import type { Uploadable } from "openai";
 import { openaiClient } from "@/lib/openai";
 import { ffmpegPath } from "@/lib/ffmpeg";
 import { getAppSettings } from "@/lib/settings";
+import { withYtdlpCookies } from "@/lib/ytdlp";
 
-const ALLOWED_HOSTS = ["tiktok.com", "instagram.com"];
+/**
+ * 來源平台白名單。刻意維持狹窄：每個平台都要明確列出網域與允許的路徑，
+ * 新增平台時只改這張表（外加 app/page.tsx 的前端對應檢查）。
+ * paths 為 null 代表該網域不限路徑。
+ */
+const PLATFORMS: Array<{ name: string; hosts: string[]; paths: RegExp[] | null }> = [
+  { name: "TikTok", hosts: ["tiktok.com"], paths: null },
+  // IG：Reels 與限時動態
+  { name: "Instagram", hosts: ["instagram.com"], paths: [/^\/reels?\//i, /^\/stories\//i] },
+  // FB：限時動態（動態牆貼文等其他路徑仍不開放）
+  { name: "Facebook", hosts: ["facebook.com"], paths: [/^\/stories\//i] }
+];
+
+function matchPlatform(parsed: URL) {
+  const host = parsed.hostname.toLowerCase();
+  const platform = PLATFORMS.find((entry) =>
+    entry.hosts.some((base) => host === base || host.endsWith(`.${base}`))
+  );
+  if (!platform) return null;
+  if (platform.paths && !platform.paths.some((pattern) => pattern.test(parsed.pathname))) return null;
+  return platform;
+}
 
 function parseAllowedUrl(url: string): URL | null {
   let parsed: URL;
@@ -18,20 +40,19 @@ function parseAllowedUrl(url: string): URL | null {
     return null;
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-  const host = parsed.hostname.toLowerCase();
-  const allowed = ALLOWED_HOSTS.some((base) => host === base || host.endsWith(`.${base}`));
-  if (!allowed) return null;
-  if ((host === "instagram.com" || host.endsWith(".instagram.com")) && !/^\/reels?\//i.test(parsed.pathname)) return null;
-  return parsed;
+  return matchPlatform(parsed) ? parsed : null;
 }
 
 export function detectPlatform(url: string) {
   const parsed = parseAllowedUrl(url);
   if (!parsed) return "Unknown";
-  const host = parsed.hostname.toLowerCase();
-  if (host === "tiktok.com" || host.endsWith(".tiktok.com")) return "TikTok";
-  if (host === "instagram.com" || host.endsWith(".instagram.com")) return "Instagram";
-  return "Unknown";
+  return matchPlatform(parsed)?.name || "Unknown";
+}
+
+/** 限時動態幾乎都要登入才抓得到，錯誤訊息要能指出這件事。 */
+export function isStoryUrl(url: string) {
+  const parsed = parseAllowedUrl(url);
+  return parsed ? /^\/stories\//i.test(parsed.pathname) : false;
 }
 
 /**
@@ -90,8 +111,14 @@ function formatTimestampedTranscript(result: {
  * 把 yt-dlp／下載失敗的原始錯誤轉成乾淨的使用者訊息，
  * 不外洩原始 stderr、影片 ID 或網址（符合專案的錯誤訊息規範）。
  */
-export function describeDownloadError(error: unknown): Error {
+export function describeDownloadError(error: unknown, sourceUrl?: string): Error {
   const text = (error instanceof Error ? error.message : String(error || "")).toLowerCase();
+  // 限時動態就算是分享連結，沒有登入 cookies 幾乎一定失敗，直接講清楚要怎麼解。
+  if (sourceUrl && isStoryUrl(sourceUrl)) {
+    return new Error(
+      "限時動態需要登入才能下載。請在設定頁填入 yt-dlp cookies（Netscape 格式），或改用公開的 Reels／TikTok 連結，也可以下載後改用上傳影片。"
+    );
+  }
   if (/rehydration|unable to extract|extractor|unable to download webpage/.test(text)) {
     return new Error("來源平台暫時無法下載（可能是平台改版或此伺服器 IP 被限制）。請稍後再試，或改用手動輸入逐字稿。");
   }
@@ -115,20 +142,23 @@ export async function fetchTranscript(url: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "lurevid-"));
   try {
     try {
-      await run("yt-dlp", [
-        "-f",
-        "bestaudio/best",
-        "--no-playlist",
-        "--no-warnings",
-        "--ffmpeg-location",
-        ffmpegPath(),
-        "-o",
-        join(dir, "source.%(ext)s"),
-        "--",
-        normalizedUrl
-      ]);
+      await withYtdlpCookies((cookieArgs) =>
+        run("yt-dlp", [
+          "-f",
+          "bestaudio/best",
+          "--no-playlist",
+          "--no-warnings",
+          ...cookieArgs,
+          "--ffmpeg-location",
+          ffmpegPath(),
+          "-o",
+          join(dir, "source.%(ext)s"),
+          "--",
+          normalizedUrl
+        ])
+      );
     } catch (error) {
-      throw describeDownloadError(error);
+      throw describeDownloadError(error, normalizedUrl);
     }
 
     const files = await readdir(dir);

@@ -7,6 +7,7 @@ import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 import { ffmpegPath } from "@/lib/ffmpeg";
 import { describeDownloadError, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
+import { withYtdlpCookies } from "@/lib/ytdlp";
 
 function run(command: string, args: string[]) {
   return new Promise<void>((resolvePromise, reject) => {
@@ -29,22 +30,25 @@ export async function downloadSourceVideo(url: string) {
   const dir = await mkdtemp(join(tmpdir(), "lurevid-video-"));
   const output = join(dir, "source.%(ext)s");
   try {
-    await run("yt-dlp", [
-      "-f",
-      "bv*+ba/best",
-      "--merge-output-format",
-      "mp4",
-      "--no-playlist",
-      "--no-warnings",
-      "--ffmpeg-location",
-      ffmpegPath(),
-      "-o",
-      output,
-      "--",
-      normalizedUrl
-    ]);
+    await withYtdlpCookies((cookieArgs) =>
+      run("yt-dlp", [
+        "-f",
+        "bv*+ba/best",
+        "--merge-output-format",
+        "mp4",
+        "--no-playlist",
+        "--no-warnings",
+        ...cookieArgs,
+        "--ffmpeg-location",
+        ffmpegPath(),
+        "-o",
+        output,
+        "--",
+        normalizedUrl
+      ])
+    );
   } catch (error) {
-    throw describeDownloadError(error);
+    throw describeDownloadError(error, normalizedUrl);
   }
 
   const files = await readdir(dir);

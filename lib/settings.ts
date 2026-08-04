@@ -86,7 +86,13 @@ export const APP_SETTING_FIELDS = [
   { key: "SMTP_HOST", label: "SMTP 主機（寄信方式選 smtp 時使用）", secret: false, placeholder: "smtp.example.com", envFallback: true },
   { key: "SMTP_PORT", label: "SMTP 埠號（587 用 STARTTLS、465 用 SSL）", secret: false, defaultValue: "587", envFallback: true },
   { key: "SMTP_USER", label: "SMTP 帳號", secret: false, placeholder: "帳號或 API key 使用者名稱", envFallback: true },
-  { key: "SMTP_PASSWORD", label: "SMTP 密碼", secret: true, envFallback: true }
+  { key: "SMTP_PASSWORD", label: "SMTP 密碼", secret: true, envFallback: true },
+  {
+    key: "YTDLP_COOKIES",
+    label: "yt-dlp cookies（Netscape 格式，抓 FB／IG 限時動態需要）",
+    secret: true,
+    envFallback: true
+  }
 ] as const satisfies readonly SettingField[];
 
 export type AppSettingKey = (typeof APP_SETTING_FIELDS)[number]["key"];

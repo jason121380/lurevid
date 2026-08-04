@@ -46,7 +46,8 @@ When the muxed download fails, the worker falls back to an audio-only yt-dlp dow
 
 ## Platforms & Downloads
 
-- Supported source hosts: `tiktok.com` and `instagram.com` (allowlist + `new URL` validation in `lib/transcribe.ts`). Instagram is further restricted to `/reel(s)/` paths. The allowlist is intentionally narrow; adding a platform means extending `ALLOWED_HOSTS` and `detectPlatform` together (and the mirror check in `app/page.tsx`).
+- Supported sources live in one `PLATFORMS` table in `lib/transcribe.ts` (allowlist + `new URL` validation): TikTok (any path), Instagram (`/reel(s)/` and `/stories/`), Facebook (`/stories/` only — the rest of facebook.com stays closed). The allowlist is intentionally narrow; adding a platform means extending that table **and** the mirror check in `app/page.tsx`.
+- FB/IG stories are login-gated, so `YTDLP_COOKIES` (Netscape cookies.txt, admin setting) is passed to yt-dlp via `withYtdlpCookies` in `lib/ytdlp.ts`. It is written to a 0600 temp file and deleted after every download — never log it. Without cookies, `describeDownloadError` tells the user stories need them rather than returning a generic failure.
 - Users can also upload a video file directly (`app/api/projects/upload/route.ts`, accepts MP4 / MOV / WebM up to `DEFAULT_MAX_DOWNLOAD_BYTES`). Uploads skip yt-dlp; the worker analyzes the file in place and an upload is only available for the first analysis (re-analysis needs a re-upload).
 - yt-dlp is installed in the Docker image from the **nightly** channel by default (`YTDLP_CHANNEL=nightly|stable|<tag>`); platforms change often and nightly tracks extractor fixes.
 - The worker self-updates yt-dlp to the latest nightly on startup (best-effort, non-fatal, in `scripts/worker.ts`). Disable with `YTDLP_AUTO_UPDATE=0` when the deploy network can't reach GitHub. This keeps extractors current between image rebuilds.

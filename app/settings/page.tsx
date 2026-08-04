@@ -56,6 +56,13 @@ const groups: SettingGroup[] = [
       "只用於「忘記密碼」的重設信。部署在 Zeabur 請用 zeabur（機房會擋對外 SMTP 埠），只需填寄件人與 API Key；自架或其他主機可改用 smtp。沒設定的話，忘記密碼頁會請使用者聯絡管理員。",
     keys: ["MAIL_PROVIDER", "MAIL_FROM", "ZEABUR_EMAIL_API_KEY", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"],
     requiredKeys: ["MAIL_PROVIDER", "MAIL_FROM"]
+  },
+  {
+    title: "來源下載（選填）",
+    description:
+      "FB／IG 限時動態需要登入才能下載，公開的 Reels 從機房 IP 也常被擋。貼上瀏覽器匯出的 cookies.txt（Netscape 格式）可解決。內容等同登入中的 session，請只用專門的帳號。",
+    keys: ["YTDLP_COOKIES"],
+    requiredKeys: []
   }
 ];
 

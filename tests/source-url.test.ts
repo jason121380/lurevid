@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectPlatform, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
+import { detectPlatform, isStoryUrl, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
 
 describe("source URL support", () => {
   it("accepts TikTok URLs", () => {
@@ -22,5 +22,52 @@ describe("source URL support", () => {
   it("rejects non-Reels Instagram URLs", () => {
     expect(isSupportedSourceUrl("https://www.instagram.com/some-profile/")).toBe(false);
     expect(isSupportedSourceUrl("https://www.instagram.com/p/ABC123/")).toBe(false);
+  });
+});
+
+describe("Facebook / Instagram stories", () => {
+  const FB_STORY =
+    "https://www.facebook.com/stories/108389491301288/UzpfSVNDOjQ1OTY5NjQ0MzA2MjUyMzI=/?view_single=1&source=shared_permalink&mibextid=wwXIfr";
+
+  it("accepts a shared Facebook story permalink", () => {
+    expect(isSupportedSourceUrl(FB_STORY)).toBe(true);
+    expect(detectPlatform(FB_STORY)).toBe("Facebook");
+  });
+
+  it("survives the base64 padding in the story path", () => {
+    expect(normalizeSourceUrl(FB_STORY)).toContain("UzpfSVNDOjQ1OTY5NjQ0MzA2MjUyMzI=");
+  });
+
+  it("accepts Instagram stories alongside reels", () => {
+    const story = "https://www.instagram.com/stories/someone/3512345678901234567/";
+    expect(isSupportedSourceUrl(story)).toBe(true);
+    expect(detectPlatform(story)).toBe("Instagram");
+    expect(isStoryUrl(story)).toBe(true);
+  });
+
+  it("does not open up the rest of Facebook", () => {
+    for (const url of [
+      "https://www.facebook.com/somepage/posts/123",
+      "https://www.facebook.com/watch/?v=123",
+      "https://www.facebook.com/",
+      "https://www.facebook.com/groups/123"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(false);
+    }
+  });
+
+  it("still rejects lookalike hosts", () => {
+    for (const url of [
+      "https://facebook.com.evil.test/stories/1/",
+      "https://notfacebook.com/stories/1/",
+      "https://evil.test/?x=facebook.com/stories/1"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(false);
+    }
+  });
+
+  it("marks reels and TikTok as non-stories", () => {
+    expect(isStoryUrl("https://www.instagram.com/reel/ABC123/")).toBe(false);
+    expect(isStoryUrl("https://www.tiktok.com/@user/video/123")).toBe(false);
   });
 });
