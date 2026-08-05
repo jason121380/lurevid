@@ -20,6 +20,8 @@ function isSupportedVideoUrl(value: string) {
   if (matches("tiktok.com")) return true;
   if (matches("instagram.com")) return /^\/(reels?|stories)\//i.test(parsed.pathname);
   if (matches("facebook.com")) return /^\/stories\//i.test(parsed.pathname);
+  if (matches("youtu.be")) return true;
+  if (matches("youtube.com")) return /^\/(watch$|shorts\/|live\/|embed\/)/i.test(parsed.pathname);
   return false;
 }
 
@@ -37,7 +39,7 @@ export default function HomePage() {
   async function start() {
     if (!trimmedSourceUrl) return;
     if (!isSupportedVideoUrl(trimmedSourceUrl)) {
-      const message = "目前只接受 TikTok、IG Reels／限時動態，或 FB 限時動態連結";
+      const message = "目前接受 TikTok、YouTube、IG Reels／限時動態、FB 限時動態連結";
       setError(message);
       toast(message, "error");
       return;
@@ -136,8 +138,8 @@ export default function HomePage() {
             </button>
             <input
               className="min-w-0 flex-1 border-0 bg-transparent px-1 py-2.5 text-[15px] outline-none placeholder:text-[var(--gray-300)]"
-              placeholder="貼上 TikTok、IG 或 FB 連結"
-              aria-label="TikTok、IG 或 FB 影片連結"
+              placeholder="貼上 TikTok、YouTube、IG 或 FB 連結"
+              aria-label="TikTok、YouTube、IG 或 FB 影片連結"
               type="url"
               inputMode="url"
               enterKeyHint="go"
@@ -167,7 +169,7 @@ export default function HomePage() {
 
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-[12px] text-[var(--gray-500)]">
             <span>支援來源</span>
-            {["TikTok", "IG Reels", "IG／FB 限時動態", "上傳影片"].map((name) => (
+            {["TikTok", "YouTube", "IG Reels", "IG／FB 限時動態", "上傳影片"].map((name) => (
               <span key={name} className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[var(--gray-500)]">
                 {name}
               </span>

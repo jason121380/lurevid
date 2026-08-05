@@ -39,7 +39,9 @@
 
 ## 支援平台與監控
 
-- 支援來源：TikTok、Instagram Reels 與限時動態、Facebook 限時動態（`lib/transcribe.ts` 以 allowlist 驗證；FB 只開放 `/stories/`），或直接上傳影片檔（MP4／MOV／WebM）。
+- 支援來源：TikTok、YouTube（一般影片／Shorts／Live 存檔）、Instagram Reels 與限時動態、Facebook 限時動態
+  （`lib/transcribe.ts` 以 allowlist 驗證；FB 只開放 `/stories/`，YouTube 的頻道與播放清單頁不開放），或直接上傳影片檔（MP4／MOV／WebM）。
+- 影格是**平均取樣整支影片**（預設 8 張），所以長片也能分析到中後段，不是只看開頭。
 - **限時動態需要登入才能下載**：請在 `/settings` 的「來源下載」貼上瀏覽器匯出的 cookies.txt（Netscape 格式）。
   沒有 cookies 時系統會直接說明原因，不會給一個含糊的下載失敗。cookies 等同登入中的 session，建議用專門的帳號。
 - yt-dlp 在 Docker 預設用 nightly 頻道（build arg `YTDLP_CHANNEL=nightly|stable|<版本>`）。

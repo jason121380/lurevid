@@ -19,7 +19,11 @@ const PLATFORMS: Array<{ name: string; hosts: string[]; paths: RegExp[] | null }
   // IG：Reels 與限時動態
   { name: "Instagram", hosts: ["instagram.com"], paths: [/^\/reels?\//i, /^\/stories\//i] },
   // FB：限時動態（動態牆貼文等其他路徑仍不開放）
-  { name: "Facebook", hosts: ["facebook.com"], paths: [/^\/stories\//i] }
+  { name: "Facebook", hosts: ["facebook.com"], paths: [/^\/stories\//i] },
+  // YouTube：一般影片、Shorts、Live 存檔；頻道與播放清單頁不開放
+  { name: "YouTube", hosts: ["youtube.com"], paths: [/^\/watch$/i, /^\/shorts\//i, /^\/live\//i, /^\/embed\//i] },
+  // youtu.be 的路徑本身就是影片 ID
+  { name: "YouTube", hosts: ["youtu.be"], paths: null }
 ];
 
 function matchPlatform(parsed: URL) {

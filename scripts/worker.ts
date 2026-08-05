@@ -144,13 +144,16 @@ async function withProjectSourceVideo<T>(
 }
 
 async function extractAndUploadFrames(projectId: string, videoPath: string, dir: string) {
-  const frames = await extractVideoFrames(videoPath, dir);
+  const { frames, durationSec } = await extractVideoFrames(videoPath, dir);
   const sourceFrameUrls = await Promise.all(
     frames.map((frame, index) =>
       uploadObject(`projects/${projectId}/frames/${String(index + 1).padStart(2, "0")}.jpg`, frameDataUrlToBuffer(frame), "image/jpeg")
     )
   );
-  await prisma.project.update({ where: { id: projectId }, data: { sourceFrameUrls } });
+  await prisma.project.update({
+    where: { id: projectId },
+    data: { sourceFrameUrls, sourceDurationSec: durationSec > 0 ? Math.round(durationSec) : null }
+  });
 }
 
 /** 第 4 步「影片分析」= 視覺分析（用已存影格）＋ 整合逐字稿。不需重新下載。 */

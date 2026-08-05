@@ -18,6 +18,7 @@ export type Project = {
   sourcePlatform?: string;
   sourceVideoUrl?: string;
   sourceFrameUrls?: string[];
+  sourceDurationSec?: number;
   sourceTranscript?: string;
   visualAnalysis?: string;
   analysis?: string;

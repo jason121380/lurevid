@@ -50,9 +50,13 @@ const OPTIMISTIC_STEP_META: Record<number, { key: StepKey; status: string; messa
   8: { key: "video", status: "GENERATING", message: "正在建立 Seedance 影片任務", progress: 0.62 }
 };
 
-// 抽影格間隔為 3 秒（lib/visual.ts 用 fps=1/3），故第 index 張約在 index*3 秒。
-function frameTime(index: number) {
-  const total = index * 3;
+/**
+ * 影格是平均取樣整支影片，所以間隔是「片長 / 影格數」，不是固定 3 秒。
+ * 舊資料沒有 sourceDurationSec，退回舊的 3 秒假設。
+ */
+function frameTime(index: number, durationSec?: number, frameCount?: number) {
+  const interval = durationSec && frameCount ? durationSec / frameCount : 3;
+  const total = Math.round(index * interval);
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
@@ -149,6 +153,14 @@ function sourceEmbedUrl(url?: string) {
   if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
     const tiktokVideoId = parsed.pathname.match(/\/@[^/]+\/video\/(\d+)/i)?.[1];
     return tiktokVideoId ? `https://www.tiktok.com/embed/v2/${tiktokVideoId}` : "";
+  }
+  if (host === "youtu.be") {
+    const id = parsed.pathname.slice(1);
+    return /^[\w-]{6,}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : "";
+  }
+  if (host === "youtube.com" || host.endsWith(".youtube.com")) {
+    const id = parsed.searchParams.get("v") || parsed.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)/i)?.[1] || "";
+    return /^[\w-]{6,}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : "";
   }
   return "";
 }
@@ -593,7 +605,7 @@ export function ProjectClient({ projectId, initialProject }: { projectId: string
               </div>
               <div className="flex items-center justify-between px-3 py-2 text-xs text-[var(--gray-500)]">
                 <span>影格 {String(index + 1).padStart(2, "0")}</span>
-                <span className="tabular-nums text-orange">{frameTime(index)}</span>
+                <span className="tabular-nums text-orange">{frameTime(index, project.sourceDurationSec, project.sourceFrameUrls?.length)}</span>
               </div>
             </article>
           ))}

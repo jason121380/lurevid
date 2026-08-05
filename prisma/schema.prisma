@@ -75,6 +75,8 @@ model Project {
   sourcePlatform     String?
   sourceVideoUrl     String?
   sourceFrameUrls    Json?
+  /// 來源影片長度（秒）。影格是平均取樣，前端要靠它換算每張的時間點。
+  sourceDurationSec  Int?
   steps              Json          @default("{}")
   sourceTranscript   String?       @db.Text
   visualAnalysis     String?       @db.Text

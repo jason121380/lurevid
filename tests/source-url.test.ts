@@ -122,3 +122,47 @@ describe("download error next steps", () => {
     }
   });
 });
+
+describe("YouTube", () => {
+  it("accepts the common video URL shapes", () => {
+    for (const url of [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://youtu.be/dQw4w9WgXcQ",
+      "https://www.youtube.com/shorts/abc123XYZ",
+      "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://www.youtube.com/live/abc123XYZ"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(true);
+      expect(detectPlatform(url)).toBe("YouTube");
+    }
+  });
+
+  it("keeps the video id through normalisation", () => {
+    expect(normalizeSourceUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toContain("v=dQw4w9WgXcQ");
+  });
+
+  it("does not open up channels, playlists or the home page", () => {
+    for (const url of [
+      "https://www.youtube.com/",
+      "https://www.youtube.com/@somechannel",
+      "https://www.youtube.com/playlist?list=PL123",
+      "https://www.youtube.com/results?search_query=x",
+      "https://www.youtube.com/feed/subscriptions"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(false);
+    }
+  });
+
+  it("still rejects lookalike hosts", () => {
+    for (const url of ["https://youtube.com.evil.test/watch?v=1", "https://notyoutube.com/watch?v=1"]) {
+      expect(isSupportedSourceUrl(url)).toBe(false);
+    }
+  });
+
+  it("is not treated as a story, so it never asks for cookies", () => {
+    const url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+    expect(isStoryUrl(url)).toBe(false);
+    expect(describeDownloadError(new Error("boom"), { sourceUrl: url })).not.toBeUndefined();
+    expect(describeDownloadError(new Error("boom"), { sourceUrl: url }).message).not.toContain("cookies");
+  });
+});

@@ -30,6 +30,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         sourcePlatform: project.sourcePlatform || undefined,
         sourceVideoUrl: project.sourceVideoUrl || undefined,
         sourceFrameUrls: stringArray(project.sourceFrameUrls),
+        sourceDurationSec: project.sourceDurationSec ?? undefined,
         sourceTranscript: project.sourceTranscript || undefined,
         visualAnalysis: project.visualAnalysis || undefined,
         analysis: project.analysis || undefined,

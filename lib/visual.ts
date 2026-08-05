@@ -57,25 +57,61 @@ export async function downloadSourceVideo(url: string) {
   return { dir, path: join(dir, video) };
 }
 
+export const FRAME_COUNT = 8;
+
+/**
+ * 用 ffmpeg 自己的輸出讀片長（`ffmpeg -i` 會把 Duration 印在 stderr）。
+ * 這樣不必多帶一個 ffprobe 執行檔。讀不到時回 0，由呼叫端退回固定間隔。
+ */
+function probeDurationSeconds(videoPath: string) {
+  return new Promise<number>((resolvePromise) => {
+    const child = spawn(ffmpegPath(), ["-i", videoPath]);
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", () => resolvePromise(0));
+    // 沒有指定輸出檔時 ffmpeg 一定以非零結束，這裡只要 stderr。
+    child.on("close", () => {
+      const match = stderr.match(/Duration:\s*(\d+):(\d{2}):(\d{2})(?:\.(\d+))?/);
+      if (!match) return resolvePromise(0);
+      const [, h, m, s, frac] = match;
+      const seconds = Number(h) * 3600 + Number(m) * 60 + Number(s) + Number(`0.${frac || 0}`);
+      resolvePromise(Number.isFinite(seconds) && seconds > 0 ? seconds : 0);
+    });
+  });
+}
+
+/**
+ * 平均取樣整支影片，而不是只看開頭。
+ * 舊版固定 fps=1/3 取 8 張，等於永遠只分析前 24 秒——
+ * 對 90 秒的 Reels 就已經失真，YouTube 長片更是完全錯誤。
+ * 回傳 durationSec 讓前端能標出每張影格真正的時間點。
+ */
 export async function extractVideoFrames(videoPath: string, dir: string) {
+  const durationSec = await probeDurationSeconds(videoPath);
+  // 讀不到片長時退回原本的固定間隔，至少還能取到開頭幾張。
+  const fpsFilter = durationSec > 0 ? `fps=${FRAME_COUNT}/${durationSec.toFixed(3)}` : "fps=1/3";
+
   await run(ffmpegPath(), [
     "-y",
     "-i",
     videoPath,
     "-vf",
-    "fps=1/3,scale=720:-1",
+    `${fpsFilter},scale=720:-1`,
     "-frames:v",
-    "8",
+    String(FRAME_COUNT),
     join(dir, "frame-%02d.jpg")
   ]);
 
   const files = (await readdir(dir)).filter((file) => /^frame-\d+\.jpg$/i.test(file)).sort();
-  return Promise.all(
+  const frames = await Promise.all(
     files.map(async (file) => {
       const bytes = await readFile(join(dir, file));
       return `data:image/jpeg;base64,${bytes.toString("base64")}`;
     })
   );
+  return { frames, durationSec };
 }
 
 export async function analyzeVideoFrames(frames: string[], transcript: string, platform: string) {
