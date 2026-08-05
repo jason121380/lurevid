@@ -46,8 +46,9 @@ When the muxed download fails, the worker falls back to an audio-only yt-dlp dow
 
 ## Platforms & Downloads
 
-- Supported sources live in one `PLATFORMS` table in `lib/transcribe.ts` (allowlist + `new URL` validation): TikTok (any path), YouTube (`/watch`, `/shorts/`, `/live/`, `/embed/`, plus any `youtu.be` path — channels, playlists and search stay closed), Instagram (`/reel(s)/` and `/stories/`), Facebook (`/stories/` only — the rest of facebook.com stays closed). The allowlist is intentionally narrow; adding a platform means extending that table **and** the mirror check in `app/page.tsx`.
-- FB/IG stories are login-gated, so `YTDLP_COOKIES` (Netscape cookies.txt, admin setting) is passed to yt-dlp via `withYtdlpCookies` in `lib/ytdlp.ts`. It is written to a 0600 temp file and deleted after every download — never log it. Without cookies, `describeDownloadError` tells the user stories need them rather than returning a generic failure.
+- Supported sources live in one `PLATFORMS` table in `lib/transcribe.ts` (allowlist + `new URL` validation): TikTok (any path) and Instagram (`/reel(s)/` only). YouTube and FB/IG stories were tried and removed — YouTube trips a bot check from datacenter IPs and stories are login-gated, so neither worked reliably from Zeabur. The allowlist is intentionally narrow; adding a platform means extending that table **and** the mirror check in `app/page.tsx`.
+- `YTDLP_COOKIES` (Netscape cookies.txt, optional admin setting) is passed to yt-dlp via `withYtdlpCookies` in `lib/ytdlp.ts` for when a datacenter IP gets a login wall. It is a session credential: written to a 0600 temp file, deleted after every download, never logged. `describeDownloadError` distinguishes "no cookies set" from "cookies set but rejected" so it never asks for what is already there.
+- yt-dlp's own failure text goes to the worker log via `logDownloadFailure`; users only ever see the translated message.
 - Users can also upload a video file directly (`app/api/projects/upload/route.ts`, accepts MP4 / MOV / WebM up to `DEFAULT_MAX_DOWNLOAD_BYTES`). Uploads skip yt-dlp; the worker analyzes the file in place and an upload is only available for the first analysis (re-analysis needs a re-upload).
 - yt-dlp is installed in the Docker image from the **nightly** channel by default (`YTDLP_CHANNEL=nightly|stable|<tag>`); platforms change often and nightly tracks extractor fixes.
 - The worker self-updates yt-dlp to the latest nightly on startup (best-effort, non-fatal, in `scripts/worker.ts`). Disable with `YTDLP_AUTO_UPDATE=0` when the deploy network can't reach GitHub. This keeps extractors current between image rebuilds.
@@ -123,7 +124,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `lib/transcribe.ts`: audio transcription + source-URL allowlist.
 - `lib/mailer.ts`: mail transports (Zeabur Email REST + SMTP) and the password-reset mail template.
 - `lib/password-reset.ts`: reset-token issue/verify/consume helpers.
-- `lib/visual.ts`: video download, frame extraction, visual analysis. `extractVideoFrames` probes the duration from ffmpeg's own stderr and samples `FRAME_COUNT` frames evenly across the whole video, returning `durationSec`. Do not go back to a fixed `fps=1/3`: that only ever covered the first 24 seconds, which silently misrepresents anything longer — most Reels, and every YouTube video. `Project.sourceDurationSec` stores it so the UI can label each frame's real timestamp.
+- `lib/visual.ts`: video download, frame extraction, visual analysis. `extractVideoFrames` probes the duration from ffmpeg's own stderr and samples `FRAME_COUNT` frames evenly across the whole video, returning `durationSec`. Do not go back to a fixed `fps=1/3`: that only ever covered the first 24 seconds, which silently misrepresents anything longer — most Reels, and any longer uploaded file. `Project.sourceDurationSec` stores it so the UI can label each frame's real timestamp.
 - `lib/video.ts` / `lib/ffmpeg.ts`: size-capped video download / shared ffmpeg path (frame extraction + yt-dlp).
 - `lib/safe-fetch.ts`: SSRF guard for fetching upstream URLs.
 - `lib/rate-limit.ts`: Redis-backed rate limiting.

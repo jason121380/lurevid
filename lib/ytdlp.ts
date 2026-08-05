@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { getAppSettings } from "@/lib/settings";
 
 /**
- * FB／IG 限時動態幾乎都要登入才抓得到，公開的 Reels 也常在機房 IP 被擋。
+ * TikTok／IG Reels 的公開連結從機房 IP 常被要求登入或限流。
  * 管理員可在設定頁貼入 Netscape 格式的 cookies.txt，這裡把它寫成暫存檔交給 yt-dlp。
  *
  * cookie 內容等同於登入中的 session，因此：

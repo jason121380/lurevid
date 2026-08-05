@@ -154,14 +154,6 @@ function sourceEmbedUrl(url?: string) {
     const tiktokVideoId = parsed.pathname.match(/\/@[^/]+\/video\/(\d+)/i)?.[1];
     return tiktokVideoId ? `https://www.tiktok.com/embed/v2/${tiktokVideoId}` : "";
   }
-  if (host === "youtu.be") {
-    const id = parsed.pathname.slice(1);
-    return /^[\w-]{6,}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : "";
-  }
-  if (host === "youtube.com" || host.endsWith(".youtube.com")) {
-    const id = parsed.searchParams.get("v") || parsed.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)/i)?.[1] || "";
-    return /^[\w-]{6,}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : "";
-  }
   return "";
 }
 

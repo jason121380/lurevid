@@ -39,12 +39,10 @@
 
 ## 支援平台與監控
 
-- 支援來源：TikTok、YouTube（一般影片／Shorts／Live 存檔）、Instagram Reels 與限時動態、Facebook 限時動態
-  （`lib/transcribe.ts` 以 allowlist 驗證；FB 只開放 `/stories/`，YouTube 的頻道與播放清單頁不開放），或直接上傳影片檔（MP4／MOV／WebM）。
+- 支援來源：TikTok 與 Instagram Reels（`lib/transcribe.ts` 以 allowlist 驗證；IG 僅限 `/reel(s)/`），或直接上傳影片檔（MP4／MOV／WebM）。
 - 影格是**平均取樣整支影片**（預設 8 張），所以長片也能分析到中後段，不是只看開頭。
-- **需要 cookies 的情況**：FB／IG 限時動態本來就要登入；YouTube 從機房 IP 也常被要求「證明你不是機器人」。
-  請在 `/settings` 的「來源下載」貼上瀏覽器匯出的 cookies.txt（Netscape 格式），多站可接在一起貼。
-  沒有 cookies 時系統會直接說明原因，不會給一個含糊的下載失敗。cookies 等同登入中的 session，建議用專門的帳號。
+- **cookies（選填）**：從機房 IP 抓片有時會被要求登入或限流，可在 `/settings` 的「來源下載」貼上瀏覽器匯出的
+  cookies.txt（Netscape 格式）改善。cookies 等同登入中的 session，建議用專門的帳號；留空也能正常使用公開連結。
 - yt-dlp 在 Docker 預設用 nightly 頻道（build arg `YTDLP_CHANNEL=nightly|stable|<版本>`）。
 - 從機房 IP（Zeabur）抓平台影片仍可能被擋，這是平台 IP 封鎖、非程式問題；可改用代理或換公開可下載來源。
 - Worker 每 15 秒寫一次 Redis 心跳，`/health` 用它判斷 worker 是否存活；該頁也能一鍵清除累積的失敗任務紀錄。

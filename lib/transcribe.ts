@@ -16,14 +16,8 @@ import { hasYtdlpCookies, withYtdlpCookies } from "@/lib/ytdlp";
  */
 const PLATFORMS: Array<{ name: string; hosts: string[]; paths: RegExp[] | null }> = [
   { name: "TikTok", hosts: ["tiktok.com"], paths: null },
-  // IG：Reels 與限時動態
-  { name: "Instagram", hosts: ["instagram.com"], paths: [/^\/reels?\//i, /^\/stories\//i] },
-  // FB：限時動態（動態牆貼文等其他路徑仍不開放）
-  { name: "Facebook", hosts: ["facebook.com"], paths: [/^\/stories\//i] },
-  // YouTube：一般影片、Shorts、Live 存檔；頻道與播放清單頁不開放
-  { name: "YouTube", hosts: ["youtube.com"], paths: [/^\/watch$/i, /^\/shorts\//i, /^\/live\//i, /^\/embed\//i] },
-  // youtu.be 的路徑本身就是影片 ID
-  { name: "YouTube", hosts: ["youtu.be"], paths: null }
+  // IG 只開放 Reels；限時動態要登入、留言/貼文頁不是影片，都不在範圍內。
+  { name: "Instagram", hosts: ["instagram.com"], paths: [/^\/reels?\//i] }
 ];
 
 function matchPlatform(parsed: URL) {
@@ -51,12 +45,6 @@ export function detectPlatform(url: string) {
   const parsed = parseAllowedUrl(url);
   if (!parsed) return "Unknown";
   return matchPlatform(parsed)?.name || "Unknown";
-}
-
-/** 限時動態幾乎都要登入才抓得到，錯誤訊息要能指出這件事。 */
-export function isStoryUrl(url: string) {
-  const parsed = parseAllowedUrl(url);
-  return parsed ? /^\/stories\//i.test(parsed.pathname) : false;
 }
 
 /**
@@ -123,46 +111,22 @@ export function logDownloadFailure(scope: string, error: unknown) {
  * 把 yt-dlp／下載失敗的原始錯誤轉成乾淨的使用者訊息，
  * 不外洩原始 stderr、影片 ID 或網址（符合專案的錯誤訊息規範）。
  */
-export function describeDownloadError(error: unknown, options?: { sourceUrl?: string; hasCookies?: boolean }): Error {
+export function describeDownloadError(error: unknown, options?: { hasCookies?: boolean }): Error {
   const text = (error instanceof Error ? error.message : String(error || "")).toLowerCase();
-  const isStory = Boolean(options?.sourceUrl && isStoryUrl(options.sourceUrl));
 
-  // 沒設 cookies：限時動態幾乎一定失敗，直接講要怎麼解。
-  if (isStory && !options?.hasCookies) {
-    return new Error(
-      "限時動態需要登入才能下載。請在設定頁填入 yt-dlp cookies（Netscape 格式），或改用公開的 Reels／TikTok 連結，也可以下載後改用上傳影片。"
-    );
-  }
-  // 已經設了 cookies 還是失敗：叫使用者再去填一次 cookies 沒有意義，要給不同的下一步。
-  if (isStory) {
-    return new Error(
-      "限時動態下載失敗。cookies 可能已過期（請重新匯出一份），或該動態已超過 24 小時失效；也可能是此伺服器 IP 被平台阻擋。可改用「上傳影片」。"
-    );
-  }
-  const platform = options?.sourceUrl ? detectPlatform(options.sourceUrl) : "Unknown";
-
-  // YouTube 從機房 IP 抓片時最常見的就是這個，訊息本身就寫著要用 cookies。
-  if (/not a bot|cookies-from-browser|confirm you|consent/.test(text)) {
+  // 需要登入／被判定為機器人：填 cookies 通常能解，但已經填了就別再叫人填一次。
+  if (/not a bot|cookies-from-browser|confirm you|consent|login|sign in|private|verification|captcha|robot|forbidden|403/.test(text)) {
     return new Error(
       options?.hasCookies
         ? "來源平台要求登入驗證，但目前的 cookies 沒有通過（可能已過期）。請重新匯出一份，或把影片下載到本機後改用「上傳影片」。"
-        : "來源平台要求登入驗證才能下載（機房 IP 特別容易被要求）。請在設定頁填入 yt-dlp cookies，或把影片下載到本機後改用「上傳影片」。"
+        : "此影片需要登入或被來源平台阻擋。可在設定頁填入 yt-dlp cookies，或把影片下載到本機後改用「上傳影片」。"
     );
   }
   if (/rehydration|unable to extract|extractor|unable to download webpage/.test(text)) {
-    // 同樣的症狀在 YouTube 上多半是 IP 被要求驗證，填 cookies 通常就過了。
-    if (platform === "YouTube" && !options?.hasCookies) {
-      return new Error(
-        "YouTube 這次無法解析（機房 IP 常被要求登入驗證，或平台剛改版）。請在設定頁填入 yt-dlp cookies 再試，或把影片下載到本機後改用「上傳影片」。"
-      );
-    }
     return new Error("來源平台暫時無法下載（可能是平台改版或此伺服器 IP 被限制）。請稍後再試，或把影片下載到本機後改用「上傳影片」。");
   }
   if (/429|too many requests|rate.?limit/.test(text)) {
     return new Error("來源平台暫時限流（429）。請稍後再試，或把影片下載到本機後改用「上傳影片」。");
-  }
-  if (/login|sign in|private|verification|captcha|robot|forbidden|403/.test(text)) {
-    return new Error("此影片需要登入或被來源平台阻擋，無法自動下載。請改用公開影片連結，或把影片下載到本機後改用「上傳影片」。");
   }
   return new Error("影片下載失敗。請確認連結有效且為公開影片，稍後再試，或把影片下載到本機後改用「上傳影片」。");
 }
@@ -195,7 +159,7 @@ export async function fetchTranscript(url: string): Promise<string> {
       );
     } catch (error) {
       logDownloadFailure("audio", error);
-      throw describeDownloadError(error, { sourceUrl: normalizedUrl, hasCookies: await hasYtdlpCookies() });
+      throw describeDownloadError(error, { hasCookies: await hasYtdlpCookies() });
     }
 
     const files = await readdir(dir);

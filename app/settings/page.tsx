@@ -60,7 +60,7 @@ const groups: SettingGroup[] = [
   {
     title: "來源下載（選填）",
     description:
-      "YouTube 從機房 IP 常被要求「證明你不是機器人」，FB／IG 限時動態則本來就要登入。貼上瀏覽器匯出的 cookies.txt（Netscape 格式）可解決，多個站台的內容可以直接接在一起貼。內容等同登入中的 session，請只用專門的帳號。",
+      "選填。TikTok／IG 從機房 IP 有時會被要求登入或限流，貼上瀏覽器匯出的 cookies.txt（Netscape 格式）可能改善。內容等同登入中的 session，請只用專門的帳號。留空也能正常使用公開連結。",
     keys: ["YTDLP_COOKIES"],
     requiredKeys: []
   }

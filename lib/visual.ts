@@ -49,7 +49,7 @@ export async function downloadSourceVideo(url: string) {
     );
   } catch (error) {
     logDownloadFailure("video", error);
-    throw describeDownloadError(error, { sourceUrl: normalizedUrl, hasCookies: await hasYtdlpCookies() });
+    throw describeDownloadError(error, { hasCookies: await hasYtdlpCookies() });
   }
 
   const files = await readdir(dir);
@@ -86,7 +86,7 @@ function probeDurationSeconds(videoPath: string) {
 /**
  * 平均取樣整支影片，而不是只看開頭。
  * 舊版固定 fps=1/3 取 8 張，等於永遠只分析前 24 秒——
- * 對 90 秒的 Reels 就已經失真，YouTube 長片更是完全錯誤。
+ * 對 90 秒的 Reels 就已經失真，上傳的長片更是完全錯誤。
  * 回傳 durationSec 讓前端能標出每張影格真正的時間點。
  */
 export async function extractVideoFrames(videoPath: string, dir: string) {
