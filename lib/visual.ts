@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 import { ffmpegPath } from "@/lib/ffmpeg";
-import { describeDownloadError, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/transcribe";
+import { describeDownloadError, isSupportedSourceUrl, logDownloadFailure, normalizeSourceUrl } from "@/lib/transcribe";
 import { hasYtdlpCookies, withYtdlpCookies } from "@/lib/ytdlp";
 
 function run(command: string, args: string[]) {
@@ -48,6 +48,7 @@ export async function downloadSourceVideo(url: string) {
       ])
     );
   } catch (error) {
+    logDownloadFailure("video", error);
     throw describeDownloadError(error, { sourceUrl: normalizedUrl, hasCookies: await hasYtdlpCookies() });
   }
 

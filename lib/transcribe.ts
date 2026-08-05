@@ -112,6 +112,14 @@ function formatTimestampedTranscript(result: {
 }
 
 /**
+ * yt-dlp 的原文只能進伺服器日誌：裡面有 stderr、影片 ID 與網址。
+ * 沒有這行的話，下載失敗時完全查不出原因（平台改版？IP 被擋？要登入？）。
+ */
+export function logDownloadFailure(scope: string, error: unknown) {
+  console.error(`[download:${scope}]`, error instanceof Error ? error.message : error);
+}
+
+/**
  * 把 yt-dlp／下載失敗的原始錯誤轉成乾淨的使用者訊息，
  * 不外洩原始 stderr、影片 ID 或網址（符合專案的錯誤訊息規範）。
  */
@@ -131,7 +139,23 @@ export function describeDownloadError(error: unknown, options?: { sourceUrl?: st
       "限時動態下載失敗。cookies 可能已過期（請重新匯出一份），或該動態已超過 24 小時失效；也可能是此伺服器 IP 被平台阻擋。可改用「上傳影片」。"
     );
   }
+  const platform = options?.sourceUrl ? detectPlatform(options.sourceUrl) : "Unknown";
+
+  // YouTube 從機房 IP 抓片時最常見的就是這個，訊息本身就寫著要用 cookies。
+  if (/not a bot|cookies-from-browser|confirm you|consent/.test(text)) {
+    return new Error(
+      options?.hasCookies
+        ? "來源平台要求登入驗證，但目前的 cookies 沒有通過（可能已過期）。請重新匯出一份，或把影片下載到本機後改用「上傳影片」。"
+        : "來源平台要求登入驗證才能下載（機房 IP 特別容易被要求）。請在設定頁填入 yt-dlp cookies，或把影片下載到本機後改用「上傳影片」。"
+    );
+  }
   if (/rehydration|unable to extract|extractor|unable to download webpage/.test(text)) {
+    // 同樣的症狀在 YouTube 上多半是 IP 被要求驗證，填 cookies 通常就過了。
+    if (platform === "YouTube" && !options?.hasCookies) {
+      return new Error(
+        "YouTube 這次無法解析（機房 IP 常被要求登入驗證，或平台剛改版）。請在設定頁填入 yt-dlp cookies 再試，或把影片下載到本機後改用「上傳影片」。"
+      );
+    }
     return new Error("來源平台暫時無法下載（可能是平台改版或此伺服器 IP 被限制）。請稍後再試，或把影片下載到本機後改用「上傳影片」。");
   }
   if (/429|too many requests|rate.?limit/.test(text)) {
@@ -170,6 +194,7 @@ export async function fetchTranscript(url: string): Promise<string> {
         ])
       );
     } catch (error) {
+      logDownloadFailure("audio", error);
       throw describeDownloadError(error, { sourceUrl: normalizedUrl, hasCookies: await hasYtdlpCookies() });
     }
 

@@ -166,3 +166,45 @@ describe("YouTube", () => {
     expect(describeDownloadError(new Error("boom"), { sourceUrl: url }).message).not.toContain("cookies");
   });
 });
+
+describe("YouTube download failures", () => {
+  const YT = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+
+  it("recognises the bot check and says to add cookies", () => {
+    const raw = new Error("ERROR: [youtube] xx: Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies");
+    expect(describeDownloadError(raw, { sourceUrl: YT, hasCookies: false }).message).toContain("cookies");
+  });
+
+  it("says cookies may be stale rather than asking for them again", () => {
+    const raw = new Error("ERROR: Sign in to confirm you're not a bot");
+    const message = describeDownloadError(raw, { sourceUrl: YT, hasCookies: true }).message;
+    expect(message).toContain("已過期");
+    expect(message).not.toContain("請在設定頁填入");
+  });
+
+  it("suggests cookies for a YouTube extractor failure too", () => {
+    const raw = new Error("ERROR: [youtube] xx: Unable to extract yt initial data");
+    expect(describeDownloadError(raw, { sourceUrl: YT, hasCookies: false }).message).toContain("cookies");
+  });
+
+  it("does not blame cookies once they are set", () => {
+    const raw = new Error("ERROR: [youtube] xx: Unable to extract yt initial data");
+    expect(describeDownloadError(raw, { sourceUrl: YT, hasCookies: true }).message).not.toContain("cookies");
+  });
+
+  it("keeps the generic wording for other platforms", () => {
+    const raw = new Error("ERROR: Unable to extract data");
+    const message = describeDownloadError(raw, { sourceUrl: "https://www.tiktok.com/@u/video/1", hasCookies: false }).message;
+    expect(message).not.toContain("cookies");
+    expect(message).toContain("上傳影片");
+  });
+
+  it("never leaks the raw yt-dlp text", () => {
+    const raw = new Error("ERROR: [youtube] dQw4w9WgXcQ: Unable to extract yt initial data");
+    for (const hasCookies of [true, false]) {
+      const message = describeDownloadError(raw, { sourceUrl: YT, hasCookies }).message;
+      expect(message).not.toContain("dQw4w9WgXcQ");
+      expect(message).not.toContain("yt initial data");
+    }
+  });
+});
