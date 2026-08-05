@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Clapperboard, Home, ImageIcon, Layers, LogOut, Settings } from "lucide-react";
+import { Clapperboard, Home, ImageIcon, Layers, LogOut } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -19,11 +19,9 @@ const QUICK_ITEMS: NavItem[] = [
   { href: "/quick/video", label: "文生影片", icon: Clapperboard, match: (p) => p === "/quick/video" }
 ];
 
-const ADMIN_ITEMS: NavItem[] = [
-  { href: "/health", label: "健康檢查", icon: Activity, match: (p) => p === "/health" },
-  { href: "/usage", label: "用量", icon: BarChart3, match: (p) => p === "/usage" },
-  { href: "/settings", label: "設定", icon: Settings, match: (p) => p === "/settings" }
-];
+// 健康檢查／用量／設定都是從「我的」進去的，所以停在那些頁面時帳號列要維持作用中，
+// 否則側欄會整個沒有選取項目。與底部分頁列的判定一致。
+const ACCOUNT_PATHS = ["/me", "/settings", "/usage", "/health"];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
@@ -45,8 +43,8 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function SideNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const isAdmin = Boolean(session?.user?.isAdmin);
   const email = session?.user?.email || "";
+  const accountActive = ACCOUNT_PATHS.includes(pathname);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-sidenav flex-col border-r border-[var(--border)] bg-[var(--surface)] lg:flex">
@@ -65,25 +63,16 @@ export function SideNav() {
         {QUICK_ITEMS.map((item) => (
           <NavLink key={item.href} item={item} active={item.match(pathname)} />
         ))}
-
-        {isAdmin && (
-          <>
-            <div className="px-3 pb-1 pt-5 text-[11px] font-medium uppercase tracking-wide text-[var(--gray-400)]">管理員</div>
-            {ADMIN_ITEMS.map((item) => (
-              <NavLink key={item.href} item={item} active={item.match(pathname)} />
-            ))}
-          </>
-        )}
       </nav>
 
-      {/* 帳號列同時是「我的」的入口，所以上方導覽不再重複放一個「我的」。 */}
+      {/* 帳號列是「我的」的入口；健康檢查／用量／設定都在那一頁裡，側欄不重複列出。 */}
       <div className="shrink-0 border-t border-[var(--border)] p-3">
         <div className="flex items-center gap-1">
           <Link
             href="/me"
-            aria-current={pathname === "/me" ? "page" : undefined}
+            aria-current={accountActive ? "page" : undefined}
             className={`min-w-0 flex-1 truncate rounded-md px-3 py-2.5 text-[13px] transition ${
-              pathname === "/me"
+              accountActive
                 ? "bg-orange-bg font-medium text-orange"
                 : "text-[var(--gray-600)] hover:bg-[var(--surface-muted)]"
             }`}
