@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Clapperboard, Home, ImageIcon, Layers, LogOut, Settings, User } from "lucide-react";
+import { Activity, BarChart3, Clapperboard, Home, ImageIcon, Layers, LogOut, Settings } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -11,8 +11,7 @@ type NavItem = { href: string; label: string; icon: ComponentType<{ size?: numbe
 
 const MAIN_ITEMS: NavItem[] = [
   { href: "/", label: "首頁", icon: Home, match: (p) => p === "/" },
-  { href: "/projects", label: "專案", icon: Layers, match: (p) => p === "/projects" || p.startsWith("/projects/") },
-  { href: "/me", label: "我的", icon: User, match: (p) => p === "/me" }
+  { href: "/projects", label: "專案", icon: Layers, match: (p) => p === "/projects" || p.startsWith("/projects/") }
 ];
 
 const QUICK_ITEMS: NavItem[] = [
@@ -77,23 +76,32 @@ export function SideNav() {
         )}
       </nav>
 
+      {/* 帳號列同時是「我的」的入口，所以上方導覽不再重複放一個「我的」。 */}
       <div className="shrink-0 border-t border-[var(--border)] p-3">
-        <div className="flex items-center gap-2.5 px-2 pb-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-orange text-[13px] font-semibold text-white">
-            {(email[0] || "?").toUpperCase()}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--gray-500)]" title={email}>
+        <div className="flex items-center gap-1">
+          <Link
+            href="/me"
+            aria-current={pathname === "/me" ? "page" : undefined}
+            className={`min-w-0 flex-1 truncate rounded-md px-3 py-2.5 text-[13px] transition ${
+              pathname === "/me"
+                ? "bg-orange-bg font-medium text-orange"
+                : "text-[var(--gray-600)] hover:bg-[var(--surface-muted)]"
+            }`}
+            title={email || "未登入"}
+          >
             {email || "未登入"}
-          </span>
+          </Link>
+          {/* 只有圖示，所以 aria-label 是螢幕閱讀器唯一的線索。 */}
+          <button
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-[var(--gray-400)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--gray-600)]"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            title="登出"
+            aria-label="登出"
+            type="button"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
-        <button
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-[13px] text-[var(--gray-500)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--gray-600)]"
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          type="button"
-        >
-          <LogOut size={16} />
-          登出
-        </button>
       </div>
     </aside>
   );
