@@ -128,15 +128,15 @@ export function describeDownloadError(error: unknown, options?: { sourceUrl?: st
     );
   }
   if (/rehydration|unable to extract|extractor|unable to download webpage/.test(text)) {
-    return new Error("來源平台暫時無法下載（可能是平台改版或此伺服器 IP 被限制）。請稍後再試，或改用手動輸入逐字稿。");
+    return new Error("來源平台暫時無法下載（可能是平台改版或此伺服器 IP 被限制）。請稍後再試，或把影片下載到本機後改用「上傳影片」。");
   }
   if (/429|too many requests|rate.?limit/.test(text)) {
-    return new Error("來源平台暫時限流（429）。請稍後再試，或改用手動輸入逐字稿。");
+    return new Error("來源平台暫時限流（429）。請稍後再試，或把影片下載到本機後改用「上傳影片」。");
   }
   if (/login|sign in|private|verification|captcha|robot|forbidden|403/.test(text)) {
-    return new Error("此影片需要登入或被來源平台阻擋，無法自動下載。請改用公開影片連結，或手動輸入逐字稿。");
+    return new Error("此影片需要登入或被來源平台阻擋，無法自動下載。請改用公開影片連結，或把影片下載到本機後改用「上傳影片」。");
   }
-  return new Error("影片下載失敗。請確認連結有效且為公開影片，稍後再試，或改用手動輸入逐字稿。");
+  return new Error("影片下載失敗。請確認連結有效且為公開影片，稍後再試，或把影片下載到本機後改用「上傳影片」。");
 }
 
 /**

@@ -101,3 +101,24 @@ describe("story download errors", () => {
     }
   });
 });
+
+describe("download error next steps", () => {
+  const cases = [
+    new Error("ERROR: Unable to extract data"),
+    new Error("HTTP Error 429: Too Many Requests"),
+    new Error("ERROR: login required"),
+    new Error("something else entirely")
+  ];
+
+  it("never points at a feature the app does not have", () => {
+    for (const error of cases) {
+      expect(describeDownloadError(error).message).not.toContain("手動輸入逐字稿");
+    }
+  });
+
+  it("points at uploading, which does exist", () => {
+    for (const error of cases) {
+      expect(describeDownloadError(error).message).toContain("上傳影片");
+    }
+  });
+});
