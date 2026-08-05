@@ -60,7 +60,7 @@ const groups: SettingGroup[] = [
   {
     title: "來源下載（選填）",
     description:
-      "FB／IG 限時動態需要登入才能下載，公開的 Reels 從機房 IP 也常被擋。貼上瀏覽器匯出的 cookies.txt（Netscape 格式）可解決。內容等同登入中的 session，請只用專門的帳號。",
+      "YouTube 從機房 IP 常被要求「證明你不是機器人」，FB／IG 限時動態則本來就要登入。貼上瀏覽器匯出的 cookies.txt（Netscape 格式）可解決，多個站台的內容可以直接接在一起貼。內容等同登入中的 session，請只用專門的帳號。",
     keys: ["YTDLP_COOKIES"],
     requiredKeys: []
   }

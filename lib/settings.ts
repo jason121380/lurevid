@@ -89,7 +89,7 @@ export const APP_SETTING_FIELDS = [
   { key: "SMTP_PASSWORD", label: "SMTP 密碼", secret: true, envFallback: true },
   {
     key: "YTDLP_COOKIES",
-    label: "yt-dlp cookies（Netscape 格式，抓 FB／IG 限時動態需要）",
+    label: "yt-dlp cookies（Netscape 格式；YouTube 驗證、FB／IG 限時動態需要）",
     secret: true,
     envFallback: true
   }
