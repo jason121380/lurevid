@@ -27,6 +27,45 @@ describe("downloadWithCobalt", () => {
     await expect(downloadWithCobalt("https://youtu.be/demo", path, { apiUrl: "" })).resolves.toBe(false);
   });
 
+  it("reports only the HTTP status and safe Cobalt error code", async () => {
+    const path = await outputPath();
+    const fetchImpl: typeof fetch = async () => Response.json({
+      status: "error",
+      error: {
+        code: "error.api.youtube.login",
+        context: { url: "https://secret.example/video", cookie: "private-cookie" }
+      }
+    }, { status: 400 });
+
+    let caught: unknown;
+    try {
+      await downloadWithCobalt("https://youtu.be/demo", path, {
+        apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+        fetchImpl
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toBe("Cobalt API HTTP 400 (error.api.youtube.login)");
+    expect((caught as Error).message).not.toContain("secret.example");
+    expect((caught as Error).message).not.toContain("private-cookie");
+  });
+
+  it("omits unsafe Cobalt error codes from diagnostics", async () => {
+    const path = await outputPath();
+    const fetchImpl: typeof fetch = async () => Response.json({
+      status: "error",
+      error: { code: "token=secret value" }
+    }, { status: 401 });
+
+    await expect(downloadWithCobalt("https://youtu.be/demo", path, {
+      apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+      fetchImpl
+    })).rejects.toThrow("Cobalt API HTTP 401");
+  });
+
   it("removes a seeded output when the Cobalt URL is invalid", async () => {
     const path = await outputPath();
     await writeFile(path, "stale partial video");

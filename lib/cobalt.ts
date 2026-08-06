@@ -19,6 +19,26 @@ function isPositiveSafeInteger(value: number) {
   return Number.isSafeInteger(value) && value > 0;
 }
 
+function safeCobaltErrorCode(value: unknown) {
+  return typeof value === "string" && /^[a-z0-9._-]{1,120}$/i.test(value) ? value : null;
+}
+
+async function describeCobaltHttpError(response: Response) {
+  let code: string | null = null;
+  try {
+    const body = await response.json() as unknown;
+    if (body && typeof body === "object") {
+      const error = (body as { error?: unknown }).error;
+      if (error && typeof error === "object") {
+        code = safeCobaltErrorCode((error as { code?: unknown }).code);
+      }
+    }
+  } catch {
+    // 非 JSON 回應只記錄 HTTP 狀態，避免洩漏上游回應內容。
+  }
+  return `Cobalt API HTTP ${response.status}${code ? ` (${code})` : ""}`;
+}
+
 export async function downloadWithCobalt(
   sourceUrl: string,
   outputPath: string,
@@ -57,7 +77,7 @@ export async function downloadWithCobalt(
       }),
       signal: AbortSignal.timeout(COBALT_API_TIMEOUT_MS)
     });
-    if (!response.ok) throw new Error("Cobalt API 無法使用");
+    if (!response.ok) throw new Error(await describeCobaltHttpError(response));
 
     const result = await response.json() as unknown;
     if (!result || typeof result !== "object") throw new Error("Cobalt 無法提供單一影片");
