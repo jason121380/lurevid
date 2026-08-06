@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { openaiClient } from "@/lib/openai";
 import { getAppSettings } from "@/lib/settings";
 import { ffmpegPath } from "@/lib/ffmpeg";
+import { downloadWithCobalt } from "@/lib/cobalt";
 import { describeDownloadError, isSupportedSourceUrl, logDownloadFailure, normalizeSourceUrl } from "@/lib/transcribe";
 import { hasYtdlpCookies, withYtdlpCookies } from "@/lib/ytdlp";
 
@@ -24,39 +25,64 @@ function run(command: string, args: string[]) {
   });
 }
 
-export async function downloadSourceVideo(url: string) {
-  if (!isSupportedSourceUrl(url)) throw new Error("不支援的來源影片連結");
-  const normalizedUrl = normalizeSourceUrl(url);
-  const dir = await mkdtemp(join(tmpdir(), "lurevid-video-"));
-  const output = join(dir, "source.%(ext)s");
-  try {
-    await withYtdlpCookies((cookieArgs) =>
-      run("yt-dlp", [
-        "-f",
-        "bv*+ba/best",
-        "--merge-output-format",
-        "mp4",
-        "--no-playlist",
-        "--no-warnings",
-        ...cookieArgs,
-        "--ffmpeg-location",
-        ffmpegPath(),
-        "-o",
-        output,
-        "--",
-        normalizedUrl
-      ])
-    );
-  } catch (error) {
-    logDownloadFailure("video", error);
-    throw describeDownloadError(error, { hasCookies: await hasYtdlpCookies() });
-  }
+type SourceDownloadDeps = {
+  cobalt: typeof downloadWithCobalt;
+  ytdlp: (url: string, outputPattern: string) => Promise<void>;
+};
 
-  const files = await readdir(dir);
-  const video = files.find((file) => /^source\.(mp4|webm|mov|mkv|m4v)$/i.test(file));
-  if (!video) throw new Error("yt-dlp 沒有輸出可分析的影片檔");
-  return { dir, path: join(dir, video) };
+async function downloadWithYtdlp(url: string, outputPattern: string) {
+  await withYtdlpCookies((cookieArgs) =>
+    run("yt-dlp", [
+      "-f",
+      "bv*+ba/best",
+      "--merge-output-format",
+      "mp4",
+      "--no-playlist",
+      "--no-warnings",
+      ...cookieArgs,
+      "--ffmpeg-location",
+      ffmpegPath(),
+      "-o",
+      outputPattern,
+      "--",
+      url
+    ])
+  );
 }
+
+export function createSourceVideoDownloader(deps: SourceDownloadDeps) {
+  return async (url: string) => {
+    if (!isSupportedSourceUrl(url)) throw new Error("不支援的來源影片連結");
+    const normalizedUrl = normalizeSourceUrl(url);
+    const dir = await mkdtemp(join(tmpdir(), "lurevid-video-"));
+    const cobaltOutput = join(dir, "source.mp4");
+    const ytdlpOutput = join(dir, "source.%(ext)s");
+    try {
+      let cobaltSucceeded = false;
+      try {
+        cobaltSucceeded = await deps.cobalt(normalizedUrl, cobaltOutput);
+      } catch (error) {
+        console.error("[download:cobalt]", error instanceof Error ? error.message : "unknown error");
+      }
+
+      if (!cobaltSucceeded) await deps.ytdlp(normalizedUrl, ytdlpOutput);
+
+      const files = await readdir(dir);
+      const video = files.find((file) => /^source\.(mp4|webm|mov|mkv|m4v)$/i.test(file));
+      if (!video) throw new Error("yt-dlp 沒有輸出可分析的影片檔");
+      return { dir, path: join(dir, video) };
+    } catch (error) {
+      await rm(dir, { recursive: true, force: true });
+      logDownloadFailure("video", error);
+      throw describeDownloadError(error, { hasCookies: await hasYtdlpCookies() });
+    }
+  };
+}
+
+export const downloadSourceVideo = createSourceVideoDownloader({
+  cobalt: downloadWithCobalt,
+  ytdlp: downloadWithYtdlp
+});
 
 export const FRAME_COUNT = 8;
 
