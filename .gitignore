@@ -5,3 +5,4 @@ storage/generated
 public/generated
 *.log
 tsconfig.tsbuildinfo
+.worktrees/
