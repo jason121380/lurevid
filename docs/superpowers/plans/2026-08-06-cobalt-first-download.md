@@ -25,6 +25,7 @@
 
 - Create `lib/cobalt.ts`: Cobalt request, response validation, tunnel-origin enforcement, and capped file streaming.
 - Create `tests/cobalt.test.ts`: unit coverage for the Cobalt client.
+- Create `lib/source-url.ts`: browser/server-safe shared source URL validation and normalization.
 - Create `tests/source-download.test.ts`: Cobalt-first/fallback orchestration coverage.
 - Modify `lib/visual.ts`: extract yt-dlp download into an injectable unit and orchestrate fallback.
 - Modify `lib/transcribe.ts`: explicit YouTube URL allowlist and platform detection.
@@ -39,6 +40,7 @@
 
 **Files:**
 - Modify: `tests/source-url.test.ts`
+- Create: `lib/source-url.ts`
 - Modify: `lib/transcribe.ts:12-62`
 - Modify: `app/page.tsx:9-43`
 - Modify: `app/api/projects/route.ts:12-60`
@@ -81,7 +83,7 @@ Run: `npm test -- tests/source-url.test.ts`
 
 Expected: the supported YouTube cases fail because the current allowlist returns `false` and `Unknown`.
 
-- [ ] **Step 3: Implement narrow host/path matching in the server allowlist**
+- [ ] **Step 3: Implement narrow host/path matching in a browser/server-safe shared module**
 
 Use platform entries with a path predicate so YouTube `watch` additionally requires a non-empty `v` query, while `/shorts/<id>`, `/live/<id>`, and `youtu.be/<id>` require a non-empty first path segment. Keep exact/subdomain host matching and HTTP(S)-only parsing.
 
@@ -108,9 +110,11 @@ const PLATFORMS: Platform[] = [
 ];
 ```
 
+Export `detectPlatform`, `isSupportedSourceUrl`, and `normalizeSourceUrl` from `lib/source-url.ts`. Re-export them from `lib/transcribe.ts` so existing server imports remain compatible without duplicating the rules.
+
 - [ ] **Step 4: Mirror the same rules and update Traditional Chinese copy on the homepage and API**
 
-Update `isSupportedVideoUrl` in `app/page.tsx` with the same exact host/path/query rules. Change both validation messages to:
+Import `isSupportedSourceUrl` from `@/lib/source-url` in `app/page.tsx` and remove the local `isSupportedVideoUrl` implementation. Change both validation messages to:
 
 ```text
 目前只接受 YouTube、TikTok 或 IG Reels 連結
@@ -131,7 +135,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit URL support**
 
 ```bash
-git add tests/source-url.test.ts lib/transcribe.ts app/page.tsx app/api/projects/route.ts
+git add tests/source-url.test.ts lib/source-url.ts lib/transcribe.ts app/page.tsx app/api/projects/route.ts
 git commit -m "Support YouTube source URLs"
 ```
 
@@ -305,14 +309,14 @@ git commit -m "Add private Cobalt download client"
 **Interfaces:**
 - Consumes: `downloadWithCobalt(sourceUrl, outputPath): Promise<boolean>`
 - Preserves: `downloadSourceVideo(url: string): Promise<{ dir: string; path: string }>`
-- Adds test-only optional dependency boundary: `downloadSourceVideo(url: string, deps?: Partial<SourceDownloadDeps>)`
+- Adds a production composition boundary: `createSourceVideoDownloader(deps: SourceDownloadDeps): (url: string) => Promise<{ dir: string; path: string }>`; `downloadSourceVideo` is the default composed instance.
 
 - [ ] **Step 1: Write failing orchestration tests through injected real functions**
 
 ```ts
 it("uses Cobalt first and skips yt-dlp when Cobalt succeeds", async () => {
   const events: string[] = [];
-  const result = await downloadSourceVideo(YOUTUBE_URL, {
+  const download = createSourceVideoDownloader({
     cobalt: async (_url, outputPath) => {
       events.push("cobalt");
       await writeFile(outputPath, "video");
@@ -320,6 +324,7 @@ it("uses Cobalt first and skips yt-dlp when Cobalt succeeds", async () => {
     },
     ytdlp: async () => events.push("ytdlp")
   });
+  const result = await download(YOUTUBE_URL);
   expect(events).toEqual(["cobalt"]);
   await rm(result.dir, { recursive: true, force: true });
 });
@@ -327,13 +332,14 @@ it("uses Cobalt first and skips yt-dlp when Cobalt succeeds", async () => {
 it("falls back to yt-dlp when Cobalt is disabled or throws", async () => {
   for (const cobalt of [async () => false, async () => { throw new Error("offline"); }]) {
     const events: string[] = [];
-    const result = await downloadSourceVideo(YOUTUBE_URL, {
+    const download = createSourceVideoDownloader({
       cobalt,
       ytdlp: async (url, outputPattern) => {
         events.push(`ytdlp:${url}`);
         await writeFile(outputPattern.replace("%(ext)s", "mp4"), "fallback-video");
       }
     });
+    const result = await download(YOUTUBE_URL);
     expect(events).toContain(`ytdlp:${YOUTUBE_URL}`);
     await rm(result.dir, { recursive: true, force: true });
   }
@@ -344,7 +350,7 @@ it("falls back to yt-dlp when Cobalt is disabled or throws", async () => {
 
 Run: `npm test -- tests/source-download.test.ts`
 
-Expected: FAIL because `downloadSourceVideo` does not accept injected dependencies and always invokes yt-dlp.
+Expected: FAIL because `createSourceVideoDownloader` does not exist and the current implementation always invokes yt-dlp.
 
 - [ ] **Step 3: Extract the existing yt-dlp block and implement fallback**
 
