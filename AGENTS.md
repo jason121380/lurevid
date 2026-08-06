@@ -30,11 +30,11 @@ npm run worker              # 終端機 2：Worker
 
 - 驗證/授權：`lib/auth.ts`、`lib/auth.config.ts`（edge 安全，middleware 用）、`lib/authz.ts`、`lib/project-access.ts`。
   - middleware 跑在 edge，**不可** import Prisma / bcrypt。Credentials provider 只放 `lib/auth.ts`。
-- 安全工具：`lib/safe-fetch.ts`（SSRF 防護）、`lib/rate-limit.ts`、`lib/limits.ts`、`lib/transcribe.ts` 的 URL allowlist。
+- 安全工具：`lib/safe-fetch.ts`（SSRF 防護）、`lib/rate-limit.ts`、`lib/limits.ts`、`lib/source-url.ts` 的 URL allowlist（`lib/transcribe.ts` 僅為相容 re-export）。
 - Worker 韌性：Seedance 輪詢有逾時與 per-scene 容錯；重試是冪等的（保留已成功片段）。
 - 影片合成：用 `lib/ffmpeg.ts` 的 `ffmpegPath()`，合成是重新編碼（非 `-c copy`）。
 - 監控：`scripts/worker.ts` 每 15s 寫 Redis 心跳（`WORKER_HEARTBEAT_KEY`）；`/health`（admin）讀它判斷 worker 是否存活，並顯示 DB/Redis/佇列/金鑰狀態。
-- 平台下載：來源下載順序為自架 Cobalt（有設定時）→ yt-dlp + 選填 cookies → 直接上傳提示。`COBALT_API_URL=http://cobalt-api.zeabur.internal:9000/` 只設定在 Worker；Web 不需要這個變數。yt-dlp 在 Docker 用 nightly（`YTDLP_CHANNEL`）；來源 host allowlist 在 `lib/source-url.ts` 的 `PLATFORMS`，支援公開 YouTube 影片、Shorts、Live replay、TikTok 與 IG Reels，Facebook 與 Instagram Stories 仍不支援。改平台要連同 `app/page.tsx` 的對應檢查一起改。`YTDLP_COOKIES` 為選填（見 `lib/ytdlp.ts`）。另支援直接上傳影片檔（`app/api/projects/upload/route.ts`）。429 是機房 IP 被平台擋，非程式問題。
+- 平台下載：來源下載順序為自架 Cobalt（有設定時）→ yt-dlp + 選填 cookies → 直接上傳提示。`COBALT_API_URL=http://cobalt-api.zeabur.internal:9000/` 只設定在 Worker；Web 不需要這個變數。yt-dlp 在 Docker 用 nightly（`YTDLP_CHANNEL`）；來源 host allowlist 在共用的 `lib/source-url.ts` 的 `PLATFORMS`，支援公開 YouTube 影片、Shorts、Live replay、TikTok 與 IG Reels，Facebook 與 Instagram Stories 仍不支援。首頁與伺服器端共用此 allowlist，改平台時只更新該表。`YTDLP_COOKIES` 為選填（見 `lib/ytdlp.ts`）。另支援直接上傳影片檔（`app/api/projects/upload/route.ts`）。429 是機房 IP 被平台擋，非程式問題。
 - 物件儲存：設定頁文案是 R2 導向，但 env 鍵名仍是 `S3_*`、`lib/storage.ts` 不變。沒設好物件儲存時，跨服務本機磁碟不共用會導致分鏡圖破圖。
 
 ## 驗證

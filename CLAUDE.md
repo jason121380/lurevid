@@ -46,7 +46,7 @@ When the muxed download fails, the worker falls back to an audio-only yt-dlp dow
 
 ## Platforms & Downloads
 
-- 支援來源集中在 `lib/source-url.ts` 的 `PLATFORMS` 表（allowlist + `new URL` 驗證）：公開 YouTube 影片、Shorts、Live replay、TikTok 與 Instagram（僅 `/reel(s)/`）。Facebook 與 Instagram Stories 仍不支援。allowlist 維持嚴格；新增平台時要一併更新該表與 `app/page.tsx` 的鏡像檢查。
+- 支援來源集中在 `lib/source-url.ts` 的 `PLATFORMS` 表（allowlist + `new URL` 驗證）：公開 YouTube 影片、Shorts、Live replay、TikTok 與 Instagram（僅 `/reel(s)/`）。Facebook 與 Instagram Stories 仍不支援。allowlist 維持嚴格；首頁與伺服器端都共用 `lib/source-url.ts`，新增平台時只更新該表。
 - 來源下載順序為自架 Cobalt（有設定時）→ yt-dlp + 選填 cookies → 直接上傳提示。`COBALT_API_URL=http://cobalt-api.zeabur.internal:9000/` 只設定在 Worker；Web 不需要這個變數。
 - `YTDLP_COOKIES` (Netscape cookies.txt, optional admin setting) is passed to yt-dlp via `withYtdlpCookies` in `lib/ytdlp.ts` for when a datacenter IP gets a login wall. It is a session credential: written to a 0600 temp file, deleted after every download, never logged. `describeDownloadError` distinguishes "no cookies set" from "cookies set but rejected" so it never asks for what is already there.
 - yt-dlp's own failure text goes to the worker log via `logDownloadFailure`; users only ever see the translated message.
@@ -122,7 +122,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 - `lib/authz.ts`, `lib/project-access.ts`: session + ownership helpers for API routes.
 - `lib/settings.ts`: setting definitions, DB access, and TTL cache.
 - `lib/openai.ts`: text, vision, storyboard, and image-generation OpenAI calls.
-- `lib/transcribe.ts`: audio transcription + source-URL allowlist.
+- `lib/source-url.ts`: 共用的來源 URL allowlist；`lib/transcribe.ts` 僅 re-export 相容層與音訊轉錄。
 - `lib/mailer.ts`: mail transports (Zeabur Email REST + SMTP) and the password-reset mail template.
 - `lib/password-reset.ts`: reset-token issue/verify/consume helpers.
 - `lib/visual.ts`: video download, frame extraction, visual analysis. `extractVideoFrames` probes the duration from ffmpeg's own stderr and samples `FRAME_COUNT` frames evenly across the whole video, returning `durationSec`. Do not go back to a fixed `fps=1/3`: that only ever covered the first 24 seconds, which silently misrepresents anything longer — most Reels, and any longer uploaded file. `Project.sourceDurationSec` stores it so the UI can label each frame's real timestamp.

@@ -151,7 +151,7 @@ export default function HomePage() {
 
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-[12px] text-[var(--gray-500)]">
             <span>支援來源</span>
-            {["TikTok", "IG Reels", "上傳影片"].map((name) => (
+            {["YouTube", "TikTok", "IG Reels", "上傳影片"].map((name) => (
               <span key={name} className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[var(--gray-500)]">
                 {name}
               </span>
