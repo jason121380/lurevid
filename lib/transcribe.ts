@@ -7,59 +7,9 @@ import type { Uploadable } from "openai";
 import { openaiClient } from "@/lib/openai";
 import { ffmpegPath } from "@/lib/ffmpeg";
 import { getAppSettings } from "@/lib/settings";
+import { isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/source-url";
 import { hasYtdlpCookies, withYtdlpCookies } from "@/lib/ytdlp";
-
-/**
- * 來源平台白名單。刻意維持狹窄：每個平台都要明確列出網域與允許的路徑，
- * 新增平台時只改這張表（外加 app/page.tsx 的前端對應檢查）。
- * paths 為 null 代表該網域不限路徑。
- */
-const PLATFORMS: Array<{ name: string; hosts: string[]; paths: RegExp[] | null }> = [
-  { name: "TikTok", hosts: ["tiktok.com"], paths: null },
-  // IG 只開放 Reels；限時動態要登入、留言/貼文頁不是影片，都不在範圍內。
-  { name: "Instagram", hosts: ["instagram.com"], paths: [/^\/reels?\//i] }
-];
-
-function matchPlatform(parsed: URL) {
-  const host = parsed.hostname.toLowerCase();
-  const platform = PLATFORMS.find((entry) =>
-    entry.hosts.some((base) => host === base || host.endsWith(`.${base}`))
-  );
-  if (!platform) return null;
-  if (platform.paths && !platform.paths.some((pattern) => pattern.test(parsed.pathname))) return null;
-  return platform;
-}
-
-function parseAllowedUrl(url: string): URL | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return null;
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-  return matchPlatform(parsed) ? parsed : null;
-}
-
-export function detectPlatform(url: string) {
-  const parsed = parseAllowedUrl(url);
-  if (!parsed) return "Unknown";
-  return matchPlatform(parsed)?.name || "Unknown";
-}
-
-/**
- * 只接受 http(s) 的短影音來源連結。
- * 用 URL 解析（而非寬鬆 regex）以擋掉內網 SSRF 與 yt-dlp 參數注入（例如 `-` 開頭）。
- */
-export function isSupportedSourceUrl(url: string) {
-  return parseAllowedUrl(url) !== null && detectPlatform(url) !== "Unknown";
-}
-
-export function normalizeSourceUrl(url: string) {
-  const parsed = parseAllowedUrl(url);
-  if (!parsed) return url;
-  return parsed.toString();
-}
+export { detectPlatform, isSupportedSourceUrl, normalizeSourceUrl } from "@/lib/source-url";
 
 function run(command: string, args: string[]) {
   return new Promise<void>((resolvePromise, reject) => {

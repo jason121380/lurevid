@@ -5,22 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
-
-function isSupportedVideoUrl(value: string) {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return false;
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-  const host = parsed.hostname.toLowerCase();
-  const matches = (base: string) => host === base || host.endsWith(`.${base}`);
-  // 必須跟 lib/transcribe.ts 的 PLATFORMS 保持一致。
-  if (matches("tiktok.com")) return true;
-  if (matches("instagram.com")) return /^\/reels?\//i.test(parsed.pathname);
-  return false;
-}
+import { isSupportedSourceUrl } from "@/lib/source-url";
 
 export default function HomePage() {
   const router = useRouter();
@@ -35,8 +20,8 @@ export default function HomePage() {
 
   async function start() {
     if (!trimmedSourceUrl) return;
-    if (!isSupportedVideoUrl(trimmedSourceUrl)) {
-      const message = "目前只接受 TikTok 或 IG Reels 連結";
+    if (!isSupportedSourceUrl(trimmedSourceUrl)) {
+      const message = "目前只接受 YouTube、TikTok 或 IG Reels 連結";
       setError(message);
       toast(message, "error");
       return;
@@ -135,8 +120,8 @@ export default function HomePage() {
             </button>
             <input
               className="min-w-0 flex-1 border-0 bg-transparent px-1 py-2.5 text-[15px] outline-none placeholder:text-[var(--gray-300)]"
-              placeholder="貼上 TikTok 或 IG Reels 連結"
-              aria-label="TikTok 或 IG Reels 連結"
+              placeholder="貼上 YouTube、TikTok 或 IG Reels 連結"
+              aria-label="YouTube、TikTok 或 IG Reels 連結"
               type="url"
               inputMode="url"
               enterKeyHint="go"

@@ -41,7 +41,7 @@ describe("source URL support", () => {
   });
 });
 
-describe("platforms deliberately left out", () => {
+describe("source platform boundaries", () => {
   it("rejects Facebook entirely, including stories", () => {
     for (const url of [
       "https://www.facebook.com/stories/108389491301288/UzpfSVND/?view_single=1",
@@ -53,16 +53,26 @@ describe("platforms deliberately left out", () => {
     }
   });
 
-  it("rejects YouTube in all of its URL shapes", () => {
+  it("accepts supported YouTube single-video URLs", () => {
     for (const url of [
       "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       "https://youtu.be/dQw4w9WgXcQ",
       "https://www.youtube.com/shorts/abc123XYZ",
-      "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
-      "https://www.youtube.com/live/abc123XYZ"
+      "https://m.youtube.com/live/abc123XYZ"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(true);
+      expect(detectPlatform(url)).toBe("YouTube");
+    }
+  });
+
+  it("rejects YouTube pages that are not one video", () => {
+    for (const url of [
+      "https://www.youtube.com/",
+      "https://www.youtube.com/@openai",
+      "https://www.youtube.com/playlist?list=PL123",
+      "https://youtu.be/"
     ]) {
       expect(isSupportedSourceUrl(url)).toBe(false);
-      expect(detectPlatform(url)).toBe("Unknown");
     }
   });
 });
