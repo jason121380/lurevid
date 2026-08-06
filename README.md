@@ -1,6 +1,6 @@
 # lurevid
 
-短影音分析創作平台：使用者貼上一支 TikTok 或 Instagram Reels 連結（也可直接上傳影片檔），
+短影音分析創作平台：使用者貼上一支 YouTube、TikTok 或 Instagram Reels 連結（也可直接上傳影片檔），
 系統會下載影片、抽取影格分析畫面分鏡，並把音訊轉成逐字稿。接著依序做
 「分析 → 拆解結構 → 改編腳本」（每步都可編輯後再繼續），
 產生 9 格分鏡與分鏡圖，再合成單張 3×3 參考圖，最後送進 Seedance 2.0 生成最終影片。
@@ -9,7 +9,7 @@
 
 - Next.js App Router + TypeScript
 - Tailwind CSS，視覺參考 `jason121380/luredash`
-- yt-dlp 下載影片與音訊（Docker 內預設用 nightly 版，跟得上 TikTok 改版）
+- 自架 Cobalt 優先下載，失敗時回退 yt-dlp（Docker 內預設用 nightly 版，跟得上平台改版）
 - ffmpeg-static 抽取影片影格，做畫面／字幕／分鏡節奏分析
 - OpenAI 轉錄（`OPENAI_TRANSCRIBE_MODEL`）
 - OpenAI Responses API：`OPENAI_STORY_MODEL` + `OPENAI_PROMPT_MODEL`（視覺分析／內容分析／結構／改編／分鏡）
@@ -39,7 +39,8 @@
 
 ## 支援平台與監控
 
-- 支援來源：TikTok 與 Instagram Reels（`lib/transcribe.ts` 以 allowlist 驗證；IG 僅限 `/reel(s)/`），或直接上傳影片檔（MP4／MOV／WebM）。
+- 支援來源：公開 YouTube 影片、Shorts 與 Live replay，以及 TikTok、Instagram Reels（`lib/source-url.ts` 以 allowlist 驗證；IG 僅限 `/reel(s)/`）；也可直接上傳影片檔（MP4／MOV／WebM）。Facebook 與 Instagram Stories 仍不支援。
+- 來源下載順序為自架 Cobalt（有設定時）→ yt-dlp + 選填 cookies → 直接上傳提示。`COBALT_API_URL` 只設定在 Worker；Web 不需要這個變數。
 - 影格是**平均取樣整支影片**（預設 8 張），所以長片也能分析到中後段，不是只看開頭。
 - **cookies（選填）**：從機房 IP 抓片有時會被要求登入或限流，可在 `/settings` 的「來源下載」貼上瀏覽器匯出的
   cookies.txt（Netscape 格式）改善。cookies 等同登入中的 session，建議用專門的帳號；留空也能正常使用公開連結。
@@ -131,6 +132,12 @@ SMTP_PORT="587"
 SMTP_USER="..."
 SMTP_PASSWORD="..."
 
+# 選填：只設定在 Worker。同一個 Zeabur Project 的自架 Cobalt；失敗時自動回退 yt-dlp。
+COBALT_API_URL="http://cobalt-api.zeabur.internal:9000/"
+
+# 選填：Cobalt 回退的 yt-dlp 可使用 Netscape 格式 cookies.txt；建議改在 /settings 填。
+YTDLP_COOKIES=""
+
 # Worker 合成影片的本機暫存目錄
 STORAGE_DIR="./storage/generated"
 ```
@@ -174,21 +181,23 @@ npm run db:push
 npm run worker
 ```
 
-Web 服務負責使用者介面與 API；Worker 服務負責 OpenAI、Seedance、ffmpeg 合成，並把分鏡圖與成品影片上傳到物件儲存。
+   若同一個 Zeabur Project 已部署自架 Cobalt，只在 Worker 加上 `COBALT_API_URL=http://cobalt-api.zeabur.internal:9000/`；Web 不需要這個變數。
+
+Web 服務負責使用者介面與 API；Worker 服務負責 Cobalt／yt-dlp 下載、OpenAI、Seedance、ffmpeg 合成，並把分鏡圖與成品影片上傳到物件儲存。
 
 ## 工作流程
 
 流程如下，分析與改編階段每步都可停下來讓使用者編輯後再繼續：
 
-1. 使用者貼上 TikTok／IG Reels 連結（或上傳影片檔），Web 建立 project，worker 開始 `full` job。
-2. **分析**：worker 用 yt-dlp 下載影片（上傳檔則直接使用），抽取最多 8 張影格分析畫面、字幕、構圖、剪輯節奏；同時把音訊轉成逐字稿，再用 `OPENAI_STORY_MODEL` 整合分析受眾／賣點／視覺分鏡 → `ANALYSIS_READY`。
+1. 使用者貼上公開 YouTube（影片／Shorts／Live replay）、TikTok 或 IG Reels 連結（或上傳影片檔），Web 建立 project，worker 開始 `full` job；Facebook／Instagram Stories 不支援。
+2. **分析**：worker 依序用自架 Cobalt（有設定時）、yt-dlp + 選填 cookies 下載影片；兩者失敗時提示直接上傳。上傳檔則直接使用，接著抽取最多 8 張影格分析畫面、字幕、構圖、剪輯節奏；同時把音訊轉成逐字稿，再用 `OPENAI_STORY_MODEL` 整合分析受眾／賣點／視覺分鏡 → `ANALYSIS_READY`。
 3. **分析結構**（`structure` job）：拆解 hook／鋪陳／賣點／CTA 與節奏 → `STRUCTURE_READY`。
 4. **改編**（`adapt` job）：改寫成全新原創腳本 → `ADAPT_READY`。
 5. **分鏡**（`storyboard` job）：把腳本拆 9 鏡、產生 prompts 與 9 張分鏡圖（上傳物件儲存）→ `STORYBOARD_READY`。
 6. **合併分鏡**（`mergeStoryboard` job）：把 9 張分鏡圖合成單張 3×3 參考圖（上傳物件儲存）。
 7. **變成影片**（`video` job）：把單張參考圖與整段 prompt 送進 Seedance 一次，完成後下載成 `final.mp4` 上傳物件儲存 → `COMPLETED`。
 
-> ⚠️ 從機房 IP（Zeabur）抓 TikTok／Instagram 影片仍可能被平台阻擋。下載抓取失敗時 project 會進入 `FAILED`，
+> ⚠️ 從機房 IP（Zeabur）抓 YouTube／TikTok／Instagram 影片仍可能被平台阻擋。下載抓取失敗時 project 會進入 `FAILED`，
 > 請確認影片為公開連結，或改用較穩定的網路/代理後重試；也可改用直接上傳影片檔。
 
 預設文字模型是 `gpt-5.4-mini`，預設圖像模型是 `gpt-image-2`，影片檔案轉錄模型預設 `gpt-4o-transcribe`，都可用環境變數或設定頁切換。

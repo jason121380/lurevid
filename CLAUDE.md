@@ -2,15 +2,15 @@
 
 ## Project
 
-`lurevid` is a Next.js + TypeScript app for analyzing and adapting short-form videos from TikTok and Instagram Reels (or a directly uploaded video file).
+`lurevid` 是用於分析與改編公開 YouTube 影片、Shorts、Live replay、TikTok 與 Instagram Reels（或直接上傳影片檔）的 Next.js + TypeScript 應用程式；Facebook 與 Instagram Stories 仍不支援。
 
 The expected user experience:
 
-1. User pastes a TikTok / Instagram Reels URL, or uploads a video file.
-2. App creates a project.
-3. Worker downloads the video, extracts visual frames, transcribes audio, and runs AI analysis.
-4. User reviews/edit analysis, structure, and adapted script.
-5. App generates 9 storyboard scenes and images, merges them into one 3x3 reference image, and sends it to Seedance once to produce the final video.
+1. 使用者貼上公開 YouTube（影片／Shorts／Live replay）、TikTok 或 Instagram Reels URL，或上傳影片檔。
+2. App 建立專案。
+3. Worker 依序以自架 Cobalt（有設定時）→ yt-dlp + 選填 cookies → 直接上傳提示處理來源下載，再抽取視覺影格、轉錄音訊並執行 AI 分析。
+4. 使用者檢閱／編輯分析、結構與改編腳本。
+5. App 產生 9 格分鏡場景與圖片，合併成一張 3x3 參考圖，再送至 Seedance 一次以產生最終影片。
 
 ## Important Behavior
 
@@ -46,10 +46,11 @@ When the muxed download fails, the worker falls back to an audio-only yt-dlp dow
 
 ## Platforms & Downloads
 
-- Supported sources live in one `PLATFORMS` table in `lib/transcribe.ts` (allowlist + `new URL` validation): TikTok (any path) and Instagram (`/reel(s)/` only). YouTube and FB/IG stories were tried and removed — YouTube trips a bot check from datacenter IPs and stories are login-gated, so neither worked reliably from Zeabur. The allowlist is intentionally narrow; adding a platform means extending that table **and** the mirror check in `app/page.tsx`.
+- 支援來源集中在 `lib/source-url.ts` 的 `PLATFORMS` 表（allowlist + `new URL` 驗證）：公開 YouTube 影片、Shorts、Live replay、TikTok 與 Instagram（僅 `/reel(s)/`）。Facebook 與 Instagram Stories 仍不支援。allowlist 維持嚴格；新增平台時要一併更新該表與 `app/page.tsx` 的鏡像檢查。
+- 來源下載順序為自架 Cobalt（有設定時）→ yt-dlp + 選填 cookies → 直接上傳提示。`COBALT_API_URL=http://cobalt-api.zeabur.internal:9000/` 只設定在 Worker；Web 不需要這個變數。
 - `YTDLP_COOKIES` (Netscape cookies.txt, optional admin setting) is passed to yt-dlp via `withYtdlpCookies` in `lib/ytdlp.ts` for when a datacenter IP gets a login wall. It is a session credential: written to a 0600 temp file, deleted after every download, never logged. `describeDownloadError` distinguishes "no cookies set" from "cookies set but rejected" so it never asks for what is already there.
 - yt-dlp's own failure text goes to the worker log via `logDownloadFailure`; users only ever see the translated message.
-- Users can also upload a video file directly (`app/api/projects/upload/route.ts`, accepts MP4 / MOV / WebM up to `DEFAULT_MAX_DOWNLOAD_BYTES`). Uploads skip yt-dlp; the worker analyzes the file in place and an upload is only available for the first analysis (re-analysis needs a re-upload).
+- 使用者也可直接上傳影片檔（`app/api/projects/upload/route.ts`，接受不超過 `DEFAULT_MAX_DOWNLOAD_BYTES` 的 MP4／MOV／WebM）。上傳檔略過 Cobalt 與 yt-dlp，Worker 直接在原處分析；上傳只適用第一次分析，重新分析時需重新上傳。
 - yt-dlp is installed in the Docker image from the **nightly** channel by default (`YTDLP_CHANNEL=nightly|stable|<tag>`); platforms change often and nightly tracks extractor fixes.
 - The worker self-updates yt-dlp to the latest nightly on startup (best-effort, non-fatal, in `scripts/worker.ts`). Disable with `YTDLP_AUTO_UPDATE=0` when the deploy network can't reach GitHub. This keeps extractors current between image rebuilds.
 - Download failures surface a friendly Traditional Chinese message via `describeDownloadError` (`lib/transcribe.ts`); raw yt-dlp stderr / video ids / URLs are never shown to users.
@@ -108,7 +109,7 @@ Transcription model behavior (`lib/transcribe.ts`):
 
 ## Key Files
 
-- `app/page.tsx`: TikTok / IG Reels URL entry + video upload that creates a project.
+- `app/page.tsx`: YouTube／TikTok／IG Reels URL 入口與建立專案的影片上傳。
 - `app/quick/QuickStudio.tsx`, `app/api/quick/*`: the one-shot text-to-image / text-to-video studio.
 - `app/api/projects/route.ts`, `app/api/projects/upload/route.ts`: create-project (URL) and upload-video endpoints.
 - `app/login/page.tsx`, `app/register/page.tsx`: auth pages.
