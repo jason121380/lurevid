@@ -19,15 +19,15 @@ export async function downloadWithCobalt(
   const rawApiUrl = options.apiUrl ?? process.env.COBALT_API_URL ?? "";
   if (!rawApiUrl.trim()) return false;
 
-  let apiUrl: URL;
   try {
-    apiUrl = new URL(rawApiUrl);
-  } catch {
-    throw new Error("Cobalt 設定無效");
-  }
-  if (apiUrl.protocol !== "http:" && apiUrl.protocol !== "https:") throw new Error("Cobalt 設定無效");
+    let apiUrl: URL;
+    try {
+      apiUrl = new URL(rawApiUrl);
+    } catch {
+      throw new Error("Cobalt 設定無效");
+    }
+    if (apiUrl.protocol !== "http:" && apiUrl.protocol !== "https:") throw new Error("Cobalt 設定無效");
 
-  try {
     const fetchImpl = options.fetchImpl ?? fetch;
     const maxBytes = options.maxBytes ?? DEFAULT_MAX_DOWNLOAD_BYTES;
     const response = await fetchImpl(apiUrl, {
@@ -45,12 +45,14 @@ export async function downloadWithCobalt(
     });
     if (!response.ok) throw new Error("Cobalt API 無法使用");
 
-    const result = await response.json() as { status?: string; url?: string };
-    if (result.status !== "tunnel" || !result.url) throw new Error("Cobalt 無法提供單一影片");
+    const result = await response.json() as unknown;
+    if (!result || typeof result !== "object") throw new Error("Cobalt 無法提供單一影片");
+    const { status, url } = result as { status?: string; url?: string };
+    if (status !== "tunnel" || !url) throw new Error("Cobalt 無法提供單一影片");
 
     let tunnelUrl: URL;
     try {
-      tunnelUrl = new URL(result.url);
+      tunnelUrl = new URL(url);
     } catch {
       throw new Error("Cobalt 回傳不安全的下載位置");
     }

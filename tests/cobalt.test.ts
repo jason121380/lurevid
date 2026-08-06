@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +22,15 @@ describe("downloadWithCobalt", () => {
     const path = await outputPath();
 
     await expect(downloadWithCobalt("https://youtu.be/demo", path, { apiUrl: "" })).resolves.toBe(false);
+  });
+
+  it("removes a seeded output when the Cobalt URL is invalid", async () => {
+    const path = await outputPath();
+    await writeFile(path, "stale partial video");
+
+    await expect(downloadWithCobalt("https://youtu.be/demo", path, { apiUrl: "not a URL" })).rejects.toThrow("設定無效");
+
+    expect(existsSync(path)).toBe(false);
   });
 
   it("requests an always-proxied MP4 and writes the tunnel body", async () => {
@@ -99,6 +108,16 @@ describe("downloadWithCobalt", () => {
       apiUrl: "http://cobalt-api.zeabur.internal:9000/",
       fetchImpl
     })).rejects.toThrow("Cobalt");
+  });
+
+  it("rejects a null Cobalt response with a controlled error", async () => {
+    const path = await outputPath();
+    const fetchImpl: typeof fetch = async () => Response.json(null);
+
+    await expect(downloadWithCobalt("https://youtu.be/demo", path, {
+      apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+      fetchImpl
+    })).rejects.toThrow("Cobalt 無法提供單一影片");
   });
 
   it("rejects a declared content length over the limit", async () => {
