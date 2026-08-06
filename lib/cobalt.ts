@@ -5,11 +5,19 @@ import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { pipeline } from "node:stream/promises";
 import { DEFAULT_MAX_DOWNLOAD_BYTES } from "@/lib/safe-fetch";
 
+const COBALT_API_TIMEOUT_MS = 30_000;
+const DEFAULT_COBALT_DOWNLOAD_TIMEOUT_MS = 3_660_000;
+
 export type CobaltDownloadOptions = {
   apiUrl?: string;
   fetchImpl?: typeof fetch;
   maxBytes?: number;
+  downloadTimeoutMs?: number;
 };
+
+function isPositiveSafeInteger(value: number) {
+  return Number.isSafeInteger(value) && value > 0;
+}
 
 export async function downloadWithCobalt(
   sourceUrl: string,
@@ -30,8 +38,14 @@ export async function downloadWithCobalt(
 
     const fetchImpl = options.fetchImpl ?? fetch;
     const maxBytes = options.maxBytes ?? DEFAULT_MAX_DOWNLOAD_BYTES;
+    const downloadTimeoutMs = options.downloadTimeoutMs ?? DEFAULT_COBALT_DOWNLOAD_TIMEOUT_MS;
+    if (!isPositiveSafeInteger(maxBytes) || !isPositiveSafeInteger(downloadTimeoutMs)) {
+      throw new Error("Cobalt 下載設定無效");
+    }
+
     const response = await fetchImpl(apiUrl, {
       method: "POST",
+      redirect: "error",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({
         url: sourceUrl,
@@ -41,7 +55,7 @@ export async function downloadWithCobalt(
         youtubeVideoCodec: "h264",
         youtubeVideoContainer: "mp4"
       }),
-      signal: AbortSignal.timeout(30_000)
+      signal: AbortSignal.timeout(COBALT_API_TIMEOUT_MS)
     });
     if (!response.ok) throw new Error("Cobalt API 無法使用");
 
@@ -60,13 +74,16 @@ export async function downloadWithCobalt(
 
     const tunnel = await fetchImpl(tunnelUrl, {
       redirect: "error",
-      signal: AbortSignal.timeout(30_000)
+      signal: AbortSignal.timeout(downloadTimeoutMs)
     });
     if (!tunnel.ok || !tunnel.body) throw new Error("Cobalt 影片串流無法使用");
 
     const declaredLength = tunnel.headers.get("content-length");
-    if (declaredLength && (!Number.isFinite(Number(declaredLength)) || Number(declaredLength) > maxBytes)) {
-      throw new Error("下載檔案超過大小限制");
+    if (declaredLength !== null) {
+      if (!/^\d+$/.test(declaredLength) || !Number.isSafeInteger(Number(declaredLength))) {
+        throw new Error("Cobalt 影片串流格式無效");
+      }
+      if (Number(declaredLength) > maxBytes) throw new Error("下載檔案超過大小限制");
     }
 
     let downloaded = 0;

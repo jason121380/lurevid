@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { downloadWithCobalt } from "@/lib/cobalt";
 
 const temporaryDirectories: string[] = [];
@@ -14,6 +14,9 @@ async function outputPath() {
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  vi.resetModules();
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })));
 });
 
@@ -61,8 +64,108 @@ describe("downloadWithCobalt", () => {
       videoQuality: "1080",
       youtubeVideoContainer: "mp4"
     });
-    expect(calls[1].init?.redirect).toBe("error");
+    expect(calls.map(({ init }) => init?.redirect)).toEqual(["error", "error"]);
     expect(await readFile(path, "utf8")).toBe("video-bytes");
+  });
+
+  it("uses separate API and download timeouts", async () => {
+    const path = await outputPath();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation(() => new AbortController().signal);
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      if (init?.method === "POST") {
+        return Response.json({
+          status: "tunnel",
+          url: "http://cobalt-api.zeabur.internal:9000/tunnel?id=one"
+        });
+      }
+      return new Response("video-bytes", { status: 200 });
+    };
+
+    await expect(downloadWithCobalt("https://youtu.be/demo", path, {
+      apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+      fetchImpl,
+      downloadTimeoutMs: 3_600_001
+    })).resolves.toBe(true);
+
+    expect(timeout.mock.calls).toEqual([[30_000], [3_600_001]]);
+  });
+
+  it("defaults the download timeout beyond the longest supported video duration", async () => {
+    const path = await outputPath();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation(() => new AbortController().signal);
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      if (init?.method === "POST") {
+        return Response.json({
+          status: "tunnel",
+          url: "http://cobalt-api.zeabur.internal:9000/tunnel?id=one"
+        });
+      }
+      return new Response("video-bytes", { status: 200 });
+    };
+
+    await expect(downloadWithCobalt("https://youtu.be/demo", path, {
+      apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+      fetchImpl
+    })).resolves.toBe(true);
+
+    expect(timeout.mock.calls[0]).toEqual([30_000]);
+    expect(timeout.mock.calls[1][0]).toBeGreaterThan(3_600_000);
+  });
+
+  it.each([NaN, Infinity, 0, -1, 1.5])("rejects invalid maxBytes %s before fetching", async (maxBytes) => {
+    const path = await outputPath();
+    let fetched = false;
+    const fetchImpl: typeof fetch = async () => {
+      fetched = true;
+      return new Response("unexpected");
+    };
+
+    await expect(downloadWithCobalt("https://youtu.be/demo", path, {
+      apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+      fetchImpl,
+      maxBytes
+    })).rejects.toThrow("Cobalt 下載設定無效");
+
+    expect(fetched).toBe(false);
+  });
+
+  it.each([NaN, Infinity, 0, -1, 1.5])(
+    "rejects invalid downloadTimeoutMs %s before fetching",
+    async (downloadTimeoutMs) => {
+      const path = await outputPath();
+      let fetched = false;
+      const fetchImpl: typeof fetch = async () => {
+        fetched = true;
+        return new Response("unexpected");
+      };
+
+      await expect(downloadWithCobalt("https://youtu.be/demo", path, {
+        apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+        fetchImpl,
+        downloadTimeoutMs
+      })).rejects.toThrow("Cobalt 下載設定無效");
+
+      expect(fetched).toBe(false);
+    }
+  );
+
+  it("fails closed when the production byte-limit environment value is invalid", async () => {
+    vi.stubEnv("SAFE_FETCH_MAX_BYTES", "not-a-number");
+    vi.resetModules();
+    const { downloadWithCobalt: downloadWithInvalidEnvironment } = await import("@/lib/cobalt");
+    const path = await outputPath();
+    let fetched = false;
+    const fetchImpl: typeof fetch = async () => {
+      fetched = true;
+      return new Response("unexpected");
+    };
+
+    await expect(downloadWithInvalidEnvironment("https://youtu.be/demo", path, {
+      apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+      fetchImpl
+    })).rejects.toThrow("Cobalt 下載設定無效");
+
+    expect(fetched).toBe(false);
   });
 
   it.each(["redirect", "picker", "local-processing", "error"])(
@@ -140,6 +243,29 @@ describe("downloadWithCobalt", () => {
 
     expect(existsSync(path)).toBe(false);
   });
+
+  it.each(["-1", "1.5", "1e1", "9007199254740992"])(
+    "rejects malformed Content-Length %s",
+    async (contentLength) => {
+      const path = await outputPath();
+      const fetchImpl: typeof fetch = async (_input, init) => {
+        if (init?.method === "POST") {
+          return Response.json({
+            status: "tunnel",
+            url: "http://cobalt-api.zeabur.internal:9000/tunnel?id=one"
+          });
+        }
+        return new Response("video-bytes", { status: 200, headers: { "content-length": contentLength } });
+      };
+
+      await expect(downloadWithCobalt("https://youtu.be/demo", path, {
+        apiUrl: "http://cobalt-api.zeabur.internal:9000/",
+        fetchImpl
+      })).rejects.toThrow("Cobalt 影片串流格式無效");
+
+      expect(existsSync(path)).toBe(false);
+    }
+  );
 
   it("aborts streaming after the accumulated bytes exceed the limit", async () => {
     const path = await outputPath();

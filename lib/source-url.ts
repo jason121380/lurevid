@@ -43,7 +43,7 @@ export function detectPlatform(url: string): Platform["name"] | "Unknown" {
   return parsed ? matchPlatform(parsed)?.name || "Unknown" : "Unknown";
 }
 
-/** 只接受 http(s) 的短影音來源連結。 */
+/** 只接受 http(s) 的支援來源影片連結。 */
 export function isSupportedSourceUrl(url: string) {
   return parseAllowedUrl(url) !== null;
 }
