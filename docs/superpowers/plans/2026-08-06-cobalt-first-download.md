@@ -105,12 +105,14 @@ const PLATFORMS: Platform[] = [
       hasPathId(parsed, /^\/(shorts|live)\/[^/]+/i)
   },
   { name: "YouTube", hosts: ["youtu.be"], accepts: (parsed) => /^\/[^/]+/.test(parsed.pathname) },
-  { name: "TikTok", hosts: ["tiktok.com"], accepts: () => true },
+  { name: "TikTok", hosts: ["tiktok.com"], accepts: (parsed) => /^\/@[^/]+\/video\/[^/]+\/?$/i.test(parsed.pathname) },
   { name: "Instagram", hosts: ["instagram.com"], accepts: (parsed) => /^\/reels?\/[^/]+/i.test(parsed.pathname) }
 ];
 ```
 
 Export `detectPlatform`, `isSupportedSourceUrl`, and `normalizeSourceUrl` from `lib/source-url.ts`. Re-export them from `lib/transcribe.ts` so existing server imports remain compatible without duplicating the rules.
+
+All single-video path patterns must be anchored: accept only one ID segment plus an optional trailing slash. Reject extra path segments for YouTube Shorts/Live, `youtu.be`, TikTok videos, and Instagram Reels.
 
 - [ ] **Step 4: Mirror the same rules and update Traditional Chinese copy on the homepage and API**
 
