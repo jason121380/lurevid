@@ -39,6 +39,17 @@ describe("source URL support", () => {
       expect(isSupportedSourceUrl(url)).toBe(false);
     }
   });
+
+  it("rejects non-canonical TikTok paths", () => {
+    for (const url of [
+      "https://www.tiktok.com/@user",
+      "https://www.tiktok.com/search?q=video",
+      "https://www.tiktok.com/discover",
+      "https://www.tiktok.com/@user/video/1234567890/extra"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(false);
+    }
+  });
 });
 
 describe("source platform boundaries", () => {
@@ -71,6 +82,25 @@ describe("source platform boundaries", () => {
       "https://www.youtube.com/@openai",
       "https://www.youtube.com/playlist?list=PL123",
       "https://youtu.be/"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(false);
+    }
+  });
+
+  it("rejects YouTube video paths with extra segments", () => {
+    for (const url of [
+      "https://www.youtube.com/shorts/abc123XYZ/extra",
+      "https://www.youtube.com/live/abc123XYZ/extra",
+      "https://youtu.be/dQw4w9WgXcQ/extra"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(false);
+    }
+  });
+
+  it("rejects Instagram Reels paths with extra segments", () => {
+    for (const url of [
+      "https://www.instagram.com/reel/ABC123/extra",
+      "https://www.instagram.com/reels/ABC123/extra"
     ]) {
       expect(isSupportedSourceUrl(url)).toBe(false);
     }

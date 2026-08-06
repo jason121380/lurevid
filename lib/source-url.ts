@@ -12,11 +12,11 @@ const PLATFORMS: Platform[] = [
     hosts: ["youtube.com"],
     accepts: (parsed) =>
       (parsed.pathname === "/watch" && Boolean(parsed.searchParams.get("v"))) ||
-      hasPathId(parsed, /^\/(shorts|live)\/[^/]+/i)
+      hasPathId(parsed, /^\/(shorts|live)\/[^/]+\/?$/i)
   },
-  { name: "YouTube", hosts: ["youtu.be"], accepts: (parsed) => /^\/[^/]+/.test(parsed.pathname) },
-  { name: "TikTok", hosts: ["tiktok.com"], accepts: () => true },
-  { name: "Instagram", hosts: ["instagram.com"], accepts: (parsed) => /^\/reels?\/[^/]+/i.test(parsed.pathname) }
+  { name: "YouTube", hosts: ["youtu.be"], accepts: (parsed) => /^\/[^/]+\/?$/.test(parsed.pathname) },
+  { name: "TikTok", hosts: ["tiktok.com"], accepts: (parsed) => /^\/@[^/]+\/video\/[^/]+\/?$/.test(parsed.pathname) },
+  { name: "Instagram", hosts: ["instagram.com"], accepts: (parsed) => /^\/reels?\/[^/]+\/?$/i.test(parsed.pathname) }
 ];
 
 function matchPlatform(parsed: URL) {
