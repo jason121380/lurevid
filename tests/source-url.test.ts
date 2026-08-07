@@ -7,6 +7,26 @@ describe("source URL support", () => {
     expect(detectPlatform("https://www.tiktok.com/@user/video/1234567890")).toBe("TikTok");
   });
 
+  it("accepts the short links TikTok's own share button produces", () => {
+    // App 的「複製連結」給的是 vt./vm. 短網域，網頁版給的是 /t/<id>。
+    // 這些是手機使用者最常貼進來的形狀，擋掉等於大部分 TikTok 連結都用不了。
+    for (const url of [
+      "https://vt.tiktok.com/ZSxxxxxxx/",
+      "https://vm.tiktok.com/ZSxxxxxxx/",
+      "https://www.tiktok.com/t/ZSxxxxxxx/",
+      "https://m.tiktok.com/v/1234567890.html"
+    ]) {
+      expect(isSupportedSourceUrl(url)).toBe(true);
+      expect(detectPlatform(url)).toBe("TikTok");
+    }
+  });
+
+  it("still rejects short-link hosts pointing at more than one path segment", () => {
+    for (const url of ["https://vt.tiktok.com/foo/bar", "https://vm.tiktok.com/"]) {
+      expect(isSupportedSourceUrl(url)).toBe(false);
+    }
+  });
+
   it("accepts Instagram Reels URLs", () => {
     const url = "https://www.instagram.com/reel/ABC123/?igsh=demo";
     expect(isSupportedSourceUrl(url)).toBe(true);
@@ -16,6 +36,12 @@ describe("source URL support", () => {
 
   it("accepts the plural /reels/ spelling", () => {
     expect(isSupportedSourceUrl("https://www.instagram.com/reels/ABC123/")).toBe(true);
+  });
+
+  it("accepts the author-prefixed reel URL IG sometimes hands out", () => {
+    const url = "https://www.instagram.com/someuser/reel/ABC123/";
+    expect(isSupportedSourceUrl(url)).toBe(true);
+    expect(detectPlatform(url)).toBe("Instagram");
   });
 
   it("rejects unsupported protocols and lookalike hosts", () => {

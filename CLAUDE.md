@@ -47,6 +47,7 @@ When the muxed download fails, the worker falls back to an audio-only yt-dlp dow
 ## Platforms & Downloads
 
 - 支援來源集中在 `lib/source-url.ts` 的 `PLATFORMS` 表（allowlist + `new URL` 驗證）：公開 YouTube 影片、Shorts、Live replay、TikTok 與 Instagram（僅 `/reel(s)/`）。Facebook 與 Instagram Stories 仍不支援。allowlist 維持嚴格；首頁與伺服器端都共用 `lib/source-url.ts`，新增平台時只更新該表。
+- TikTok 的 allowlist **必須**同時收 `vt.tiktok.com/<id>`、`vm.tiktok.com/<id>`、`/t/<id>` 與 `/v/<id>.html`，不能只留 `/@user/video/<id>`：App 的「複製連結」給的就是短網域，只收正規路徑等於把大部分手機使用者擋在門外。IG 同理要收 `/<user>/reel/<id>`。
 - 來源下載順序為自架 Cobalt（有設定時）→ yt-dlp + 選填 cookies → 直接上傳提示。`COBALT_API_URL=http://cobalt-api.zeabur.internal:9000/` 只設定在 Worker；Web 不需要這個變數。
 - `YTDLP_COOKIES` (Netscape cookies.txt, optional admin setting) is passed to yt-dlp via `withYtdlpCookies` in `lib/ytdlp.ts` for when a datacenter IP gets a login wall. It is a session credential: written to a 0600 temp file, deleted after every download, never logged. `describeDownloadError` distinguishes "no cookies set" from "cookies set but rejected" so it never asks for what is already there.
 - yt-dlp's own failure text goes to the worker log via `logDownloadFailure`; users only ever see the translated message.

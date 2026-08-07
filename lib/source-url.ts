@@ -15,8 +15,28 @@ const PLATFORMS: Platform[] = [
       hasPathId(parsed, /^\/(shorts|live)\/[^/]+\/?$/i)
   },
   { name: "YouTube", hosts: ["youtu.be"], accepts: (parsed) => /^\/[^/]+\/?$/.test(parsed.pathname) },
-  { name: "TikTok", hosts: ["tiktok.com"], accepts: (parsed) => /^\/@[^/]+\/video\/[^/]+\/?$/.test(parsed.pathname) },
-  { name: "Instagram", hosts: ["instagram.com"], accepts: (parsed) => /^\/reels?\/[^/]+\/?$/i.test(parsed.pathname) }
+  {
+    name: "TikTok",
+    hosts: ["tiktok.com"],
+    accepts: (parsed) =>
+      hasPathId(parsed, /^\/@[^/]+\/video\/[^/]+\/?$/) ||
+      // 短連結：/t/<id> 是網頁版「複製連結」，/v/<id>.html 是舊版行動網頁。
+      hasPathId(parsed, /^\/t\/[^/]+\/?$/i) ||
+      hasPathId(parsed, /^\/v\/[^/]+\.html$/i)
+  },
+  {
+    // TikTok App 的「複製連結」給的就是這兩個網域，路徑只有一個不透明 ID。
+    // 這是手機使用者最常貼進來的形狀，缺了等於大部分 TikTok 連結都貼不進來。
+    name: "TikTok",
+    hosts: ["vm.tiktok.com", "vt.tiktok.com"],
+    accepts: (parsed) => /^\/[^/]+\/?$/.test(parsed.pathname)
+  },
+  {
+    name: "Instagram",
+    // /reel/<id> 與 /reels/<id>，另含 IG 有時會帶上作者的 /<user>/reel/<id>。
+    hosts: ["instagram.com"],
+    accepts: (parsed) => /^\/(?:[^/]+\/)?reels?\/[^/]+\/?$/i.test(parsed.pathname)
+  }
 ];
 
 function matchPlatform(parsed: URL) {
