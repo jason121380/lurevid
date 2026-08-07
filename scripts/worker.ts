@@ -7,7 +7,8 @@ import { Worker } from "bullmq";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/async";
-import { PROJECT_QUEUE_NAME, QUICK_QUEUE_NAME, WORKER_HEARTBEAT_KEY, createRedisConnection, redisConnectionOptions } from "@/lib/queue";
+import { PROJECT_QUEUE_NAME, QUICK_QUEUE_NAME, WORKER_COBALT_KEY, WORKER_HEARTBEAT_KEY, createRedisConnection, redisConnectionOptions } from "@/lib/queue";
+import { probeCobalt } from "@/lib/cobalt";
 import {
   adaptScript,
   generateImageFromPrompt,
@@ -766,6 +767,20 @@ async function sendHeartbeat() {
 }
 sendHeartbeat();
 setInterval(sendHeartbeat, 15000);
+
+// Cobalt 探測：COBALT_API_URL 只設在 Worker，所以只有這裡問得到它通不通。
+// 結果轉述給 /health，否則環境變數打錯只會每次安靜地回退 yt-dlp，畫面上看不出差別。
+// EX 300 > 探測間隔，所以偶爾一次寫入失敗不會讓 /health 直接空掉。
+async function reportCobaltStatus() {
+  try {
+    const probe = await probeCobalt();
+    await heartbeatRedis.set(WORKER_COBALT_KEY, JSON.stringify({ ...probe, at: Date.now() }), "EX", 300);
+  } catch (error) {
+    console.error("cobalt probe failed", error instanceof Error ? error.message : error);
+  }
+}
+reportCobaltStatus();
+setInterval(reportCobaltStatus, 60000);
 
 // 啟動時盡力把 yt-dlp 更新到最新 nightly，跟上 IG/TikTok 改版（失敗不影響啟動）。
 // 設 YTDLP_AUTO_UPDATE=0/false 可關閉（例如網路無法連到 GitHub 時）。

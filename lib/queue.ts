@@ -4,6 +4,8 @@ import IORedis from "ioredis";
 export const PROJECT_QUEUE_NAME = "seedance-projects";
 export const QUICK_QUEUE_NAME = "lurevid-quick";
 export const WORKER_HEARTBEAT_KEY = "lurevid:worker:heartbeat";
+/** Worker 回報的 Cobalt 探測結果。Web 沒有 COBALT_API_URL，只能靠 Worker 轉述。 */
+export const WORKER_COBALT_KEY = "lurevid:worker:cobalt";
 
 export type ProjectAction =
   | "full"

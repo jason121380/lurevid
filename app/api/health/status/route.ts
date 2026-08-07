@@ -5,7 +5,7 @@ import IORedis from "ioredis";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, isResponse } from "@/lib/authz";
 import { getAppSettings } from "@/lib/settings";
-import { PROJECT_QUEUE_NAME, WORKER_HEARTBEAT_KEY } from "@/lib/queue";
+import { PROJECT_QUEUE_NAME, WORKER_COBALT_KEY, WORKER_HEARTBEAT_KEY } from "@/lib/queue";
 import { storageRoot } from "@/lib/video";
 
 export const runtime = "nodejs";
@@ -56,12 +56,33 @@ async function checkDatabase(): Promise<Check> {
   }
 }
 
-async function checkRedisAndWorker(): Promise<{ redis: Check; worker: Check }> {
+const COBALT_LABEL = "Cobalt 下載服務";
+
+/**
+ * Cobalt 的狀態只能由 Worker 轉述：COBALT_API_URL 只設在 Worker，Web 沒有這個變數。
+ * 讀不到紀錄代表 worker 還沒回報過（剛啟動、或跑的是舊版），不代表 Cobalt 壞了。
+ */
+function toCobaltCheck(raw: string | null): Check {
+  if (!raw) {
+    return { key: "cobalt", label: COBALT_LABEL, status: "warn", detail: "worker 尚未回報（剛啟動請稍候，或 worker 版本較舊）" };
+  }
+  try {
+    const report = JSON.parse(raw) as { state?: string; detail?: string };
+    const detail = typeof report.detail === "string" ? report.detail.slice(0, 160) : "";
+    const status: CheckStatus = report.state === "ok" ? "ok" : report.state === "error" ? "error" : "warn";
+    return { key: "cobalt", label: COBALT_LABEL, status, detail: detail || "狀態不明" };
+  } catch {
+    return { key: "cobalt", label: COBALT_LABEL, status: "warn", detail: "worker 回報的格式無法解析" };
+  }
+}
+
+async function checkRedisAndWorker(): Promise<{ redis: Check; worker: Check; cobalt: Check }> {
   const url = process.env.REDIS_URL;
   if (!url) {
     return {
       redis: { key: "redis", label: "Redis", status: "error", detail: "缺少 REDIS_URL" },
-      worker: { key: "worker", label: "Worker 背景服務", status: "error", detail: "無法確認（Redis 未設定）" }
+      worker: { key: "worker", label: "Worker 背景服務", status: "error", detail: "無法確認（Redis 未設定）" },
+      cobalt: { key: "cobalt", label: COBALT_LABEL, status: "warn", detail: "無法確認（Redis 未設定）" }
     };
   }
 
@@ -69,7 +90,10 @@ async function checkRedisAndWorker(): Promise<{ redis: Check; worker: Check }> {
   try {
     await withTimeout(redis.connect(), 3000);
     await withTimeout(redis.ping(), 3000);
-    const beat = await withTimeout(redis.get(WORKER_HEARTBEAT_KEY), 3000);
+    const [beat, cobaltReport] = await withTimeout(
+      Promise.all([redis.get(WORKER_HEARTBEAT_KEY), redis.get(WORKER_COBALT_KEY)]),
+      3000
+    );
 
     const redisCheck: Check = { key: "redis", label: "Redis", status: "ok", detail: "連線正常" };
 
@@ -82,11 +106,12 @@ async function checkRedisAndWorker(): Promise<{ redis: Check; worker: Check }> {
         ? { key: "worker", label: "Worker 背景服務", status: "ok", detail: `運作中（最後心跳 ${Math.max(0, ageSec)} 秒前）` }
         : { key: "worker", label: "Worker 背景服務", status: "error", detail: `心跳過舊（${ageSec} 秒前），worker 可能已停止` };
     }
-    return { redis: redisCheck, worker };
+    return { redis: redisCheck, worker, cobalt: toCobaltCheck(cobaltReport) };
   } catch (error) {
     return {
       redis: { key: "redis", label: "Redis", status: "error", detail: error instanceof Error ? error.message.slice(0, 120) : "連線失敗" },
-      worker: { key: "worker", label: "Worker 背景服務", status: "error", detail: "無法確認（Redis 連線失敗）" }
+      worker: { key: "worker", label: "Worker 背景服務", status: "error", detail: "無法確認（Redis 連線失敗）" },
+      cobalt: { key: "cobalt", label: COBALT_LABEL, status: "warn", detail: "無法確認（Redis 連線失敗）" }
     };
   } finally {
     redis.disconnect();
@@ -259,6 +284,6 @@ export async function GET() {
     configChecks.push({ key: "settings", label: "應用設定", status: "error", detail: "無法讀取設定（資料庫問題？）" });
   }
 
-  const checks: Check[] = [database, redisWorker.redis, redisWorker.worker, queue, ...configChecks];
+  const checks: Check[] = [database, redisWorker.redis, redisWorker.worker, redisWorker.cobalt, queue, ...configChecks];
   return NextResponse.json({ checks, metrics, checkedAt: new Date().toISOString() });
 }

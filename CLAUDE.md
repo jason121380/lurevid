@@ -61,6 +61,7 @@ When the muxed download fails, the worker falls back to an audio-only yt-dlp dow
 
 - `/health` (admin-only page) shows status of PostgreSQL, Redis, the worker, the job queue, and OpenAI/Seedance/R2 configuration. Auto-refreshes; has a "clear failed records" action.
 - The worker writes a Redis heartbeat (`WORKER_HEARTBEAT_KEY` in `lib/queue.ts`, EX 60) every 15s so `/api/health/status` can detect worker liveness.
+- Cobalt status is reported the same way, not checked from Web: `COBALT_API_URL` only exists on the Worker, so only the Worker can tell whether Cobalt is reachable. It runs `probeCobalt` every 60s and writes to `WORKER_COBALT_KEY` (EX 300, comfortably longer than the interval so one failed write doesn't blank the row); `/api/health/status` just relays it. Without this a typo'd hostname silently falls back to yt-dlp on every job and nothing on screen changes. `probeCobalt`'s `detail` is only ever our own copy plus an allowlisted version string — the raw upstream error carries the internal hostname and must not reach the dashboard.
 - Jobs are enqueued with `removeOnComplete` + `removeOnFail: 50` so failed/completed records don't accumulate.
 
 ## Authentication
